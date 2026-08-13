@@ -18,6 +18,24 @@ const zhHant = {
   localeName: "繁中",
   openMenu: "打開選單",
   closeMenu: "關閉選單",
+  admin: {
+    title: "後台登入",
+    email: "電子郵件",
+    code: "驗證碼",
+    sendCode: "發送驗證碼",
+    verify: "登入",
+    sending: "發送中…",
+    verifying: "驗證中…",
+    sentHint: "驗證碼已發送到你的信箱（若 SMTP 已設定）。",
+    dashboard: "後台",
+    signedInAs: "目前登入",
+    logout: "登出",
+    ready: "已登入。內容 CMS 將在後續工單接上。",
+    errorGeneric: "出了點問題，請再試一次。",
+    errorNotAllowed: "此信箱無權限。",
+    errorInvalid: "驗證碼無效或已過期。",
+    errorRate: "請求過於頻繁，請稍後再試。",
+  },
 };
 
 const en = {
@@ -39,6 +57,24 @@ const en = {
   localeName: "EN",
   openMenu: "Open menu",
   closeMenu: "Close menu",
+  admin: {
+    title: "Admin sign-in",
+    email: "Email",
+    code: "One-time code",
+    sendCode: "Send code",
+    verify: "Sign in",
+    sending: "Sending…",
+    verifying: "Verifying…",
+    sentHint: "If SMTP is configured, a code was sent to your inbox.",
+    dashboard: "Admin",
+    signedInAs: "Signed in as",
+    logout: "Sign out",
+    ready: "You are signed in. Content CMS arrives in later tickets.",
+    errorGeneric: "Something went wrong. Try again.",
+    errorNotAllowed: "This email is not allowed.",
+    errorInvalid: "Invalid or expired code.",
+    errorRate: "Too many requests. Please wait.",
+  },
 };
 
 export type Dictionary = typeof zhHant;

@@ -105,27 +105,36 @@ export function Sidebar({
           </nav>
 
           <div className="mt-6 flex gap-2 border-t border-white/10 pt-4">
-            {locales.map((l) => {
-              const rest = pathname.replace(/^\/(zh-Hant|en)/, "") || "";
-              const href = `/${l}${rest}`;
-              const active = l === locale;
-              return (
-                <Link
-                  key={l}
-                  href={href}
-                  onClick={onNavigate}
-                  tabIndex={open ? 0 : -1}
-                  className={`flex-1 rounded-[var(--radius-control)] px-3 py-2 text-center text-xs font-semibold tracking-wide ${
-                    active
-                      ? "bg-white/15 text-white"
-                      : "text-[var(--text-muted)] hover:bg-white/8"
-                  }`}
-                >
-                  {l === "zh-Hant" ? "繁中" : "EN"}
-                </Link>
-              );
-            })}
-          </div>
+          {locales.map((l) => {
+            const rest = pathname.replace(/^\/(zh-Hant|en)/, "") || "";
+            const href = `/${l}${rest}`;
+            const active = l === locale;
+            return (
+              <Link
+                key={l}
+                href={href}
+                onClick={onNavigate}
+                tabIndex={open ? 0 : -1}
+                className={`flex-1 rounded-[var(--radius-control)] px-3 py-2 text-center text-xs font-semibold tracking-wide ${
+                  active
+                    ? "bg-white/15 text-white"
+                    : "text-[var(--text-muted)] hover:bg-white/8"
+                }`}
+              >
+                {l === "zh-Hant" ? "繁中" : "EN"}
+              </Link>
+            );
+          })}
+        </div>
+
+        <Link
+          href={`/${locale}/admin`}
+          onClick={onNavigate}
+          tabIndex={open ? 0 : -1}
+          className="mt-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-[var(--text-muted)] hover:bg-white/8 hover:text-white"
+        >
+          {dict.nav.admin}
+        </Link>
         </div>
       </aside>
     </>

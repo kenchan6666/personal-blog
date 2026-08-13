@@ -42,6 +42,16 @@ Expected when deps are up:
 {"status":"ok","mongo":"up","redis":"up"}
 ```
 
+## Owner OTP auth
+
+Endpoints:
+
+- `POST /api/auth/otp/request` `{ "email": "..." }`
+- `POST /api/auth/otp/verify` `{ "email": "...", "code": "......" }` → `{ "session_token": "..." }`
+- `GET /api/auth/me` with `Authorization: Bearer <token>`
+
+Copy `.env.example` to `.env` and set a Gmail **App Password** in `SMTP_PASSWORD` (same mailbox as `OWNER_EMAIL`). Frontend admin UI: `/zh-Hant/admin/login` (set `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000` if needed).
+
 ## Tests
 
 With `docker compose up -d` running:
