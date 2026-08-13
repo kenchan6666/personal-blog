@@ -24,6 +24,7 @@ export type OwnerSite = {
   skills: Localized;
   experience: Localized;
   publicEmail: string;
+  avatarUrl: string;
   links: OwnerLink[];
 };
 
@@ -46,6 +47,7 @@ export type PublicSite = {
     skills: string;
     experience: string;
     publicEmail: string;
+    avatarUrl: string;
     links: PublicLink[];
   };
 };
@@ -65,8 +67,15 @@ export function emptyOwnerSite(): OwnerSite {
     skills: emptyLocalized(),
     experience: emptyLocalized(),
     publicEmail: "",
+    avatarUrl: "",
     links: [],
   };
+}
+
+export function mediaUrl(path: string): string {
+  if (!path) return "";
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${API_BASE}${path}`;
 }
 
 export function getSessionToken(): string | null {
@@ -161,4 +170,19 @@ export async function saveOwnerSite(
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerSite;
+}
+
+export async function uploadOwnerAvatar(
+  token: string,
+  file: File,
+): Promise<{ avatarUrl: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/owner/avatar`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as { avatarUrl: string };
 }

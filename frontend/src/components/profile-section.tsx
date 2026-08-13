@@ -1,3 +1,5 @@
+import { mediaUrl } from "@/lib/api";
+
 type ProfileLink = {
   label: string;
   url: string;
@@ -15,6 +17,7 @@ export type ProfileContent = {
   skills: string;
   experience: string;
   publicEmail: string;
+  avatarUrl: string;
   links: ProfileLink[];
 };
 
@@ -43,7 +46,9 @@ function Block({
 }
 
 export function ProfileSection({ content }: Props) {
+  const avatarSrc = mediaUrl(content.avatarUrl);
   const hasBody =
+    avatarSrc ||
     content.bio ||
     content.skills ||
     content.experience ||
@@ -61,6 +66,17 @@ export function ProfileSection({ content }: Props) {
         <h2 className="display-font mb-10 text-3xl font-bold tracking-tight">
           {content.title}
         </h2>
+        {avatarSrc ? (
+          <div className="mb-10">
+            <img
+              src={avatarSrc}
+              alt=""
+              width={128}
+              height={128}
+              className="avatar-frame h-32 w-32 object-cover"
+            />
+          </div>
+        ) : null}
         <Block label={content.bioLabel}>{content.bio}</Block>
         <Block label={content.skillsLabel}>{content.skills}</Block>
         <Block label={content.experienceLabel}>{content.experience}</Block>

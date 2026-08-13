@@ -33,6 +33,7 @@ export function mergeProfileContent(dict: Dictionary, site: PublicSite | null) {
     skills: site?.profile.skills ?? "",
     experience: site?.profile.experience ?? "",
     publicEmail: site?.profile.publicEmail ?? "",
+    avatarUrl: site?.profile.avatarUrl ?? "",
     links: site?.profile.links ?? [],
   };
 }

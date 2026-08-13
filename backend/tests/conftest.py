@@ -13,8 +13,8 @@ from app.main import create_app
 from app.models import SiteProfile
 
 
-@pytest.fixture(scope="session")
-def settings() -> Settings:
+@pytest.fixture
+def settings(tmp_path) -> Settings:
     return Settings(
         mongo_uri=os.getenv("MONGO_URI", "mongodb://127.0.0.1:27019"),
         mongo_db=os.getenv("MONGO_DB", "portfolio_test"),
@@ -30,6 +30,7 @@ def settings() -> Settings:
         smtp_user="ynchanhk@gmail.com",
         smtp_password="test",
         smtp_from="ynchanhk@gmail.com",
+        avatar_dir=str(tmp_path / "avatars"),
     )
 
 

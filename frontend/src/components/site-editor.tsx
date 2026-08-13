@@ -7,7 +7,9 @@ import {
   emptyOwnerSite,
   fetchOwnerSite,
   getSessionToken,
+  mediaUrl,
   saveOwnerSite,
+  uploadOwnerAvatar,
   type Localized,
   type OwnerLink,
   type OwnerSite,
@@ -70,6 +72,7 @@ export function SiteEditor({ dict }: Props) {
   const [site, setSite] = useState<OwnerSite>(emptyOwnerSite());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,6 +115,26 @@ export function SiteEditor({ dict }: Props) {
     }));
   }
 
+  async function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    const token = getSessionToken();
+    if (!token) return;
+    setUploading(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const result = await uploadOwnerAvatar(token, file);
+      setSite((prev) => ({ ...prev, avatarUrl: result.avatarUrl }));
+      setMessage(a.avatarUploaded);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
     const token = getSessionToken();
@@ -137,6 +160,35 @@ export function SiteEditor({ dict }: Props) {
   return (
     <form onSubmit={onSave} className="mt-10 max-w-3xl">
       <h2 className="display-font mb-6 text-xl font-bold">{a.siteEditor}</h2>
+
+      <div className="mb-8">
+        <p className="mb-3 text-sm font-semibold">{a.fieldAvatar}</p>
+        <div className="flex flex-wrap items-center gap-5">
+        {site.avatarUrl ? (
+          <img
+            src={mediaUrl(site.avatarUrl)}
+            alt=""
+            width={96}
+            height={96}
+            className="avatar-frame h-24 w-24 object-cover"
+          />
+        ) : (
+          <div className="avatar-frame flex h-24 w-24 items-center justify-center text-xs text-[var(--text-muted)]">
+            {a.noAvatar}
+          </div>
+        )}
+        <label className="btn-ghost cursor-pointer text-sm">
+          {uploading ? a.uploadingAvatar : a.uploadAvatar}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={onAvatarChange}
+            disabled={uploading}
+          />
+        </label>
+        </div>
+      </div>
 
       <BilingualField
         label={a.fieldBrand}

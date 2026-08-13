@@ -5,6 +5,8 @@ from typing import Any
 from beanie import Document
 from pydantic import BaseModel, Field
 
+from app.avatar import avatar_public_url
+
 
 def empty_localized() -> dict[str, str]:
     return {"zh-Hant": "", "en": ""}
@@ -27,9 +29,15 @@ class SiteProfile(Document):
     experience: dict[str, str] = Field(default_factory=empty_localized)
     public_email: str = ""
     links: list[LinkItem] = Field(default_factory=list)
+    avatar_filename: str = ""
 
     class Settings:
         name = "site_profile"
+
+    def avatar_url(self) -> str:
+        if not self.avatar_filename:
+            return ""
+        return avatar_public_url(self.avatar_filename)
 
     def resolve(self, locale: str) -> dict[str, Any]:
         def pick(field: dict[str, str]) -> str:
@@ -49,6 +57,7 @@ class SiteProfile(Document):
                 "skills": pick(self.skills),
                 "experience": pick(self.experience),
                 "publicEmail": self.public_email,
+                "avatarUrl": self.avatar_url(),
                 "links": [
                     {
                         "label": pick(link.label),
@@ -71,5 +80,6 @@ class SiteProfile(Document):
             "skills": self.skills,
             "experience": self.experience,
             "publicEmail": self.public_email,
+            "avatarUrl": self.avatar_url(),
             "links": [link.model_dump() for link in self.links],
         }

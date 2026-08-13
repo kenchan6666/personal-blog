@@ -27,3 +27,6 @@ class Settings(BaseSettings):
     mail_backend: str = "console"
 
     cors_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+
+    avatar_dir: str = "data/avatars"
+    avatar_max_bytes: int = 2 * 1024 * 1024

@@ -52,6 +52,15 @@ Endpoints:
 
 Copy `.env.example` to `.env` and set a Gmail **App Password** in `SMTP_PASSWORD` (same mailbox as `OWNER_EMAIL`). Frontend admin UI: `/zh-Hant/admin/login` (set `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000` if needed).
 
+## Site profile + avatar
+
+- `GET /api/public/site?locale=zh-Hant|en`
+- `GET/PUT /api/owner/site` (Bearer)
+- `POST /api/owner/avatar` multipart field `file` (png/jpeg/webp, Bearer)
+- `GET /api/public/media/avatar/{filename}`
+
+Avatars are stored under `AVATAR_DIR` (default `data/avatars`, gitignored).
+
 ## Tests
 
 With `docker compose up -d` running:

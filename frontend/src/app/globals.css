@@ -179,6 +179,13 @@ a {
   animation: hero-visual-in 520ms 80ms ease both;
 }
 
+.avatar-frame {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--glass-border);
+  background: var(--glass);
+  box-shadow: 0 10px 28px rgba(10, 4, 30, 0.28);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-copy,
   .hero-visual,

@@ -2,16 +2,24 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from beanie import init_beanie
-from fastapi import Depends, FastAPI, Header, HTTPException, Response, status
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 
 from app.auth import AuthService
+from app.avatar import (
+    ensure_avatar_dir,
+    media_type_for_filename,
+    resolve_avatar_path,
+    save_avatar_file,
+)
 from app.config import Settings
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
 from app.models import LinkItem, SiteProfile, empty_localized
@@ -95,10 +103,12 @@ def create_app(
             document_models=[SiteProfile],
         )
         await redis.ping()
+        avatar_dir = ensure_avatar_dir(settings.avatar_dir)
         app.state.mongo = mongo
         app.state.redis = redis
         app.state.settings = settings
         app.state.mailer = resolved_mailer
+        app.state.avatar_dir = avatar_dir
         app.state.auth = AuthService(
             redis=redis,
             settings=settings,
@@ -219,6 +229,36 @@ def create_app(
         ]
         await site.save()
         return site.to_owner_dict()
+
+    @app.post("/api/owner/avatar")
+    async def owner_upload_avatar(
+        file: UploadFile = File(...),
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        site = await get_or_create_site()
+        settings: Settings = app.state.settings
+        directory: Path = app.state.avatar_dir
+        filename = await save_avatar_file(
+            file,
+            directory=directory,
+            max_bytes=settings.avatar_max_bytes,
+            previous_filename=site.avatar_filename or None,
+        )
+        site.avatar_filename = filename
+        await site.save()
+        return {"avatarUrl": site.avatar_url()}
+
+    @app.get("/api/public/media/avatar/{filename}")
+    async def public_avatar(filename: str) -> FileResponse:
+        directory: Path = app.state.avatar_dir
+        path = resolve_avatar_path(directory, filename)
+        if path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        media_type = media_type_for_filename(path.name)
+        return FileResponse(path, media_type=media_type)
 
     return app
 
