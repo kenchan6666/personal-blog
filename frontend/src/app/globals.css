@@ -1,0 +1,195 @@
+@import "tailwindcss";
+
+:root {
+  --bg-deep: #1a0a3e;
+  --bg-mid: #5b21b6;
+  --glass: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --text-primary: #ffffff;
+  --text-muted: rgba(255, 255, 255, 0.72);
+  --accent-cta: #ff5c7a;
+  --accent-cta-end: #ff7a59;
+  --accent-cta-hover: #ff8a9a;
+  --accent-link: #c4b5fd;
+  --radius-control: 999px;
+  --radius-card: 20px;
+  --radius-panel: 24px;
+  --sidebar-width: 16.5rem;
+  --sidebar-rail: 4rem;
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-source-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono);
+  --color-accent-link: var(--accent-link);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-body), system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse 90% 70% at 85% 15%, rgba(167, 139, 250, 0.35), transparent 55%),
+    radial-gradient(ellipse 60% 50% at 10% 80%, rgba(91, 33, 182, 0.55), transparent 50%),
+    linear-gradient(145deg, var(--bg-deep) 0%, #2e1065 42%, var(--bg-mid) 100%);
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(135deg, transparent 40%, rgba(255, 255, 255, 0.04) 41%, transparent 42%),
+    linear-gradient(45deg, transparent 48%, rgba(196, 181, 253, 0.06) 49%, transparent 51%);
+  background-size: 120px 120px, 80px 80px;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 10px 40px rgba(10, 4, 30, 0.28);
+}
+
+.sidebar-panel {
+  border: 1px solid var(--glass-border);
+  background: rgba(26, 10, 62, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 12px 48px rgba(10, 4, 30, 0.45);
+}
+
+.glass-hover {
+  transition:
+    transform 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+.glass-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 14px 44px rgba(10, 4, 30, 0.35);
+}
+
+.btn-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.85rem 1.55rem;
+  border: none;
+  border-radius: var(--radius-control);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: linear-gradient(120deg, var(--accent-cta), var(--accent-cta-end));
+  box-shadow: 0 8px 24px rgba(255, 92, 122, 0.35);
+  transition:
+    transform 180ms ease,
+    filter 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.btn-cta:hover {
+  filter: brightness(1.08);
+  transform: scale(1.03);
+  box-shadow: 0 10px 28px rgba(255, 92, 122, 0.45);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem 1.4rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+  font-weight: 600;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.display-font {
+  font-family: var(--font-display), var(--font-body), sans-serif;
+}
+
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.12em;
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-visual-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.hero-copy {
+  animation: hero-rise 420ms ease both;
+}
+
+.hero-visual {
+  animation: hero-visual-in 520ms 80ms ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-copy,
+  .hero-visual,
+  .glass-hover,
+  .btn-cta {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .glass-hover:hover,
+  .btn-cta:hover {
+    transform: none;
+  }
+}
