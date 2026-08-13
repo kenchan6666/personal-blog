@@ -34,6 +34,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         mongo = AsyncIOMotorClient(settings.mongo_uri)
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         await init_beanie(database=mongo[settings.mongo_db], document_models=[])
+        await redis.ping()
         app.state.mongo = mongo
         app.state.redis = redis
         app.state.settings = settings
