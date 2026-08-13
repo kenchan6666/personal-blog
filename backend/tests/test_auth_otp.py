@@ -33,6 +33,20 @@ async def test_otp_request_sends_code_for_owner_email(client, mailer, settings):
 
 
 @pytest.mark.asyncio
+async def test_otp_verify_rejects_wrong_code(client, settings):
+    await client.post(
+        "/api/auth/otp/request",
+        json={"email": settings.owner_email},
+    )
+    response = await client.post(
+        "/api/auth/otp/verify",
+        json={"email": settings.owner_email, "code": "000000"},
+    )
+    assert response.status_code == 401
+    assert response.json()["detail"] == "invalid_otp"
+
+
+@pytest.mark.asyncio
 async def test_otp_verify_rejects_expired_code(client, mailer, settings, app):
     await client.post(
         "/api/auth/otp/request",
