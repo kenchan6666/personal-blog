@@ -9,6 +9,7 @@ import {
   fetchMe,
   getSessionToken,
 } from "@/lib/api";
+import { SiteEditor } from "./site-editor";
 
 type Props = {
   locale: Locale;
@@ -49,17 +50,22 @@ export function AdminDashboard({ locale, dict }: Props) {
   if (!email) return null;
 
   return (
-    <div className="sidebar-panel max-w-xl rounded-[var(--radius-panel)] p-8">
-      <h1 className="display-font mb-2 text-2xl font-bold">
-        {dict.admin.dashboard}
-      </h1>
-      <p className="mb-6 text-sm text-[var(--text-muted)]">
-        {dict.admin.signedInAs}: {email}
-      </p>
-      <p className="mb-8 text-[var(--text-primary)]">{dict.admin.ready}</p>
-      <button type="button" className="btn-ghost" onClick={logout}>
-        {dict.admin.logout}
-      </button>
+    <div className="sidebar-panel max-w-4xl rounded-[var(--radius-panel)] p-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="display-font mb-2 text-2xl font-bold">
+            {dict.admin.dashboard}
+          </h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            {dict.admin.signedInAs}: {email}
+          </p>
+        </div>
+        <button type="button" className="btn-ghost" onClick={logout}>
+          {dict.admin.logout}
+        </button>
+      </div>
+
+      <SiteEditor dict={dict} />
     </div>
   );
 }

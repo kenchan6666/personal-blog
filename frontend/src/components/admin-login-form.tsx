@@ -19,8 +19,16 @@ function mapError(message: string, dict: Dictionary): string {
       return dict.admin.errorInvalid;
     case "rate_limited":
       return dict.admin.errorRate;
+    case "smtp_failed":
+      return dict.admin.errorSmtp;
+    case "Failed to fetch":
+    case "NetworkError when attempting to fetch resource.":
+      return dict.admin.errorNetwork;
     default:
-      return dict.admin.errorGeneric;
+      if (message.startsWith("http_") || message.includes("Timeout")) {
+        return dict.admin.errorNetwork;
+      }
+      return `${dict.admin.errorGeneric} (${message || "unknown"})`;
   }
 }
 

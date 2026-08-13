@@ -17,7 +17,7 @@ docker compose up -d
 
 Defaults:
 
-- MongoDB: `mongodb://127.0.0.1:27017`
+- MongoDB: `mongodb://127.0.0.1:27019` (host **27019** → container 27017; avoids clashes with other local Mongo on 27017)
 - Redis: `redis://127.0.0.1:6380` (host port **6380** → container 6379)
 
 ## Install & run
@@ -64,13 +64,14 @@ cd backend
 Override URLs if needed:
 
 ```bash
-set MONGO_URI=mongodb://127.0.0.1:27017
+set MONGO_URI=mongodb://127.0.0.1:27019
 set REDIS_URL=redis://127.0.0.1:6380/15
 pytest -v
 ```
 
 ## Layout
 
-- `app/main.py` — app factory, lifespan, health route
+- `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
+- `app/models.py` — Beanie documents (SiteProfile)
 - `tests/` — HTTP-seam integration tests

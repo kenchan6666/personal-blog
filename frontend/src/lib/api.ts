@@ -3,6 +3,72 @@ const API_BASE =
 
 export const SESSION_KEY = "portfolio_session_token";
 
+export type Localized = {
+  "zh-Hant": string;
+  en: string;
+};
+
+export type OwnerLink = {
+  label: Localized;
+  url: string;
+  order: number;
+};
+
+export type OwnerSite = {
+  brand: Localized;
+  heroHeadline: Localized;
+  heroSupport: Localized;
+  heroCtaProjects: Localized;
+  heroCtaArticles: Localized;
+  bio: Localized;
+  skills: Localized;
+  experience: Localized;
+  publicEmail: string;
+  links: OwnerLink[];
+};
+
+export type PublicLink = {
+  label: string;
+  url: string;
+  order: number;
+};
+
+export type PublicSite = {
+  brand: string;
+  hero: {
+    headline: string;
+    support: string;
+    ctaProjects: string;
+    ctaArticles: string;
+  };
+  profile: {
+    bio: string;
+    skills: string;
+    experience: string;
+    publicEmail: string;
+    links: PublicLink[];
+  };
+};
+
+export function emptyLocalized(): Localized {
+  return { "zh-Hant": "", en: "" };
+}
+
+export function emptyOwnerSite(): OwnerSite {
+  return {
+    brand: emptyLocalized(),
+    heroHeadline: emptyLocalized(),
+    heroSupport: emptyLocalized(),
+    heroCtaProjects: emptyLocalized(),
+    heroCtaArticles: emptyLocalized(),
+    bio: emptyLocalized(),
+    skills: emptyLocalized(),
+    experience: emptyLocalized(),
+    publicEmail: "",
+    links: [],
+  };
+}
+
 export function getSessionToken(): string | null {
   if (typeof window === "undefined") return null;
   return window.localStorage.getItem(SESSION_KEY);
@@ -27,11 +93,16 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function requestOtp(email: string) {
-  const res = await fetch(`${API_BASE}/api/auth/otp/request`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/auth/otp/request`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    throw new Error("Failed to fetch");
+  }
   if (!res.ok) throw new Error(await parseError(res));
   return res.json();
 }
@@ -52,4 +123,42 @@ export async function fetchMe(token: string) {
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json() as Promise<{ email: string; role: string }>;
+}
+
+export async function fetchPublicSite(locale: string): Promise<PublicSite | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/site?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PublicSite;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchOwnerSite(token: string): Promise<OwnerSite> {
+  const res = await fetch(`${API_BASE}/api/owner/site`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerSite;
+}
+
+export async function saveOwnerSite(
+  token: string,
+  body: OwnerSite,
+): Promise<OwnerSite> {
+  const res = await fetch(`${API_BASE}/api/owner/site`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerSite;
 }

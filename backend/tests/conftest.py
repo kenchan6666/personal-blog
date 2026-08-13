@@ -10,12 +10,13 @@ from httpx import ASGITransport, AsyncClient
 from app.config import Settings
 from app.mailer import RecordingMailer
 from app.main import create_app
+from app.models import SiteProfile
 
 
 @pytest.fixture(scope="session")
 def settings() -> Settings:
     return Settings(
-        mongo_uri=os.getenv("MONGO_URI", "mongodb://127.0.0.1:27017"),
+        mongo_uri=os.getenv("MONGO_URI", "mongodb://127.0.0.1:27019"),
         mongo_db=os.getenv("MONGO_DB", "portfolio_test"),
         redis_url=os.getenv("REDIS_URL", "redis://127.0.0.1:6380/15"),
         owner_email="ynchanhk@gmail.com",
@@ -23,6 +24,7 @@ def settings() -> Settings:
         otp_rate_limit=3,
         otp_rate_window_seconds=600,
         session_ttl_seconds=3600,
+        mail_backend="console",
         smtp_host="localhost",
         smtp_port=1025,
         smtp_user="ynchanhk@gmail.com",
@@ -40,8 +42,8 @@ async def mailer() -> RecordingMailer:
 async def app(settings: Settings, mailer: RecordingMailer):
     application = create_app(settings, mailer=mailer)
     async with LifespanManager(application):
-        # Isolate Redis keys between tests
         await application.state.redis.flushdb()
+        await SiteProfile.delete_all()
         yield application
 
 

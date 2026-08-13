@@ -15,6 +15,13 @@ class RecordingMailer:
         self.sent.append({"to": to, "code": code})
 
 
+class ConsoleMailer:
+    """Local/dev mailer: prints OTP to the API process stdout."""
+
+    async def send_otp(self, *, to: str, code: str) -> None:
+        print(f"[otp] to={to} code={code}", flush=True)
+
+
 class SmtpMailer:
     def __init__(
         self,
@@ -42,10 +49,12 @@ class SmtpMailer:
         msg["To"] = to
         msg.set_content(f"Your one-time code is: {code}\n\nIt expires shortly.")
 
+        password = self.password.replace(" ", "")
+
         def _send() -> None:
             with smtplib.SMTP(self.host, self.port, timeout=20) as smtp:
                 smtp.starttls()
-                smtp.login(self.username, self.password)
+                smtp.login(self.username, password)
                 smtp.send_message(msg)
 
         await asyncio.to_thread(_send)
