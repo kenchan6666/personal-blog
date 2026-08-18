@@ -1,0 +1,56 @@
+# Single-VM stack: nginx :80 → Next.js + FastAPI, plus Mongo and Redis.
+# Usage: copy deploy/env.example to deploy/.env, then:
+#   docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d --build
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    env_file:
+      - ./deploy/.env
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: portfolio
+      REDIS_URL: redis://redis:6379/0
+      AVATAR_DIR: /data/avatars
+    volumes:
+      - avatar_data:/data/avatars
+    depends_on:
+      - mongo
+      - redis
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ""
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:8000
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  mongo_data:
+  avatar_data:

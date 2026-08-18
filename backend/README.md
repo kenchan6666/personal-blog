@@ -108,6 +108,10 @@ Private SourceRepos and Draft Projects return 404 for these routes.
 
 Journal and Article only (Projects 404). Visitor `POST` with `displayName`, `email`, `body` creates a **pending** Comment. Public `GET` returns approved comments without `email`. Owner `GET /api/owner/comments` sees emails; `POST .../approve|reject|reply` to moderate.
 
+## Production compose
+
+See [docs/deploy.md](../docs/deploy.md). `MONGO_URI` / `REDIS_URL` inside the stack are `mongodb://mongo:27017` and `redis://redis:6379/0`.
+
 ## Tests
 
 With `docker compose up -d` running:

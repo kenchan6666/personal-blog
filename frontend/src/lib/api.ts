@@ -1,5 +1,9 @@
-const API_BASE =
+const PUBLIC_API =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+const API_BASE =
+  typeof window === "undefined"
+    ? (process.env.API_INTERNAL_URL ?? PUBLIC_API)
+    : PUBLIC_API;
 
 export const SESSION_KEY = "portfolio_session_token";
 
@@ -75,7 +79,7 @@ export function emptyOwnerSite(): OwnerSite {
 export function mediaUrl(path: string): string {
   if (!path) return "";
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  return `${API_BASE}${path}`;
+  return `${PUBLIC_API}${path}`;
 }
 
 export function getSessionToken(): string | null {

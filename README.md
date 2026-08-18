@@ -22,6 +22,10 @@ npm run dev
 
 See [backend/README.md](backend/README.md).
 
+### Single-VM deploy (nginx)
+
+See [docs/deploy.md](docs/deploy.md). Compose file: `docker-compose.prod.yml`.
+
 ## Specs & tickets
 
 - Spec: [docs/specs/0001-personal-portfolio.md](docs/specs/0001-personal-portfolio.md)
