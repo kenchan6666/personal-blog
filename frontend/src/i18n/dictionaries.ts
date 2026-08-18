@@ -28,6 +28,10 @@ const zhHant = {
   closeMenu: "關閉選單",
   projects: {
     empty: "目前沒有已發布的項目。",
+    sourceBrowser: "源碼",
+    branch: "分支",
+    dir: "目錄",
+    file: "檔案",
   },
   articles: {
     empty: "目前沒有已發布的文章。",
@@ -147,6 +151,10 @@ const en = {
   closeMenu: "Close menu",
   projects: {
     empty: "No published projects yet.",
+    sourceBrowser: "Source",
+    branch: "Branch",
+    dir: "dir",
+    file: "file",
   },
   articles: {
     empty: "No published articles yet.",

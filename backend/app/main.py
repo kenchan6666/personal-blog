@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
@@ -23,7 +24,7 @@ from app.avatar import (
     save_avatar_file,
 )
 from app.config import Settings
-from app.github import GitHubClient, GitHubOAuthError, HttpGitHub
+from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
 from app.models import (
     STATUSES,
@@ -368,6 +369,181 @@ def create_app(
                 detail="not_found",
             )
         return project.resolve(locale)
+
+    GITHUB_CACHE_TTL = 120
+
+    async def published_browsable_source(slug: str) -> tuple[SourceRepo, str]:
+        project = await Project.find_one(
+            Project.slug == slug,
+            Project.status == "published",
+        )
+        repo = project.source_repo if project is not None else None
+        if repo is None or not repo.full_name or repo.private:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        github_client: GitHubClient = app.state.github
+        try:
+            if await github_client.repo_is_private(
+                access_token=access,
+                owner=repo.owner,
+                name=repo.name,
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="not_found",
+                )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return repo, access
+
+    async def cached_github(
+        *,
+        kind: str,
+        full_name: str,
+        ref: str,
+        path: str,
+        loader,
+    ):
+        redis: Redis = app.state.redis
+        key = f"github:src:{full_name}:{kind}:{ref}:{path}"
+        raw = await redis.get(key)
+        if raw:
+            return json.loads(raw)
+        data = await loader()
+        await redis.set(key, json.dumps(data), ex=GITHUB_CACHE_TTL)
+        return data
+
+    @app.get("/api/public/projects/{slug}/source")
+    async def public_project_source(
+        slug: str, ref: str = ""
+    ) -> dict[str, Any]:
+        repo, access = await published_browsable_source(slug)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            branches = await cached_github(
+                kind="branches",
+                full_name=repo.full_name,
+                ref="-",
+                path="",
+                loader=lambda: github_client.list_branches(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                ),
+            )
+            try:
+                readme = await cached_github(
+                    kind="readme",
+                    full_name=repo.full_name,
+                    ref=branch,
+                    path="",
+                    loader=lambda: github_client.get_readme(
+                        access_token=access,
+                        owner=repo.owner,
+                        name=repo.name,
+                        ref=branch,
+                    ),
+                )
+            except GitHubBrowseError:
+                readme = {"path": "", "content": ""}
+            tree = await cached_github(
+                kind="tree",
+                full_name=repo.full_name,
+                ref=branch,
+                path="",
+                loader=lambda: github_client.list_tree(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path="",
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {
+            "defaultBranch": repo.default_branch,
+            "ref": branch,
+            "branches": branches,
+            "readme": readme,
+            "tree": tree,
+        }
+
+    @app.get("/api/public/projects/{slug}/source/tree")
+    async def public_project_source_tree(
+        slug: str, ref: str = "", path: str = ""
+    ) -> dict[str, Any]:
+        repo, access = await published_browsable_source(slug)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            tree = await cached_github(
+                kind="tree",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.list_tree(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {"ref": branch, "path": path, "tree": tree}
+
+    @app.get("/api/public/projects/{slug}/source/blob")
+    async def public_project_source_blob(
+        slug: str, ref: str = "", path: str = ""
+    ) -> dict[str, Any]:
+        if not path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="path_required",
+            )
+        repo, access = await published_browsable_source(slug)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            blob = await cached_github(
+                kind="blob",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.get_blob(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return blob
 
     @app.get("/api/owner/projects")
     async def owner_list_projects(

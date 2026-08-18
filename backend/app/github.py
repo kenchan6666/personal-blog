@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import base64
 from typing import Protocol
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import httpx
 
 
 class GitHubOAuthError(Exception):
+    pass
+
+
+class GitHubBrowseError(Exception):
     pass
 
 
@@ -16,6 +21,38 @@ class GitHubClient(Protocol):
     async def exchange_code(self, *, code: str) -> str: ...
 
     async def list_repos(self, *, access_token: str) -> list[dict[str, object]]: ...
+
+    async def repo_is_private(
+        self, *, access_token: str, owner: str, name: str
+    ) -> bool: ...
+
+    async def list_branches(
+        self, *, access_token: str, owner: str, name: str
+    ) -> list[str]: ...
+
+    async def get_readme(
+        self, *, access_token: str, owner: str, name: str, ref: str
+    ) -> dict[str, str]: ...
+
+    async def list_tree(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> list[dict[str, str]]: ...
+
+    async def get_blob(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> dict[str, str]: ...
 
 
 class RecordingGitHub:
@@ -62,6 +99,93 @@ class RecordingGitHub:
                 "defaultBranch": "main",
             },
         ]
+
+    FILES = {
+        "kenchan6666/personal-blog": {
+            "master": {
+                "README.md": "# Glass\nHello\n",
+                "src/app.py": "print('hi')\n",
+            },
+            "feature": {
+                "README.md": "# Feature\nnext\n",
+                "src/app.py": "print('feat')\n",
+            },
+        }
+    }
+
+    async def repo_is_private(
+        self, *, access_token: str, owner: str, name: str
+    ) -> bool:
+        full_name = f"{owner}/{name}"
+        if full_name == "kenchan6666/secret-lab":
+            return True
+        if full_name in self.FILES:
+            return False
+        raise GitHubBrowseError("not_found")
+
+    def _files(self, owner: str, name: str, ref: str) -> dict[str, str]:
+        repo = self.FILES.get(f"{owner}/{name}")
+        if repo is None or ref not in repo:
+            raise GitHubBrowseError("not_found")
+        return repo[ref]
+
+    async def list_branches(
+        self, *, access_token: str, owner: str, name: str
+    ) -> list[str]:
+        repo = self.FILES.get(f"{owner}/{name}")
+        if repo is None:
+            raise GitHubBrowseError("not_found")
+        return sorted(repo)
+
+    async def get_readme(
+        self, *, access_token: str, owner: str, name: str, ref: str
+    ) -> dict[str, str]:
+        files = self._files(owner, name, ref)
+        for filename in ("README.md", "README", "readme.md"):
+            if filename in files:
+                return {"path": filename, "content": files[filename]}
+        raise GitHubBrowseError("not_found")
+
+    async def list_tree(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> list[dict[str, str]]:
+        files = self._files(owner, name, ref)
+        prefix = path.strip("/")
+        entries: dict[str, dict[str, str]] = {}
+        for file_path in files:
+            relative = file_path
+            if prefix:
+                if relative == prefix or not relative.startswith(prefix + "/"):
+                    continue
+                rest = relative[len(prefix) + 1 :]
+            else:
+                rest = relative
+            part = rest.split("/", 1)[0]
+            child_path = f"{prefix}/{part}" if prefix else part
+            kind = "dir" if "/" in rest else "file"
+            entries[child_path] = {"name": part, "path": child_path, "type": kind}
+        return sorted(entries.values(), key=lambda item: (item["type"] != "dir", item["name"]))
+
+    async def get_blob(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> dict[str, str]:
+        files = self._files(owner, name, ref)
+        content = files.get(path.strip("/"))
+        if content is None:
+            raise GitHubBrowseError("not_found")
+        return {"path": path.strip("/"), "content": content}
 
 
 class HttpGitHub:
@@ -134,3 +258,117 @@ class HttpGitHub:
                     )
                 url = response.links.get("next", {}).get("url")
         return repos
+
+    async def repo_is_private(
+        self, *, access_token: str, owner: str, name: str
+    ) -> bool:
+        url = f"https://api.github.com/repos/{owner}/{name}"
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(url, headers=self._headers(access_token))
+        if response.status_code >= 400:
+            raise GitHubBrowseError("not_found")
+        return bool(response.json().get("private"))
+
+    def _headers(self, access_token: str) -> dict[str, str]:
+        return {
+            "Authorization": f"Bearer {access_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+
+    async def list_branches(
+        self, *, access_token: str, owner: str, name: str
+    ) -> list[str]:
+        url = f"https://api.github.com/repos/{owner}/{name}/branches?per_page=100"
+        names: list[str] = []
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            while url:
+                response = await client.get(url, headers=self._headers(access_token))
+                if response.status_code >= 400:
+                    raise GitHubBrowseError("not_found")
+                names.extend(item["name"] for item in response.json())
+                url = response.links.get("next", {}).get("url")
+        return sorted(names)
+
+    async def get_readme(
+        self, *, access_token: str, owner: str, name: str, ref: str
+    ) -> dict[str, str]:
+        url = f"https://api.github.com/repos/{owner}/{name}/readme"
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(
+                url,
+                headers=self._headers(access_token),
+                params={"ref": ref},
+            )
+        if response.status_code >= 400:
+            raise GitHubBrowseError("not_found")
+        payload = response.json()
+        raw = base64.b64decode(payload.get("content") or "")
+        return {
+            "path": str(payload.get("path") or "README.md"),
+            "content": raw.decode("utf-8", errors="replace"),
+        }
+
+    async def list_tree(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> list[dict[str, str]]:
+        payload = await self._contents(access_token, owner, name, ref, path)
+        if not isinstance(payload, list):
+            raise GitHubBrowseError("not_a_directory")
+        entries = []
+        for item in payload:
+            kind = "dir" if item.get("type") == "dir" else "file"
+            entries.append(
+                {
+                    "name": str(item["name"]),
+                    "path": str(item["path"]),
+                    "type": kind,
+                }
+            )
+        return sorted(entries, key=lambda item: (item["type"] != "dir", item["name"]))
+
+    async def get_blob(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> dict[str, str]:
+        payload = await self._contents(access_token, owner, name, ref, path)
+        if isinstance(payload, list) or payload.get("type") != "file":
+            raise GitHubBrowseError("not_a_file")
+        raw = base64.b64decode(payload.get("content") or "")
+        return {
+            "path": str(payload.get("path") or path),
+            "content": raw.decode("utf-8", errors="replace"),
+        }
+
+    async def _contents(
+        self,
+        access_token: str,
+        owner: str,
+        name: str,
+        ref: str,
+        path: str,
+    ) -> object:
+        suffix = quote(path.strip("/")) if path.strip("/") else ""
+        url = f"https://api.github.com/repos/{owner}/{name}/contents"
+        if suffix:
+            url = f"{url}/{suffix}"
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(
+                url,
+                headers=self._headers(access_token),
+                params={"ref": ref},
+            )
+        if response.status_code >= 400:
+            raise GitHubBrowseError("not_found")
+        return response.json()

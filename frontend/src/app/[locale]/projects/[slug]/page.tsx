@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownBody } from "@/components/markdown-body";
+import { SourceBrowser } from "@/components/source-browser";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicProject } from "@/lib/api";
@@ -49,6 +50,9 @@ export default async function ProjectDetailPage({
       <div className="mt-10">
         <MarkdownBody source={project.body} />
       </div>
+      {project.sourceRepo && !project.sourceRepo.private ? (
+        <SourceBrowser slug={project.slug} dict={dict} />
+      ) : null}
     </article>
   );
 }

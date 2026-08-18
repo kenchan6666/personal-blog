@@ -260,6 +260,66 @@ export async function fetchPublicProject(
   }
 }
 
+export type SourceTreeEntry = {
+  name: string;
+  path: string;
+  type: "file" | "dir";
+};
+
+export type PublicSourceOverview = {
+  defaultBranch: string;
+  ref: string;
+  branches: string[];
+  readme: { path: string; content: string };
+  tree: SourceTreeEntry[];
+};
+
+export async function fetchPublicSource(
+  slug: string,
+  ref?: string,
+): Promise<PublicSourceOverview | null> {
+  const params = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source${params}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PublicSourceOverview;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchPublicSourceTree(
+  slug: string,
+  ref: string,
+  path: string,
+): Promise<SourceTreeEntry[]> {
+  const params = new URLSearchParams({ ref, path });
+  const res = await fetch(
+    `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source/tree?${params}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) return [];
+  const data = (await res.json()) as { tree: SourceTreeEntry[] };
+  return data.tree;
+}
+
+export async function fetchPublicSourceBlob(
+  slug: string,
+  ref: string,
+  path: string,
+): Promise<{ path: string; content: string } | null> {
+  const params = new URLSearchParams({ ref, path });
+  const res = await fetch(
+    `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source/blob?${params}`,
+    { cache: "no-store" },
+  );
+  if (!res.ok) return null;
+  return (await res.json()) as { path: string; content: string };
+}
+
 export async function fetchOwnerProjects(
   token: string,
 ): Promise<OwnerProject[]> {

@@ -94,7 +94,15 @@ Create a GitHub OAuth App (callback `GITHUB_OAUTH_CALLBACK_URL`) and set `GITHUB
 - `GET /api/owner/github/repos` (Bearer) — 409 if GitHub is not connected
 - `PUT /api/owner/projects/{id}/source-repo` `{ "fullName": "owner/name" }`
 
-Public project payloads may include `sourceRepo` metadata. Unattached GitHub repos never appear as public Projects. Tree/blob browsing is ticket #10.
+Public project payloads may include `sourceRepo` metadata. Unattached GitHub repos never appear as public Projects.
+
+Public SourceRepo browser (Published + public repo only; Redis cache ~120s, no git mirror):
+
+- `GET /api/public/projects/{slug}/source?ref=`
+- `GET /api/public/projects/{slug}/source/tree?ref=&path=`
+- `GET /api/public/projects/{slug}/source/blob?ref=&path=`
+
+Private SourceRepos and Draft Projects return 404 for these routes.
 
 ## Tests
 
