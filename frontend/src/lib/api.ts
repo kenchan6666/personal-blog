@@ -646,3 +646,90 @@ export async function deleteOwnerJournal(
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
+
+export type PublicComment = {
+  id: string;
+  displayName: string;
+  body: string;
+  ownerReply: string;
+};
+
+export type OwnerComment = PublicComment & {
+  email: string;
+  status: "pending" | "approved" | "rejected";
+  targetType: "article" | "journal";
+  targetSlug: string;
+};
+
+export async function fetchPublicComments(
+  kind: "articles" | "journals",
+  slug: string,
+): Promise<PublicComment[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/${kind}/${encodeURIComponent(slug)}/comments`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicComment[];
+  } catch {
+    return [];
+  }
+}
+
+export async function submitPublicComment(
+  kind: "articles" | "journals",
+  slug: string,
+  body: { displayName: string; email: string; body: string },
+): Promise<void> {
+  const res = await fetch(
+    `${API_BASE}/api/public/${kind}/${encodeURIComponent(slug)}/comments`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
+export async function fetchOwnerComments(
+  token: string,
+): Promise<OwnerComment[]> {
+  const res = await fetch(`${API_BASE}/api/owner/comments`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerComment[];
+}
+
+export async function moderateOwnerComment(
+  token: string,
+  id: string,
+  action: "approve" | "reject",
+): Promise<OwnerComment> {
+  const res = await fetch(`${API_BASE}/api/owner/comments/${id}/${action}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerComment;
+}
+
+export async function replyOwnerComment(
+  token: string,
+  id: string,
+  body: string,
+): Promise<OwnerComment> {
+  const res = await fetch(`${API_BASE}/api/owner/comments/${id}/reply`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ body }),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerComment;
+}

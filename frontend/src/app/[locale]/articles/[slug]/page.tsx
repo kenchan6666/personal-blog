@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CommentThread } from "@/components/comment-thread";
 import { MarkdownBody } from "@/components/markdown-body";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
@@ -47,6 +48,7 @@ export default async function ArticleDetailPage({
       <div className="mt-10">
         <MarkdownBody source={article.body} />
       </div>
+      <CommentThread kind="articles" slug={article.slug} dict={dict} />
     </article>
   );
 }

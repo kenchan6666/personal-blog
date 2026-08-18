@@ -29,6 +29,7 @@ from app.mailer import ConsoleMailer, Mailer, SmtpMailer
 from app.models import (
     STATUSES,
     Article,
+    Comment,
     Journal,
     LinkItem,
     Project,
@@ -104,6 +105,16 @@ class ArticleBody(BaseModel):
     relatedProjectSlug: str = ""
 
 
+class CommentSubmitBody(BaseModel):
+    displayName: str = Field(min_length=1, max_length=80)
+    email: str = Field(min_length=3, max_length=320)
+    body: str = Field(min_length=1, max_length=4000)
+
+
+class OwnerReplyBody(BaseModel):
+    body: str = Field(min_length=1, max_length=4000)
+
+
 class JournalBody(BaseModel):
     model_config = ConfigDict(extra="allow")
     slug: str = Field(min_length=1, max_length=80)
@@ -156,7 +167,7 @@ def create_app(
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         await init_beanie(
             database=mongo[settings.mongo_db],
-            document_models=[SiteProfile, Project, Article, Journal],
+            document_models=[SiteProfile, Project, Article, Journal, Comment],
         )
         await redis.ping()
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
@@ -905,6 +916,137 @@ def create_app(
             )
         await journal.delete()
         return {"status": "deleted"}
+
+    def public_comment_payload(comment: Comment) -> dict[str, Any]:
+        return comment.to_public_dict()
+
+    async def published_comment_target(target_type: str, slug: str):
+        if target_type == "article":
+            return await Article.find_one(
+                Article.slug == slug,
+                Article.status == "published",
+            )
+        if target_type == "journal":
+            return await Journal.find_one(
+                Journal.slug == slug,
+                Journal.status == "published",
+            )
+        return None
+
+    async def submit_public_comment(
+        target_type: str,
+        slug: str,
+        body: CommentSubmitBody,
+    ) -> dict[str, Any]:
+        target = await published_comment_target(target_type, slug)
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        name = body.displayName.strip()
+        if not name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_name",
+            )
+        if "@" not in body.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_email",
+            )
+        comment = Comment(
+            target_type=target_type,
+            target_slug=slug,
+            display_name=name,
+            email=body.email.strip(),
+            body=body.body.strip(),
+            status="pending",
+        )
+        await comment.insert()
+        return public_comment_payload(comment)
+
+    async def list_public_comments(target_type: str, slug: str) -> list[dict[str, Any]]:
+        target = await published_comment_target(target_type, slug)
+        if target is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        comments = await Comment.find(
+            Comment.target_type == target_type,
+            Comment.target_slug == slug,
+            Comment.status == "approved",
+        ).to_list()
+        return [item.to_public_dict() for item in comments]
+
+    @app.post("/api/public/articles/{slug}/comments")
+    async def public_submit_article_comment(
+        slug: str, body: CommentSubmitBody
+    ) -> dict[str, Any]:
+        return await submit_public_comment("article", slug, body)
+
+    @app.get("/api/public/articles/{slug}/comments")
+    async def public_list_article_comments(slug: str) -> list[dict[str, Any]]:
+        return await list_public_comments("article", slug)
+
+    @app.post("/api/public/journals/{slug}/comments")
+    async def public_submit_journal_comment(
+        slug: str, body: CommentSubmitBody
+    ) -> dict[str, Any]:
+        return await submit_public_comment("journal", slug, body)
+
+    @app.get("/api/public/journals/{slug}/comments")
+    async def public_list_journal_comments(slug: str) -> list[dict[str, Any]]:
+        return await list_public_comments("journal", slug)
+
+    async def load_owner_comment(comment_id: PydanticObjectId) -> Comment:
+        comment = await Comment.get(comment_id)
+        if comment is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return comment
+
+    @app.get("/api/owner/comments")
+    async def owner_list_comments(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        comments = await Comment.find_all().to_list()
+        comments.sort(key=lambda item: str(item.id))
+        return [item.to_owner_dict() for item in comments]
+
+    @app.post("/api/owner/comments/{comment_id}/approve")
+    async def owner_approve_comment(
+        comment_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        comment = await load_owner_comment(comment_id)
+        comment.status = "approved"
+        await comment.save()
+        return comment.to_owner_dict()
+
+    @app.post("/api/owner/comments/{comment_id}/reject")
+    async def owner_reject_comment(
+        comment_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        comment = await load_owner_comment(comment_id)
+        comment.status = "rejected"
+        await comment.save()
+        return comment.to_owner_dict()
+
+    @app.post("/api/owner/comments/{comment_id}/reply")
+    async def owner_reply_comment(
+        comment_id: PydanticObjectId,
+        body: OwnerReplyBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        comment = await load_owner_comment(comment_id)
+        comment.owner_reply = body.body.strip()
+        await comment.save()
+        return comment.to_owner_dict()
 
     return app
 

@@ -104,6 +104,10 @@ Public SourceRepo browser (Published + public repo only; Redis cache ~120s, no g
 
 Private SourceRepos and Draft Projects return 404 for these routes.
 
+## Comments
+
+Journal and Article only (Projects 404). Visitor `POST` with `displayName`, `email`, `body` creates a **pending** Comment. Public `GET` returns approved comments without `email`. Owner `GET /api/owner/comments` sees emails; `POST .../approve|reject|reply` to moderate.
+
 ## Tests
 
 With `docker compose up -d` running:
@@ -125,6 +129,6 @@ pytest -v
 
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
-- `app/models.py` — Beanie documents (SiteProfile, Project, Article, Journal)
+- `app/models.py` — Beanie documents (SiteProfile, Project, Article, Journal, Comment)
 - `app/github.py` — GitHub OAuth + repo list (injected in tests)
 - `tests/` — HTTP-seam integration tests

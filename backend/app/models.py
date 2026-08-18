@@ -229,3 +229,33 @@ class Journal(Document):
             "body": pick(self.body),
             "order": self.order,
         }
+
+
+class Comment(Document):
+    target_type: str = "article"
+    target_slug: str = ""
+    display_name: str = ""
+    email: str = ""
+    body: str = ""
+    status: str = "pending"
+    owner_reply: str = ""
+
+    class Settings:
+        name = "comments"
+
+    def to_public_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "displayName": self.display_name,
+            "body": self.body,
+            "status": self.status,
+            "ownerReply": self.owner_reply,
+        }
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            **self.to_public_dict(),
+            "email": self.email,
+            "targetType": self.target_type,
+            "targetSlug": self.target_slug,
+        }

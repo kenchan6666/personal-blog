@@ -11,7 +11,7 @@ from app.config import Settings
 from app.github import RecordingGitHub
 from app.mailer import RecordingMailer
 from app.main import create_app
-from app.models import Article, Journal, Project, SiteProfile
+from app.models import Article, Comment, Journal, Project, SiteProfile
 
 
 @pytest.fixture
@@ -58,6 +58,7 @@ async def app(settings: Settings, mailer: RecordingMailer, github: RecordingGitH
         await Project.delete_all()
         await Article.delete_all()
         await Journal.delete_all()
+        await Comment.delete_all()
         yield application
 
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CommentThread } from "@/components/comment-thread";
 import { MarkdownBody } from "@/components/markdown-body";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
@@ -36,6 +37,7 @@ export default async function JournalDetailPage({
       <div className="mt-10">
         <MarkdownBody source={journal.body} />
       </div>
+      <CommentThread kind="journals" slug={journal.slug} dict={dict} />
     </article>
   );
 }
