@@ -9,6 +9,7 @@ import {
   fetchMe,
   getSessionToken,
 } from "@/lib/api";
+import { ProjectEditor } from "./project-editor";
 import { SiteEditor } from "./site-editor";
 
 type Props = {
@@ -66,6 +67,7 @@ export function AdminDashboard({ locale, dict }: Props) {
       </div>
 
       <SiteEditor dict={dict} />
+      <ProjectEditor dict={dict} />
     </div>
   );
 }

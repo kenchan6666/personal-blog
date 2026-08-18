@@ -10,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from app.config import Settings
 from app.mailer import RecordingMailer
 from app.main import create_app
-from app.models import SiteProfile
+from app.models import Project, SiteProfile
 
 
 @pytest.fixture
@@ -45,6 +45,7 @@ async def app(settings: Settings, mailer: RecordingMailer):
     async with LifespanManager(application):
         await application.state.redis.flushdb()
         await SiteProfile.delete_all()
+        await Project.delete_all()
         yield application
 
 

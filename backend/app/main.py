@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from beanie import init_beanie
+from beanie import PydanticObjectId, init_beanie
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -22,7 +22,7 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
-from app.models import LinkItem, SiteProfile, empty_localized
+from app.models import STATUSES, LinkItem, Project, SiteProfile, empty_localized
 
 
 async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
@@ -68,6 +68,15 @@ class SiteUpdateBody(BaseModel):
     links: list[LinkInput] = Field(default_factory=list)
 
 
+class ProjectBody(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    summary: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+
+
 async def get_or_create_site() -> SiteProfile:
     site = await SiteProfile.find_one()
     if site is None:
@@ -100,7 +109,7 @@ def create_app(
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         await init_beanie(
             database=mongo[settings.mongo_db],
-            document_models=[SiteProfile],
+            document_models=[SiteProfile, Project],
         )
         await redis.ping()
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
@@ -259,6 +268,95 @@ def create_app(
             )
         media_type = media_type_for_filename(path.name)
         return FileResponse(path, media_type=media_type)
+
+    def normalize_locale(locale: str) -> str:
+        return locale if locale in ("zh-Hant", "en") else "zh-Hant"
+
+    def apply_project_body(project: Project, body: ProjectBody) -> None:
+        if body.status not in STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_status",
+            )
+        slug = body.slug.strip().lower()
+        if not slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_slug",
+            )
+        project.slug = slug
+        project.title = body.title
+        project.summary = body.summary
+        project.body = body.body
+        project.status = body.status
+        project.order = body.order
+
+    async def ensure_unique_slug(slug: str, exclude_id: str | None = None) -> None:
+        existing = await Project.find_one(Project.slug == slug)
+        if existing is not None and str(existing.id) != exclude_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="slug_taken",
+            )
+
+    @app.get("/api/public/projects")
+    async def public_projects(locale: str = "zh-Hant") -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        projects = await Project.find(Project.status == "published").to_list()
+        projects.sort(key=lambda item: (item.order, item.slug))
+        return [item.resolve(locale) for item in projects]
+
+    @app.get("/api/public/projects/{slug}")
+    async def public_project(
+        slug: str, locale: str = "zh-Hant"
+    ) -> dict[str, Any]:
+        locale = normalize_locale(locale)
+        project = await Project.find_one(
+            Project.slug == slug,
+            Project.status == "published",
+        )
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return project.resolve(locale)
+
+    @app.get("/api/owner/projects")
+    async def owner_list_projects(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        projects = await Project.find_all().to_list()
+        projects.sort(key=lambda item: (item.order, item.slug))
+        return [item.to_owner_dict() for item in projects]
+
+    @app.post("/api/owner/projects")
+    async def owner_create_project(
+        body: ProjectBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        project = Project()
+        apply_project_body(project, body)
+        await ensure_unique_slug(project.slug)
+        await project.insert()
+        return project.to_owner_dict()
+
+    @app.put("/api/owner/projects/{project_id}")
+    async def owner_update_project(
+        project_id: PydanticObjectId,
+        body: ProjectBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        project = await Project.get(project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        apply_project_body(project, body)
+        await ensure_unique_slug(project.slug, exclude_id=str(project.id))
+        await project.save()
+        return project.to_owner_dict()
 
     return app
 

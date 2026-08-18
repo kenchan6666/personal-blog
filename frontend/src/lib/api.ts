@@ -186,3 +186,108 @@ export async function uploadOwnerAvatar(
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as { avatarUrl: string };
 }
+
+export type OwnerProject = {
+  id: string;
+  slug: string;
+  title: Localized;
+  summary: Localized;
+  body: Localized;
+  status: "draft" | "published";
+  order: number;
+};
+
+export type PublicProject = {
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  order: number;
+};
+
+export function emptyOwnerProject(): OwnerProject {
+  return {
+    id: "",
+    slug: "",
+    title: emptyLocalized(),
+    summary: emptyLocalized(),
+    body: emptyLocalized(),
+    status: "draft",
+    order: 0,
+  };
+}
+
+export async function fetchPublicProjects(
+  locale: string,
+): Promise<PublicProject[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/projects?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicProject[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPublicProject(
+  locale: string,
+  slug: string,
+): Promise<PublicProject | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PublicProject;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchOwnerProjects(
+  token: string,
+): Promise<OwnerProject[]> {
+  const res = await fetch(`${API_BASE}/api/owner/projects`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerProject[];
+}
+
+export async function createOwnerProject(
+  token: string,
+  body: Omit<OwnerProject, "id">,
+): Promise<OwnerProject> {
+  const res = await fetch(`${API_BASE}/api/owner/projects`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerProject;
+}
+
+export async function saveOwnerProject(
+  token: string,
+  id: string,
+  body: Omit<OwnerProject, "id">,
+): Promise<OwnerProject> {
+  const res = await fetch(`${API_BASE}/api/owner/projects/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerProject;
+}

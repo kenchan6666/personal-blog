@@ -61,6 +61,14 @@ Copy `.env.example` to `.env` and set a Gmail **App Password** in `SMTP_PASSWORD
 
 Avatars are stored under `AVATAR_DIR` (default `data/avatars`, gitignored).
 
+## Projects
+
+- `GET /api/public/projects?locale=` — Published only, ordered
+- `GET /api/public/projects/{slug}?locale=` — 404 for Draft / missing
+- `GET/POST /api/owner/projects` and `PUT /api/owner/projects/{id}` (Bearer)
+
+Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `published`.
+
 ## Tests
 
 With `docker compose up -d` running:
@@ -82,5 +90,5 @@ pytest -v
 
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
-- `app/models.py` — Beanie documents (SiteProfile)
+- `app/models.py` — Beanie documents (SiteProfile, Project)
 - `tests/` — HTTP-seam integration tests

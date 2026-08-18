@@ -83,3 +83,41 @@ class SiteProfile(Document):
             "avatarUrl": self.avatar_url(),
             "links": [link.model_dump() for link in self.links],
         }
+
+
+STATUSES = ("draft", "published")
+
+
+class Project(Document):
+    slug: str = ""
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    summary: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+
+    class Settings:
+        name = "projects"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "slug": self.slug,
+            "title": self.title,
+            "summary": self.summary,
+            "body": self.body,
+            "status": self.status,
+            "order": self.order,
+        }
+
+    def resolve(self, locale: str) -> dict[str, Any]:
+        def pick(field: dict[str, str]) -> str:
+            return (field or {}).get(locale, "") or ""
+
+        return {
+            "slug": self.slug,
+            "title": pick(self.title),
+            "summary": pick(self.summary),
+            "body": pick(self.body),
+            "order": self.order,
+        }
