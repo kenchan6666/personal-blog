@@ -10,6 +10,7 @@ import {
   getSessionToken,
 } from "@/lib/api";
 import { ArticleEditor } from "./article-editor";
+import { JournalEditor } from "./journal-editor";
 import { ProjectEditor } from "./project-editor";
 import { SiteEditor } from "./site-editor";
 
@@ -70,6 +71,7 @@ export function AdminDashboard({ locale, dict }: Props) {
       <SiteEditor dict={dict} />
       <ProjectEditor dict={dict} />
       <ArticleEditor dict={dict} />
+      <JournalEditor dict={dict} />
     </div>
   );
 }

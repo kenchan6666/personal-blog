@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, Upl
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
 
 from app.auth import AuthService
@@ -22,7 +22,7 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
-from app.models import STATUSES, Article, LinkItem, Project, SiteProfile, empty_localized
+from app.models import STATUSES, Article, Journal, LinkItem, Project, SiteProfile, empty_localized
 
 
 async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
@@ -87,6 +87,16 @@ class ArticleBody(BaseModel):
     relatedProjectSlug: str = ""
 
 
+class JournalBody(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    slug: str = Field(min_length=1, max_length=80)
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    summary: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+
+
 async def get_or_create_site() -> SiteProfile:
     site = await SiteProfile.find_one()
     if site is None:
@@ -119,7 +129,7 @@ def create_app(
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         await init_beanie(
             database=mongo[settings.mongo_db],
-            document_models=[SiteProfile, Project, Article],
+            document_models=[SiteProfile, Project, Article, Journal],
         )
         await redis.ping()
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
@@ -484,6 +494,117 @@ def create_app(
                 detail="not_found",
             )
         await article.delete()
+        return {"status": "deleted"}
+
+    def reject_journal_project_link(body: JournalBody) -> None:
+        extra = body.model_extra or {}
+        if extra.get("relatedProjectSlug"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="journals_have_no_project",
+            )
+
+    def apply_journal_body(journal: Journal, body: JournalBody) -> None:
+        reject_journal_project_link(body)
+        if body.status not in STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_status",
+            )
+        slug = body.slug.strip().lower()
+        if not slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_slug",
+            )
+        journal.slug = slug
+        journal.title = body.title
+        journal.summary = body.summary
+        journal.body = body.body
+        journal.status = body.status
+        journal.order = body.order
+
+    async def ensure_unique_journal_slug(
+        slug: str, exclude_id: str | None = None
+    ) -> None:
+        existing = await Journal.find_one(Journal.slug == slug)
+        if existing is not None and str(existing.id) != exclude_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="slug_taken",
+            )
+
+    @app.get("/api/public/journals")
+    async def public_journals(locale: str = "zh-Hant") -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        journals = await Journal.find(Journal.status == "published").to_list()
+        journals.sort(key=lambda item: (item.order, item.slug))
+        return [item.resolve(locale) for item in journals]
+
+    @app.get("/api/public/journals/{slug}")
+    async def public_journal(
+        slug: str, locale: str = "zh-Hant"
+    ) -> dict[str, Any]:
+        locale = normalize_locale(locale)
+        journal = await Journal.find_one(
+            Journal.slug == slug,
+            Journal.status == "published",
+        )
+        if journal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return journal.resolve(locale)
+
+    @app.get("/api/owner/journals")
+    async def owner_list_journals(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        journals = await Journal.find_all().to_list()
+        journals.sort(key=lambda item: (item.order, item.slug))
+        return [item.to_owner_dict() for item in journals]
+
+    @app.post("/api/owner/journals")
+    async def owner_create_journal(
+        body: JournalBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        journal = Journal()
+        apply_journal_body(journal, body)
+        await ensure_unique_journal_slug(journal.slug)
+        await journal.insert()
+        return journal.to_owner_dict()
+
+    @app.put("/api/owner/journals/{journal_id}")
+    async def owner_update_journal(
+        journal_id: PydanticObjectId,
+        body: JournalBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        journal = await Journal.get(journal_id)
+        if journal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        apply_journal_body(journal, body)
+        await ensure_unique_journal_slug(journal.slug, exclude_id=str(journal.id))
+        await journal.save()
+        return journal.to_owner_dict()
+
+    @app.delete("/api/owner/journals/{journal_id}")
+    async def owner_delete_journal(
+        journal_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        journal = await Journal.get(journal_id)
+        if journal is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        await journal.delete()
         return {"status": "deleted"}
 
     return app

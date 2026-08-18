@@ -415,3 +415,119 @@ export async function deleteOwnerArticle(
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
+
+export type OwnerJournal = {
+  id: string;
+  slug: string;
+  title: Localized;
+  summary: Localized;
+  body: Localized;
+  status: "draft" | "published";
+  order: number;
+};
+
+export type PublicJournal = {
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  order: number;
+};
+
+export function emptyOwnerJournal(): OwnerJournal {
+  return {
+    id: "",
+    slug: "",
+    title: emptyLocalized(),
+    summary: emptyLocalized(),
+    body: emptyLocalized(),
+    status: "draft",
+    order: 0,
+  };
+}
+
+export async function fetchPublicJournals(
+  locale: string,
+): Promise<PublicJournal[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/journals?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicJournal[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPublicJournal(
+  locale: string,
+  slug: string,
+): Promise<PublicJournal | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/journals/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PublicJournal;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchOwnerJournals(
+  token: string,
+): Promise<OwnerJournal[]> {
+  const res = await fetch(`${API_BASE}/api/owner/journals`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerJournal[];
+}
+
+export async function createOwnerJournal(
+  token: string,
+  body: Omit<OwnerJournal, "id">,
+): Promise<OwnerJournal> {
+  const res = await fetch(`${API_BASE}/api/owner/journals`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerJournal;
+}
+
+export async function saveOwnerJournal(
+  token: string,
+  id: string,
+  body: Omit<OwnerJournal, "id">,
+): Promise<OwnerJournal> {
+  const res = await fetch(`${API_BASE}/api/owner/journals/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerJournal;
+}
+
+export async function deleteOwnerJournal(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/journals/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}

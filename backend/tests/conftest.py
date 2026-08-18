@@ -10,7 +10,7 @@ from httpx import ASGITransport, AsyncClient
 from app.config import Settings
 from app.mailer import RecordingMailer
 from app.main import create_app
-from app.models import Article, Project, SiteProfile
+from app.models import Article, Journal, Project, SiteProfile
 
 
 @pytest.fixture
@@ -47,6 +47,7 @@ async def app(settings: Settings, mailer: RecordingMailer):
         await SiteProfile.delete_all()
         await Project.delete_all()
         await Article.delete_all()
+        await Journal.delete_all()
         yield application
 
 

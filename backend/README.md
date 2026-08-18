@@ -77,6 +77,14 @@ Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `publ
 
 Optional `relatedProjectSlug`. A Draft related Project is omitted from the public payload.
 
+## Journals
+
+- `GET /api/public/journals?locale=` — Published only
+- `GET /api/public/journals/{slug}?locale=`
+- `GET/POST /api/owner/journals`, `PUT/DELETE /api/owner/journals/{id}` (Bearer)
+
+Journals have no `relatedProject`. Sending `relatedProjectSlug` is rejected with 400.
+
 ## Tests
 
 With `docker compose up -d` running:
@@ -98,5 +106,5 @@ pytest -v
 
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
-- `app/models.py` — Beanie documents (SiteProfile, Project, Article)
+- `app/models.py` — Beanie documents (SiteProfile, Project, Article, Journal)
 - `tests/` — HTTP-seam integration tests
