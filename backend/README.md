@@ -69,6 +69,14 @@ Avatars are stored under `AVATAR_DIR` (default `data/avatars`, gitignored).
 
 Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `published`.
 
+## Articles
+
+- `GET /api/public/articles?locale=` — Published only
+- `GET /api/public/articles/{slug}?locale=` — includes `relatedProject` when that Project is Published
+- `GET/POST /api/owner/articles`, `PUT/DELETE /api/owner/articles/{id}` (Bearer)
+
+Optional `relatedProjectSlug`. A Draft related Project is omitted from the public payload.
+
 ## Tests
 
 With `docker compose up -d` running:
@@ -90,5 +98,5 @@ pytest -v
 
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
-- `app/models.py` — Beanie documents (SiteProfile, Project)
+- `app/models.py` — Beanie documents (SiteProfile, Project, Article)
 - `tests/` — HTTP-seam integration tests

@@ -291,3 +291,127 @@ export async function saveOwnerProject(
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerProject;
 }
+
+export type RelatedProject = {
+  slug: string;
+  title: string;
+};
+
+export type OwnerArticle = {
+  id: string;
+  slug: string;
+  title: Localized;
+  summary: Localized;
+  body: Localized;
+  status: "draft" | "published";
+  order: number;
+  relatedProjectSlug: string;
+};
+
+export type PublicArticle = {
+  slug: string;
+  title: string;
+  summary: string;
+  body: string;
+  order: number;
+  relatedProject: RelatedProject | null;
+};
+
+export function emptyOwnerArticle(): OwnerArticle {
+  return {
+    id: "",
+    slug: "",
+    title: emptyLocalized(),
+    summary: emptyLocalized(),
+    body: emptyLocalized(),
+    status: "draft",
+    order: 0,
+    relatedProjectSlug: "",
+  };
+}
+
+export async function fetchPublicArticles(
+  locale: string,
+): Promise<PublicArticle[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/articles?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicArticle[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPublicArticle(
+  locale: string,
+  slug: string,
+): Promise<PublicArticle | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/articles/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as PublicArticle;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchOwnerArticles(
+  token: string,
+): Promise<OwnerArticle[]> {
+  const res = await fetch(`${API_BASE}/api/owner/articles`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticle[];
+}
+
+export async function createOwnerArticle(
+  token: string,
+  body: Omit<OwnerArticle, "id">,
+): Promise<OwnerArticle> {
+  const res = await fetch(`${API_BASE}/api/owner/articles`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticle;
+}
+
+export async function saveOwnerArticle(
+  token: string,
+  id: string,
+  body: Omit<OwnerArticle, "id">,
+): Promise<OwnerArticle> {
+  const res = await fetch(`${API_BASE}/api/owner/articles/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticle;
+}
+
+export async function deleteOwnerArticle(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/articles/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}

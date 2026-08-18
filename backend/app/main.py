@@ -22,7 +22,7 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
-from app.models import STATUSES, LinkItem, Project, SiteProfile, empty_localized
+from app.models import STATUSES, Article, LinkItem, Project, SiteProfile, empty_localized
 
 
 async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
@@ -77,6 +77,16 @@ class ProjectBody(BaseModel):
     order: int = 0
 
 
+class ArticleBody(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    summary: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+    relatedProjectSlug: str = ""
+
+
 async def get_or_create_site() -> SiteProfile:
     site = await SiteProfile.find_one()
     if site is None:
@@ -109,7 +119,7 @@ def create_app(
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
         await init_beanie(
             database=mongo[settings.mongo_db],
-            document_models=[SiteProfile, Project],
+            document_models=[SiteProfile, Project, Article],
         )
         await redis.ping()
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
@@ -357,6 +367,124 @@ def create_app(
         await ensure_unique_slug(project.slug, exclude_id=str(project.id))
         await project.save()
         return project.to_owner_dict()
+
+    def apply_article_body(article: Article, body: ArticleBody) -> None:
+        if body.status not in STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_status",
+            )
+        slug = body.slug.strip().lower()
+        if not slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_slug",
+            )
+        article.slug = slug
+        article.title = body.title
+        article.summary = body.summary
+        article.body = body.body
+        article.status = body.status
+        article.order = body.order
+        article.related_project_slug = body.relatedProjectSlug.strip().lower()
+
+    async def ensure_unique_article_slug(
+        slug: str, exclude_id: str | None = None
+    ) -> None:
+        existing = await Article.find_one(Article.slug == slug)
+        if existing is not None and str(existing.id) != exclude_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="slug_taken",
+            )
+
+    async def public_article_payload(article: Article, locale: str) -> dict[str, Any]:
+        payload = article.resolve(locale)
+        related_slug = article.related_project_slug
+        if related_slug:
+            project = await Project.find_one(
+                Project.slug == related_slug,
+                Project.status == "published",
+            )
+            if project is not None:
+                payload["relatedProject"] = {
+                    "slug": project.slug,
+                    "title": project.resolve(locale)["title"],
+                }
+        return payload
+
+    @app.get("/api/public/articles")
+    async def public_articles(locale: str = "zh-Hant") -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        articles = await Article.find(Article.status == "published").to_list()
+        articles.sort(key=lambda item: (item.order, item.slug))
+        return [await public_article_payload(item, locale) for item in articles]
+
+    @app.get("/api/public/articles/{slug}")
+    async def public_article(
+        slug: str, locale: str = "zh-Hant"
+    ) -> dict[str, Any]:
+        locale = normalize_locale(locale)
+        article = await Article.find_one(
+            Article.slug == slug,
+            Article.status == "published",
+        )
+        if article is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return await public_article_payload(article, locale)
+
+    @app.get("/api/owner/articles")
+    async def owner_list_articles(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        articles = await Article.find_all().to_list()
+        articles.sort(key=lambda item: (item.order, item.slug))
+        return [item.to_owner_dict() for item in articles]
+
+    @app.post("/api/owner/articles")
+    async def owner_create_article(
+        body: ArticleBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        article = Article()
+        apply_article_body(article, body)
+        await ensure_unique_article_slug(article.slug)
+        await article.insert()
+        return article.to_owner_dict()
+
+    @app.put("/api/owner/articles/{article_id}")
+    async def owner_update_article(
+        article_id: PydanticObjectId,
+        body: ArticleBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        article = await Article.get(article_id)
+        if article is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        apply_article_body(article, body)
+        await ensure_unique_article_slug(article.slug, exclude_id=str(article.id))
+        await article.save()
+        return article.to_owner_dict()
+
+    @app.delete("/api/owner/articles/{article_id}")
+    async def owner_delete_article(
+        article_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        article = await Article.get(article_id)
+        if article is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        await article.delete()
+        return {"status": "deleted"}
 
     return app
 
