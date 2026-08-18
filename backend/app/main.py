@@ -1,14 +1,16 @@
 from __future__ import annotations
 
+import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
 from beanie import PydanticObjectId, init_beanie
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
@@ -21,8 +23,18 @@ from app.avatar import (
     save_avatar_file,
 )
 from app.config import Settings
+from app.github import GitHubClient, GitHubOAuthError, HttpGitHub
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer
-from app.models import STATUSES, Article, Journal, LinkItem, Project, SiteProfile, empty_localized
+from app.models import (
+    STATUSES,
+    Article,
+    Journal,
+    LinkItem,
+    Project,
+    SiteProfile,
+    SourceRepo,
+    empty_localized,
+)
 
 
 async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
@@ -77,6 +89,10 @@ class ProjectBody(BaseModel):
     order: int = 0
 
 
+class SourceRepoBody(BaseModel):
+    fullName: str = Field(min_length=1, max_length=200)
+
+
 class ArticleBody(BaseModel):
     slug: str = Field(min_length=1, max_length=80)
     title: dict[str, str] = Field(default_factory=empty_localized)
@@ -105,9 +121,14 @@ async def get_or_create_site() -> SiteProfile:
     return site
 
 
+GITHUB_STATE_TTL = 600
+GITHUB_TOKEN_KEY = "github:owner_token"
+
+
 def create_app(
     settings: Settings | None = None,
     mailer: Mailer | None = None,
+    github: GitHubClient | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     if mailer is not None:
@@ -122,6 +143,11 @@ def create_app(
             password=settings.smtp_password,
             from_addr=settings.smtp_from,
         )
+    resolved_github: GitHubClient = github or HttpGitHub(
+        client_id=settings.github_client_id,
+        client_secret=settings.github_client_secret,
+        callback_url=settings.github_oauth_callback_url,
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -137,6 +163,7 @@ def create_app(
         app.state.redis = redis
         app.state.settings = settings
         app.state.mailer = resolved_mailer
+        app.state.github = resolved_github
         app.state.avatar_dir = avatar_dir
         app.state.auth = AuthService(
             redis=redis,
@@ -375,6 +402,102 @@ def create_app(
             )
         apply_project_body(project, body)
         await ensure_unique_slug(project.slug, exclude_id=str(project.id))
+        await project.save()
+        return project.to_owner_dict()
+
+    def github_redirect(*, connected: bool) -> RedirectResponse:
+        dest = settings.github_oauth_success_url
+        joiner = "&" if "?" in dest else "?"
+        flag = "connected" if connected else "error"
+        return RedirectResponse(f"{dest}{joiner}github={flag}", status_code=302)
+
+    async def github_access_token() -> str | None:
+        redis: Redis = app.state.redis
+        token = await redis.get(GITHUB_TOKEN_KEY)
+        return str(token) if token else None
+
+    @app.get("/api/owner/github/oauth/start")
+    async def owner_github_oauth_start(
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        redis: Redis = app.state.redis
+        github_client: GitHubClient = app.state.github
+        state = secrets.token_urlsafe(24)
+        await redis.set(f"github:oauth:{state}", "1", ex=GITHUB_STATE_TTL)
+        return {"authorizationUrl": github_client.authorization_url(state=state)}
+
+    @app.get("/api/auth/github/callback")
+    async def github_oauth_callback(
+        code: str = "",
+        state: str = "",
+    ) -> RedirectResponse:
+        redis: Redis = app.state.redis
+        github_client: GitHubClient = app.state.github
+        stored = await redis.get(f"github:oauth:{state}") if state else None
+        if stored:
+            await redis.delete(f"github:oauth:{state}")
+        if not code or not stored:
+            return github_redirect(connected=False)
+        try:
+            access = await github_client.exchange_code(code=code)
+        except GitHubOAuthError:
+            return github_redirect(connected=False)
+        await redis.set(
+            GITHUB_TOKEN_KEY,
+            access,
+            ex=settings.session_ttl_seconds,
+        )
+        return github_redirect(connected=True)
+
+    @app.get("/api/owner/github/repos")
+    async def owner_github_repos(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            )
+        github_client: GitHubClient = app.state.github
+        try:
+            return await github_client.list_repos(access_token=access)
+        except GitHubOAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
+
+    @app.put("/api/owner/projects/{project_id}/source-repo")
+    async def owner_attach_source_repo(
+        project_id: PydanticObjectId,
+        body: SourceRepoBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        project = await Project.get(project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            )
+        github_client: GitHubClient = app.state.github
+        repos = await github_client.list_repos(access_token=access)
+        match = next(
+            (item for item in repos if item.get("fullName") == body.fullName),
+            None,
+        )
+        if match is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="unknown_repo",
+            )
+        project.source_repo = SourceRepo.from_github(match)
         await project.save()
         return project.to_owner_dict()
 

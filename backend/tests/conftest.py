@@ -8,6 +8,7 @@ from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
+from app.github import RecordingGitHub
 from app.mailer import RecordingMailer
 from app.main import create_app
 from app.models import Article, Journal, Project, SiteProfile
@@ -31,6 +32,10 @@ def settings(tmp_path) -> Settings:
         smtp_password="test",
         smtp_from="ynchanhk@gmail.com",
         avatar_dir=str(tmp_path / "avatars"),
+        github_client_id="test-client",
+        github_client_secret="test-secret",
+        github_oauth_callback_url="http://test/api/auth/github/callback",
+        github_oauth_success_url="http://localhost:3000/zh-Hant/admin",
     )
 
 
@@ -39,9 +44,14 @@ async def mailer() -> RecordingMailer:
     return RecordingMailer()
 
 
+@pytest.fixture
+def github() -> RecordingGitHub:
+    return RecordingGitHub()
+
+
 @pytest_asyncio.fixture
-async def app(settings: Settings, mailer: RecordingMailer):
-    application = create_app(settings, mailer=mailer)
+async def app(settings: Settings, mailer: RecordingMailer, github: RecordingGitHub):
+    application = create_app(settings, mailer=mailer, github=github)
     async with LifespanManager(application):
         await application.state.redis.flushdb()
         await SiteProfile.delete_all()

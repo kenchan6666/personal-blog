@@ -33,6 +33,19 @@ export default async function ProjectDetailPage({
           {project.summary}
         </p>
       ) : null}
+      {project.sourceRepo ? (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          {dict.admin.sourceRepo}:{" "}
+          <a
+            href={project.sourceRepo.htmlUrl}
+            className="text-[var(--accent-link)] hover:underline"
+            rel="noreferrer"
+            target="_blank"
+          >
+            {project.sourceRepo.fullName}
+          </a>
+        </p>
+      ) : null}
       <div className="mt-10">
         <MarkdownBody source={project.body} />
       </div>

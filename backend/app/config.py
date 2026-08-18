@@ -30,3 +30,8 @@ class Settings(BaseSettings):
 
     avatar_dir: str = "data/avatars"
     avatar_max_bytes: int = 2 * 1024 * 1024
+
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    github_oauth_callback_url: str = "http://127.0.0.1:8000/api/auth/github/callback"
+    github_oauth_success_url: str = "http://localhost:3000/zh-Hant/admin"

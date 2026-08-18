@@ -187,6 +187,15 @@ export async function uploadOwnerAvatar(
   return (await res.json()) as { avatarUrl: string };
 }
 
+export type SourceRepo = {
+  fullName: string;
+  owner: string;
+  name: string;
+  private: boolean;
+  htmlUrl: string;
+  defaultBranch: string;
+};
+
 export type OwnerProject = {
   id: string;
   slug: string;
@@ -195,6 +204,7 @@ export type OwnerProject = {
   body: Localized;
   status: "draft" | "published";
   order: number;
+  sourceRepo: SourceRepo | null;
 };
 
 export type PublicProject = {
@@ -203,6 +213,7 @@ export type PublicProject = {
   summary: string;
   body: string;
   order: number;
+  sourceRepo: SourceRepo | null;
 };
 
 export function emptyOwnerProject(): OwnerProject {
@@ -214,6 +225,7 @@ export function emptyOwnerProject(): OwnerProject {
     body: emptyLocalized(),
     status: "draft",
     order: 0,
+    sourceRepo: null,
   };
 }
 
@@ -261,7 +273,7 @@ export async function fetchOwnerProjects(
 
 export async function createOwnerProject(
   token: string,
-  body: Omit<OwnerProject, "id">,
+  body: Omit<OwnerProject, "id" | "sourceRepo">,
 ): Promise<OwnerProject> {
   const res = await fetch(`${API_BASE}/api/owner/projects`, {
     method: "POST",
@@ -278,7 +290,7 @@ export async function createOwnerProject(
 export async function saveOwnerProject(
   token: string,
   id: string,
-  body: Omit<OwnerProject, "id">,
+  body: Omit<OwnerProject, "id" | "sourceRepo">,
 ): Promise<OwnerProject> {
   const res = await fetch(`${API_BASE}/api/owner/projects/${id}`, {
     method: "PUT",
@@ -288,6 +300,49 @@ export async function saveOwnerProject(
     },
     body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerProject;
+}
+
+export async function startGitHubOAuth(
+  token: string,
+): Promise<{ authorizationUrl: string }> {
+  const res = await fetch(`${API_BASE}/api/owner/github/oauth/start`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as { authorizationUrl: string };
+}
+
+export async function fetchOwnerGitHubRepos(
+  token: string,
+): Promise<SourceRepo[] | null> {
+  const res = await fetch(`${API_BASE}/api/owner/github/repos`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (res.status === 409) return null;
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as SourceRepo[];
+}
+
+export async function attachOwnerSourceRepo(
+  token: string,
+  projectId: string,
+  fullName: string,
+): Promise<OwnerProject> {
+  const res = await fetch(
+    `${API_BASE}/api/owner/projects/${projectId}/source-repo`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fullName }),
+    },
+  );
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerProject;
 }

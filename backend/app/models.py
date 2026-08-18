@@ -88,6 +88,38 @@ class SiteProfile(Document):
 STATUSES = ("draft", "published")
 
 
+class SourceRepo(BaseModel):
+    full_name: str = ""
+    owner: str = ""
+    name: str = ""
+    private: bool = False
+    html_url: str = ""
+    default_branch: str = ""
+
+    @classmethod
+    def from_github(cls, item: dict[str, object]) -> SourceRepo:
+        return cls(
+            full_name=str(item["fullName"]),
+            owner=str(item["owner"]),
+            name=str(item["name"]),
+            private=bool(item["private"]),
+            html_url=str(item["htmlUrl"]),
+            default_branch=str(item["defaultBranch"]),
+        )
+
+    def to_public(self) -> dict[str, Any] | None:
+        if not self.full_name:
+            return None
+        return {
+            "fullName": self.full_name,
+            "owner": self.owner,
+            "name": self.name,
+            "private": self.private,
+            "htmlUrl": self.html_url,
+            "defaultBranch": self.default_branch,
+        }
+
+
 class Project(Document):
     slug: str = ""
     title: dict[str, str] = Field(default_factory=empty_localized)
@@ -95,6 +127,7 @@ class Project(Document):
     body: dict[str, str] = Field(default_factory=empty_localized)
     status: str = "draft"
     order: int = 0
+    source_repo: SourceRepo | None = None
 
     class Settings:
         name = "projects"
@@ -108,6 +141,7 @@ class Project(Document):
             "body": self.body,
             "status": self.status,
             "order": self.order,
+            "sourceRepo": self.source_repo.to_public() if self.source_repo else None,
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
@@ -120,6 +154,7 @@ class Project(Document):
             "summary": pick(self.summary),
             "body": pick(self.body),
             "order": self.order,
+            "sourceRepo": self.source_repo.to_public() if self.source_repo else None,
         }
 
 

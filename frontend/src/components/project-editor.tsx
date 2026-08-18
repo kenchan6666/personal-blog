@@ -3,13 +3,17 @@
 import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import {
+  attachOwnerSourceRepo,
   createOwnerProject,
   emptyOwnerProject,
+  fetchOwnerGitHubRepos,
   fetchOwnerProjects,
   getSessionToken,
   saveOwnerProject,
+  startGitHubOAuth,
   type Localized,
   type OwnerProject,
+  type SourceRepo,
 } from "@/lib/api";
 
 type Props = {
@@ -64,8 +68,10 @@ function BilingualField({
   );
 }
 
-function payloadOf(project: OwnerProject): Omit<OwnerProject, "id"> {
-  const { id: _id, ...rest } = project;
+function payloadOf(
+  project: OwnerProject,
+): Omit<OwnerProject, "id" | "sourceRepo"> {
+  const { id: _id, sourceRepo: _repo, ...rest } = project;
   return rest;
 }
 
@@ -77,10 +83,15 @@ export function ProjectEditor({ dict }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [repos, setRepos] = useState<SourceRepo[]>([]);
+  const [githubReady, setGithubReady] = useState(false);
 
   async function reload(token: string) {
     const list = await fetchOwnerProjects(token);
     setProjects(list);
+    const githubRepos = await fetchOwnerGitHubRepos(token);
+    setGithubReady(githubRepos !== null);
+    setRepos(githubRepos ?? []);
     return list;
   }
 
@@ -99,6 +110,36 @@ export function ProjectEditor({ dict }: Props) {
     setCurrent(emptyOwnerProject());
     setMessage(null);
     setError(null);
+  }
+
+  async function onConnectGitHub() {
+    const token = getSessionToken();
+    if (!token) return;
+    setError(null);
+    try {
+      const { authorizationUrl } = await startGitHubOAuth(token);
+      window.location.href = authorizationUrl;
+    } catch {
+      setError(a.errorGeneric);
+    }
+  }
+
+  async function onAttachRepo(fullName: string) {
+    const token = getSessionToken();
+    if (!token || !current.id || !fullName) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const saved = await attachOwnerSourceRepo(token, current.id, fullName);
+      setCurrent(saved);
+      await reload(token);
+      setMessage(a.saved);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function onSave(e: React.FormEvent) {
@@ -219,6 +260,36 @@ export function ProjectEditor({ dict }: Props) {
           onChange={(body) => setCurrent({ ...current, body })}
           multiline
         />
+
+        <div className="mb-6">
+          <p className="mb-2 text-sm font-semibold">{a.fieldSourceRepo}</p>
+          {githubReady ? (
+            <select
+              className="w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+              value={current.sourceRepo?.fullName ?? ""}
+              disabled={!current.id || saving}
+              onChange={(e) => {
+                if (e.target.value) void onAttachRepo(e.target.value);
+              }}
+            >
+              <option value="">{a.noSourceRepo}</option>
+              {repos.map((repo) => (
+                <option key={repo.fullName} value={repo.fullName}>
+                  {repo.fullName}
+                  {repo.private ? " (private)" : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={onConnectGitHub}
+            >
+              {a.connectGitHub}
+            </button>
+          )}
+        </div>
 
         {message ? (
           <p className="mb-3 text-sm text-[var(--accent-link)]">{message}</p>

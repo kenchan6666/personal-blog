@@ -85,6 +85,17 @@ Optional `relatedProjectSlug`. A Draft related Project is omitted from the publi
 
 Journals have no `relatedProject`. Sending `relatedProjectSlug` is rejected with 400.
 
+## GitHub OAuth + SourceRepo
+
+Create a GitHub OAuth App (callback `GITHUB_OAUTH_CALLBACK_URL`) and set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
+
+- `GET /api/owner/github/oauth/start` (Bearer) → `{ authorizationUrl }`
+- `GET /api/auth/github/callback?code=&state=` → redirects to admin; **never** puts the access token in the URL
+- `GET /api/owner/github/repos` (Bearer) — 409 if GitHub is not connected
+- `PUT /api/owner/projects/{id}/source-repo` `{ "fullName": "owner/name" }`
+
+Public project payloads may include `sourceRepo` metadata. Unattached GitHub repos never appear as public Projects. Tree/blob browsing is ticket #10.
+
 ## Tests
 
 With `docker compose up -d` running:
@@ -107,4 +118,5 @@ pytest -v
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
 - `app/models.py` — Beanie documents (SiteProfile, Project, Article, Journal)
+- `app/github.py` — GitHub OAuth + repo list (injected in tests)
 - `tests/` — HTTP-seam integration tests
