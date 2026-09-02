@@ -123,6 +123,7 @@ Create a GitHub OAuth App (callback `GITHUB_OAUTH_CALLBACK_URL`) and set `GITHUB
 - `GET /api/owner/github/oauth/start` (Bearer) → `{ authorizationUrl }`
 - `GET /api/auth/github/callback?code=&state=` → redirects to admin; **never** puts the access token in the URL
 - `GET /api/owner/github/repos` (Bearer) — 409 if GitHub is not connected
+- `GET /api/owner/github/repos/{owner}/{name}` (+ `/tree`, `/blob`) — Owner/Agent can read authorized public and private repos without attaching a Project
 - `PUT /api/owner/projects/{id}/source-repo` `{ "fullName": "owner/name" }`
 
 Public project payloads may include `sourceRepo` metadata. Unattached GitHub repos never appear as public Projects.

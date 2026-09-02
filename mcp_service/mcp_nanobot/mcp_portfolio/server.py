@@ -87,6 +87,40 @@ def _find(items: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
     raise RuntimeError(f"Content not found: {identifier}")
 
 
+def _repo_parts(full_name: str) -> tuple[str, str]:
+    parts = [part for part in full_name.strip().strip("/").split("/") if part]
+    if len(parts) != 2:
+        raise RuntimeError("full_name must be owner/name")
+    return parts[0], parts[1]
+
+
+def _github_snapshot(api: PortfolioApi) -> dict[str, Any]:
+    try:
+        items = api.request("GET", "/api/owner/github/repos")
+    except RuntimeError as exc:
+        detail = str(exc)
+        if "409" in detail or "github_not_connected" in detail:
+            return {
+                "connected": False,
+                "repos": [],
+                "hint": "Connect GitHub in the admin GitHub tab, then ask again.",
+            }
+        return {"connected": False, "repos": [], "error": detail[:200]}
+    return {
+        "connected": True,
+        "repos": [
+            {
+                "fullName": item.get("fullName"),
+                "private": item.get("private"),
+                "description": item.get("description"),
+                "htmlUrl": item.get("htmlUrl"),
+                "defaultBranch": item.get("defaultBranch"),
+            }
+            for item in items
+        ],
+    }
+
+
 def create_server() -> FastMCP:
     server = FastMCP("portfolio")
     api = PortfolioApi()
@@ -102,6 +136,7 @@ def create_server() -> FastMCP:
             "journals": api.request("GET", "/api/owner/journals"),
             "about": api.request("GET", "/api/owner/about-modules"),
             "comments": api.request("GET", "/api/owner/comments"),
+            "github": _github_snapshot(api),
         }
 
     @server.tool()
@@ -265,6 +300,42 @@ def create_server() -> FastMCP:
                 "tags": tags or [],
                 "order": order,
             },
+        )
+
+    @server.tool()
+    def portfolio_list_github_repos() -> dict[str, Any]:
+        """List every GitHub repository the Owner has authorized, including private ones."""
+        snapshot = _github_snapshot(api)
+        repos = snapshot.get("repos") or []
+        return {**snapshot, "items": repos, "total": len(repos)}
+
+    @server.tool()
+    def portfolio_get_github_source(
+        full_name: str,
+        ref: str = "",
+        path: str = "",
+    ) -> dict[str, Any]:
+        """Read README/tree for any authorized GitHub repo by owner/name. Binding a Project is not required."""
+        owner, name = _repo_parts(full_name)
+        suffix = "/tree" if path else ""
+        params = httpx.QueryParams({"ref": ref, "path": path})
+        return api.request(
+            "GET",
+            f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}{suffix}?{params}",
+        )
+
+    @server.tool()
+    def portfolio_get_github_file(
+        full_name: str,
+        path: str,
+        ref: str = "",
+    ) -> dict[str, Any]:
+        """Read one file from any authorized GitHub repo, including private repositories."""
+        owner, name = _repo_parts(full_name)
+        params = httpx.QueryParams({"ref": ref, "path": path})
+        return api.request(
+            "GET",
+            f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}/blob?{params}",
         )
 
     @server.tool()

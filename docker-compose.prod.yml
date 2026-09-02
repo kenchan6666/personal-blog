@@ -13,6 +13,9 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
 
   qdrant:
     image: qdrant/qdrant:v1.15.4
@@ -108,6 +111,7 @@ services:
 
 volumes:
   mongo_data:
+  redis_data:
   certbot_www:
   certbot_certs:
   agent_data:

@@ -4,7 +4,8 @@
 
 | 版本 | 狀態 | 說明 |
 | --- | --- | --- |
-| [1.0.1](./1.0.1.md) | 當前 | Embedding 渠道失敗時回退備用模型 |
+| [1.0.2](./1.0.2.md) | 當前 | 公開導覽語氣簡化；Owner Agent 讀取已授權 GitHub |
+| [1.0.1](./1.0.1.md) | 歷史 | Embedding 渠道失敗時回退備用模型 |
 | [1.0.0](./1.0.0.md) | 歷史 | 公開只讀 Portfolio Guide、Owner Agent + RAG、UniAPI Gemini 基線 |
 
 **憲法原則**：凡修改 prompt 模板或變更 README 記載的大模型基線，必須在同一變更集更新 README 該節、新增或修訂本目錄版本檔。

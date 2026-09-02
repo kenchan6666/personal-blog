@@ -980,12 +980,52 @@ def create_app(
             access = await github_client.exchange_code(code=code)
         except GitHubOAuthError:
             return github_redirect(connected=False)
-        await redis.set(
-            GITHUB_TOKEN_KEY,
-            access,
-            ex=settings.session_ttl_seconds,
-        )
+        await redis.set(GITHUB_TOKEN_KEY, access)
         return github_redirect(connected=True)
+
+    def parse_github_full_name(owner: str, name: str) -> str:
+        owner_part = owner.strip()
+        name_part = name.strip()
+        if (
+            not owner_part
+            or not name_part
+            or "/" in owner_part
+            or "/" in name_part
+            or owner_part in {".", ".."}
+            or name_part in {".", ".."}
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_repo",
+            )
+        return f"{owner_part}/{name_part}"
+
+    async def owner_github_repo(owner: str, name: str) -> tuple[SourceRepo, str]:
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            )
+        github_client: GitHubClient = app.state.github
+        try:
+            repos = await github_client.list_repos(access_token=access)
+        except GitHubOAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
+        full_name = parse_github_full_name(owner, name)
+        match = next(
+            (item for item in repos if item.get("fullName") == full_name),
+            None,
+        )
+        if match is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return SourceRepo.from_github(match), access
 
     @app.get("/api/owner/github/repos")
     async def owner_github_repos(
@@ -1005,6 +1045,100 @@ def create_app(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="github_not_connected",
             ) from None
+
+    @app.get("/api/owner/github/repos/{owner}/{name}")
+    async def owner_github_repo_source(
+        owner: str,
+        name: str,
+        ref: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        repo, access = await owner_github_repo(owner, name)
+        try:
+            payload = await github_source_overview(repo, access, ref)
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        payload["private"] = bool(repo.private)
+        payload["htmlUrl"] = repo.html_url
+        payload["fullName"] = repo.full_name
+        return payload
+
+    @app.get("/api/owner/github/repos/{owner}/{name}/tree")
+    async def owner_github_repo_tree(
+        owner: str,
+        name: str,
+        ref: str = "",
+        path: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        repo, access = await owner_github_repo(owner, name)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            tree = await cached_github(
+                kind="tree",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.list_tree(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {
+            "ref": branch,
+            "path": path,
+            "tree": tree,
+            "private": bool(repo.private),
+        }
+
+    @app.get("/api/owner/github/repos/{owner}/{name}/blob")
+    async def owner_github_repo_blob(
+        owner: str,
+        name: str,
+        ref: str = "",
+        path: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        if not path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="path_required",
+            )
+        repo, access = await owner_github_repo(owner, name)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            blob = await cached_github(
+                kind="blob",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.get_blob(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {**blob, "private": bool(repo.private)}
 
     @app.put("/api/owner/projects/{project_id}/source-repo")
     async def owner_attach_source_repo(

@@ -15,6 +15,7 @@
 - `portfolio_list_content` / `portfolio_get_content`
 - `portfolio_create_content` / `portfolio_update_content`
 - `portfolio_update_site`
+- `portfolio_list_github_repos` / `portfolio_get_github_source` / `portfolio_get_github_file`
 - `portfolio_get_project_source` / `portfolio_get_source_file`
 - `portfolio_list_comments` / `portfolio_comment_action`
 - `portfolio_list_knowledge` / `portfolio_remember_knowledge` / `portfolio_update_knowledge`

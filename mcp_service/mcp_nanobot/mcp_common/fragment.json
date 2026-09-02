@@ -21,6 +21,9 @@
       "portfolio_list_knowledge",
       "portfolio_remember_knowledge",
       "portfolio_update_knowledge",
+      "portfolio_list_github_repos",
+      "portfolio_get_github_source",
+      "portfolio_get_github_file",
       "portfolio_get_project_source",
       "portfolio_get_source_file",
       "portfolio_comment_action"

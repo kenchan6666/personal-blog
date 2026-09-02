@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_portfolio.server import PortfolioApi, _merge
+from mcp_portfolio.server import PortfolioApi, _merge, _repo_parts
 
 
 def test_portfolio_client_requires_service_token(monkeypatch) -> None:
@@ -35,3 +35,9 @@ def test_merge_preserves_omitted_locales() -> None:
         "en": "New",
     }
     assert merged["status"] == "draft"
+
+
+def test_repo_parts_require_owner_and_name() -> None:
+    assert _repo_parts("kenchan6666/secret-lab") == ("kenchan6666", "secret-lab")
+    with pytest.raises(RuntimeError, match="owner/name"):
+        _repo_parts("not-a-repo")

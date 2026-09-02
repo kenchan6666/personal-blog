@@ -4,7 +4,10 @@
 - `mcp_portfolio_portfolio_list_content` / `get_content`：写作前读取相关内容。
 - `mcp_portfolio_portfolio_create_content`：创建 Draft 项目、文章、日志或 About 模块。
 - `mcp_portfolio_portfolio_update_content` / `update_site`：只传用户要求改变的字段。
-- `mcp_portfolio_portfolio_get_project_source` / `get_source_file`：读取已绑定 SourceRepo 的源码。私有仓只在后台对话中使用，不要把私有细节写进会公开发布的内容。
+- `mcp_portfolio_portfolio_list_github_repos`：列出 Owner 已授权的全部 GitHub 仓库（含私有）。未连接时先请用户到后台 GitHub 页授权。
+- `mcp_portfolio_portfolio_get_github_source` / `get_github_file`：用 `owner/name` 读取任意已授权仓库。不必绑定 Project。
+- `mcp_portfolio_portfolio_get_project_source` / `get_source_file`：读取已绑定 SourceRepo 的项目源码。
+- 私有仓只在后台对话中使用，不要把私有细节写进会公开发布的内容。
 - `mcp_portfolio_portfolio_list_comments`：可读取待审核及历史评论。
 - `mcp_portfolio_portfolio_comment_action`：仅在用户明确要求时审核、拒绝或回复。
 - `mcp_portfolio_portfolio_list_knowledge`：查看“关于我”RAG 资料。

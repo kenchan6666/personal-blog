@@ -75,7 +75,7 @@ async def test_unauthenticated_cannot_start_github_oauth(client):
 
 @pytest.mark.asyncio
 async def test_owner_oauth_lists_repos_without_leaking_token(
-    client, mailer, settings
+    client, app, mailer, settings
 ):
     token = await _owner_token(client, mailer, settings)
     headers = {"Authorization": f"Bearer {token}"}
@@ -108,6 +108,7 @@ async def test_owner_oauth_lists_repos_without_leaking_token(
     assert repos.json()[1]["private"] is True
     assert repos.json()[0]["description"] == "Job-seeking portfolio"
     assert "accessToken" not in repos.json()[0]
+    assert await app.state.redis.ttl("github:owner_token") == -1
 
 
 @pytest.mark.asyncio
@@ -158,3 +159,46 @@ async def test_owner_attaches_source_repo_public_inventory_stays_projects_only(
 
     missing = await client.get("/api/public/github/repos")
     assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_owner_can_read_unbound_private_github_repo(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    await _connect_github(client, token)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    source = await client.get(
+        "/api/owner/github/repos/kenchan6666/secret-lab",
+        headers=headers,
+    )
+    assert source.status_code == 200
+    assert source.json()["private"] is True
+    assert source.json()["fullName"] == "kenchan6666/secret-lab"
+    assert "private notes" in source.json()["readme"]["content"]
+
+    blob = await client.get(
+        "/api/owner/github/repos/kenchan6666/secret-lab/blob",
+        headers=headers,
+        params={"path": "secret.txt"},
+    )
+    assert blob.status_code == 200
+    assert blob.json()["content"] == "do-not-leak\n"
+
+    settings.agent_service_token = "github-agent-token"
+    via_agent = await client.get(
+        "/api/owner/github/repos/kenchan6666/secret-lab",
+        headers={"Authorization": "Bearer github-agent-token"},
+    )
+    assert via_agent.status_code == 200
+    assert via_agent.json()["private"] is True
+
+    anonymous = await client.get("/api/owner/github/repos/kenchan6666/secret-lab")
+    assert anonymous.status_code == 401
+
+    unknown = await client.get(
+        "/api/owner/github/repos/someone/else",
+        headers=headers,
+    )
+    assert unknown.status_code == 404

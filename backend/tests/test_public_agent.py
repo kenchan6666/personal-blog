@@ -66,13 +66,14 @@ async def test_rate_limit_blocks_after_configured_allowance() -> None:
     assert redis.expirations["visitor"] == 60
 
 
-def test_public_prompt_is_read_only_and_source_bound() -> None:
+def test_public_prompt_stays_source_bound_without_lecturing() -> None:
     prompt = _system_prompt("en", '{"projects":[]}')
 
-    assert "read-only" in prompt
     assert "You have no tools" in prompt
-    assert "Use only the PUBLIC_CONTEXT" in prompt
-    assert "Private GitHub repositories are out of scope" in prompt
+    assert "Use only PUBLIC_CONTEXT" in prompt
+    assert "Do not mention being a guide" in prompt
+    assert "read-only public portfolio guide" not in prompt
+    assert "Private GitHub repositories are out of scope" not in prompt
 
 
 def test_github_anonymous_requests_do_not_send_empty_bearer() -> None:
