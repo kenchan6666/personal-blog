@@ -78,7 +78,7 @@ Copy `.env.example` to `.env` and set a Gmail **App Password** in `SMTP_PASSWORD
 - `POST /api/owner/avatar` multipart field `file` (png/jpeg/webp, Bearer)
 - `GET /api/public/media/avatar/{filename}`
 
-Avatars, hero, and Markdown content images are stored under `AVATAR_DIR` (local default `data/avatars`; production uses the `avatar_data` volume, synced with `./data/media`).
+Avatars, hero, and Markdown content images are stored under `AVATAR_DIR` (local default `data/avatars`; production bind-mounts `./data/media`). The first `--prod` start copies any leftover `avatar_data` volume into that folder once.
 
 ## Projects
 
