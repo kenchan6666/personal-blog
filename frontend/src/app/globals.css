@@ -586,6 +586,35 @@ a:visited {
   border: 1px solid var(--hairline);
 }
 
+.md-blocks {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.25rem;
+}
+
+.md-block-image {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  background: var(--field-bg);
+}
+
+.md-block-image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 14rem;
+  object-fit: contain;
+  background: var(--checker-a);
+}
+
+.md-block-image-remove {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+}
+
 .site-nav-scrim {
   position: fixed;
   inset: 0;

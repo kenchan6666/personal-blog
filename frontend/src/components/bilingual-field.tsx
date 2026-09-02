@@ -5,7 +5,11 @@ import { localeLabels } from "@/i18n/config";
 import type { Localized } from "@/lib/api";
 import { emptyLocalized, getSessionToken, mediaUrl, uploadOwnerMedia } from "@/lib/api";
 import { appendMarkdownToAll } from "@/lib/about-templates";
-import { markdownImages } from "@/lib/markdown-images";
+import {
+  joinMarkdownBlocks,
+  splitMarkdownBlocks,
+  type MarkdownBlock,
+} from "@/lib/markdown-images";
 import { MarkdownBody } from "./markdown-body";
 
 type Props = {
@@ -42,6 +46,7 @@ export function BilingualField({
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(false);
   const showPreview = previewable && multiline;
+  const visualImages = allowImages && multiline;
 
   async function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -112,6 +117,18 @@ export function BilingualField({
                   </p>
                 )}
               </div>
+            ) : visualImages ? (
+              <MarkdownBlocksField
+                source={value[localeKey] ?? ""}
+                rows={rows}
+                onChange={(next) =>
+                  onChange({
+                    ...emptyLocalized(),
+                    ...value,
+                    [localeKey]: next,
+                  })
+                }
+              />
             ) : multiline ? (
               <textarea
                 className="field"
@@ -138,9 +155,6 @@ export function BilingualField({
                 }
               />
             )}
-            {allowImages ? (
-              <ImagePreviews source={value[localeKey] ?? ""} />
-            ) : null}
           </div>
         ))}
       </div>
@@ -148,18 +162,58 @@ export function BilingualField({
   );
 }
 
-function ImagePreviews({ source }: { source: string }) {
-  const images = markdownImages(source);
-  if (images.length === 0) return null;
+function MarkdownBlocksField({
+  source,
+  rows,
+  onChange,
+}: {
+  source: string;
+  rows: number;
+  onChange: (next: string) => void;
+}) {
+  const blocks = splitMarkdownBlocks(source);
+  const textCount = Math.max(
+    1,
+    blocks.filter((block) => block.type === "text").length,
+  );
+  const textRows = Math.max(3, Math.round(rows / textCount));
+
+  function commit(next: MarkdownBlock[]) {
+    onChange(joinMarkdownBlocks(next));
+  }
+
   return (
-    <div className="about-image-previews mt-2">
-      {images.map((image, index) => (
-        <img
-          key={`${image.src}-${index}`}
-          src={mediaUrl(image.src)}
-          alt={image.alt || ""}
-        />
-      ))}
+    <div className="md-blocks">
+      {blocks.map((block, index) =>
+        block.type === "text" ? (
+          <textarea
+            key={`text-${index}`}
+            className="field"
+            value={block.value}
+            rows={textRows}
+            onChange={(event) => {
+              const next = [...blocks];
+              next[index] = { type: "text", value: event.target.value };
+              commit(next);
+            }}
+          />
+        ) : (
+          <div key={`image-${block.src}-${index}`} className="md-block-image">
+            <img src={mediaUrl(block.src)} alt={block.alt || ""} />
+            <button
+              type="button"
+              className="icon-btn md-block-image-remove"
+              aria-label="Remove image"
+              onClick={() => {
+                const next = blocks.filter((_, item) => item !== index);
+                commit(next);
+              }}
+            >
+              ×
+            </button>
+          </div>
+        ),
+      )}
     </div>
   );
 }
