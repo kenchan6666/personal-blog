@@ -127,14 +127,17 @@ ensure_media_dir() {
   if [ -f "$marker" ]; then
     return 0
   fi
-  local vol
+  local vol uid gid
+  uid="$(id -u)"
+  gid="$(id -g)"
   vol="$(docker volume ls -q | grep 'avatar_data$' | head -n 1 || true)"
   if [ -n "$vol" ]; then
     echo "one-time copy $vol → data/media"
     docker run --rm -v "$vol:/from:ro" -v "$ROOT/data/media:/to" alpine:3.20 \
-      sh -c 'cp -an /from/. /to/'
+      sh -c "cp -an /from/. /to/; touch /to/.migrated-from-avatar-volume; chown -R ${uid}:${gid} /to"
+  else
+    touch "$marker"
   fi
-  touch "$marker"
 }
 
 start_prod() {
