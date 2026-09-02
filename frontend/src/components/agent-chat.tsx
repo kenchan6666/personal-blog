@@ -335,7 +335,15 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
 
       <div className="agent-chat">
         <div className="agent-chat-intro">
-          <span className="agent-orb" aria-hidden="true">✦</span>
+          <span className="agent-orb" aria-hidden="true">
+            <span className="agent-orb-core" />
+            <i className="particle p1" />
+            <i className="particle p2" />
+            <i className="particle p3" />
+            <i className="particle p4" />
+            <i className="particle p5" />
+            <i className="particle p6" />
+          </span>
           <div>
             <h2 className="display-font font-bold">
               {context ? `协助编辑 · ${context.label}` : "Portfolio Agent"}
