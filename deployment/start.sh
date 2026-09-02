@@ -123,17 +123,14 @@ wait_http() {
 
 ensure_media_dir() {
   mkdir -p "$ROOT/data/media"
-  if [ -n "$(ls -A "$ROOT/data/media" 2>/dev/null)" ]; then
-    return 0
-  fi
   local vol
   vol="$(docker volume ls -q | grep 'avatar_data$' | head -n 1 || true)"
   if [ -z "$vol" ]; then
     return 0
   fi
-  echo "migrating $vol → data/media"
-  docker run --rm -v "$vol:/from:ro" -v "$ROOT/data/media:/to" alpine:3.20 \
-    sh -c 'cp -a /from/. /to/'
+  echo "merging media: $vol ↔ data/media"
+  docker run --rm -v "$vol:/vol" -v "$ROOT/data/media:/host" alpine:3.20 \
+    sh -c 'cp -an /vol/. /host/ 2>/dev/null || true; cp -an /host/. /vol/ 2>/dev/null || true'
 }
 
 start_prod() {
