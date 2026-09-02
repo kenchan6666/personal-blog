@@ -3,7 +3,11 @@ import { PageFrame } from "@/components/page-frame";
 import { PostArchive } from "@/components/post-archive";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { fetchPublicArticles } from "@/lib/api";
+import {
+  articleHref,
+  fetchPublicArticleCategories,
+  fetchPublicArticles,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +20,10 @@ export default async function ArticlesPage({
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
   const dict = getDictionary(locale);
-  const articles = await fetchPublicArticles(locale);
+  const [articles, categories] = await Promise.all([
+    fetchPublicArticles(locale),
+    fetchPublicArticleCategories(locale),
+  ]);
 
   return (
     <PageFrame title={dict.nav.articles} lead={dict.articles.lead} narrow>
@@ -30,7 +37,9 @@ export default async function ArticlesPage({
           oldest: dict.articles.sortOldest,
           longest: dict.articles.sortLongest,
           related: dict.articles.relatedProject,
+          category: dict.articles.category,
         }}
+        categoryOptions={categories}
         labels={{
           search: dict.archive.search,
           empty: dict.articles.empty,
@@ -39,13 +48,14 @@ export default async function ArticlesPage({
           words: dict.archive.words,
         }}
         posts={articles.map((article) => ({
-          href: `/${locale}/articles/${article.slug}`,
+          href: articleHref(locale, article),
           title: article.title,
           summary: article.summary,
           publishedAt: article.publishedAt,
           wordCount: article.wordCount,
           readingMinutes: article.readingMinutes,
           project: article.relatedProject ?? undefined,
+          categorySlug: article.categorySlug,
         }))}
       />
     </PageFrame>

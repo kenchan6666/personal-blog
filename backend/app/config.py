@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     smtp_user: str = "ynchanhk@gmail.com"
     smtp_password: str = ""
     smtp_from: str = "ynchanhk@gmail.com"
-    # smtp | console — default console for local; Gmail SMTP often times out
+    # smtp | console — default console. GCP VMs block outbound 25/465/587,
+    # so smtp.gmail.com:587 times out; SmtpThenConsoleMailer prints OTP then.
     mail_backend: str = "console"
 
     cors_origins: str = (

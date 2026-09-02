@@ -161,6 +161,8 @@ async def test_published_article_shows_related_project(
         "/api/public/articles/craft-notes", params={"locale": "zh-Hant"}
     )
     assert zh_detail.json()["relatedProject"]["title"] == "玻璃 API"
+    assert zh_detail.json()["categorySlug"] == "taiko"
+    assert zh_detail.json()["categoryTitle"] == "太鼓"
 
 
 @pytest.mark.asyncio
@@ -185,3 +187,84 @@ async def test_related_draft_project_is_hidden_on_public_article(
     )
     assert detail.status_code == 200
     assert detail.json()["relatedProject"] is None
+
+
+@pytest.mark.asyncio
+async def test_owner_sees_seeded_taiko_category_and_cannot_delete_it(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    listed = await client.get("/api/owner/article-categories", headers=headers)
+    assert listed.status_code == 200
+    categories = listed.json()
+    assert [item["slug"] for item in categories] == ["taiko"]
+    assert categories[0]["title"]["zh-Hant"] == "太鼓"
+    assert categories[0]["protected"] is True
+
+    blocked = await client.delete(
+        f"/api/owner/article-categories/{categories[0]['id']}",
+        headers=headers,
+    )
+    assert blocked.status_code == 400
+    assert blocked.json()["detail"] == "protected_category"
+
+
+@pytest.mark.asyncio
+async def test_owner_can_add_article_category_and_visitors_can_filter(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/article-categories",
+        json={
+            "slug": "notes",
+            "title": {"zh-Hant": "筆記", "en": "Notes"},
+            "order": 1,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert created.json()["slug"] == "notes"
+    assert created.json()["protected"] is False
+
+    await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="taiko-piece"),
+        headers=headers,
+    )
+    await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="note-piece", categorySlug="notes"),
+        headers=headers,
+    )
+
+    unknown = await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="ghost", categorySlug="missing"),
+        headers=headers,
+    )
+    assert unknown.status_code == 400
+    assert unknown.json()["detail"] == "unknown_category"
+
+    public_cats = await client.get(
+        "/api/public/article-categories", params={"locale": "zh-Hant"}
+    )
+    assert public_cats.status_code == 200
+    assert [item["slug"] for item in public_cats.json()] == ["taiko", "notes"]
+    assert public_cats.json()[0]["title"] == "太鼓"
+
+    notes = await client.get(
+        "/api/public/articles",
+        params={"locale": "zh-Hant", "category": "notes"},
+    )
+    assert [item["slug"] for item in notes.json()] == ["note-piece"]
+    assert notes.json()[0]["categorySlug"] == "notes"
+    assert notes.json()[0]["categoryTitle"] == "筆記"
+
+    taiko = await client.get(
+        "/api/public/articles",
+        params={"locale": "zh-Hant", "category": "taiko"},
+    )
+    assert [item["slug"] for item in taiko.json()] == ["taiko-piece"]

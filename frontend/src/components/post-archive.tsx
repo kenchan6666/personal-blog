@@ -19,6 +19,7 @@ export type TimelinePost = {
   wordCount: number;
   readingMinutes: number;
   project?: { slug: string; title: string };
+  categorySlug?: string;
 };
 
 type Labels = {
@@ -36,6 +37,12 @@ export type ArchiveChrome = {
   oldest: string;
   longest: string;
   related: string;
+  category?: string;
+};
+
+export type ArchiveCategory = {
+  slug: string;
+  title: string;
 };
 
 type YearGroup = {
@@ -101,6 +108,7 @@ type Props = {
   searchPlaceholder: string;
   labels: Labels;
   chrome?: ArchiveChrome;
+  categoryOptions?: ArchiveCategory[];
 };
 
 export function PostArchive({
@@ -109,10 +117,12 @@ export function PostArchive({
   searchPlaceholder,
   labels,
   chrome,
+  categoryOptions,
 }: Props) {
   const [query, setQuery] = useState("");
   const [year, setYear] = useState("all");
   const [project, setProject] = useState("all");
+  const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<SortKey>("newest");
 
   const years = useMemo(() => {
@@ -123,6 +133,28 @@ export function PostArchive({
     }
     return [...counts.entries()].sort(([a], [b]) => b - a);
   }, [posts]);
+
+  const categories = useMemo(() => {
+    if (categoryOptions && categoryOptions.length > 0) {
+      return categoryOptions.map((item) => ({
+        ...item,
+        count: posts.filter((post) => post.categorySlug === item.slug).length,
+      }));
+    }
+    const seen = new Map<string, { slug: string; title: string; count: number }>();
+    for (const post of posts) {
+      if (!post.categorySlug) continue;
+      const current = seen.get(post.categorySlug);
+      if (current) current.count += 1;
+      else
+        seen.set(post.categorySlug, {
+          slug: post.categorySlug,
+          title: post.categorySlug,
+          count: 1,
+        });
+    }
+    return [...seen.values()];
+  }, [posts, categoryOptions]);
 
   const projects = useMemo(() => {
     const seen = new Map<string, { slug: string; title: string; count: number }>();
@@ -142,6 +174,7 @@ export function PostArchive({
         return false;
       }
       if (project !== "all" && post.project?.slug !== project) return false;
+      if (category !== "all" && post.categorySlug !== category) return false;
       if (!q) return true;
       return (
         post.title.toLowerCase().includes(q) ||
@@ -149,7 +182,7 @@ export function PostArchive({
         (post.project?.title.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [posts, query, year, project]);
+  }, [posts, query, year, project, category]);
 
   const ranked = useMemo(() => {
     const next = [...filtered];
@@ -165,7 +198,13 @@ export function PostArchive({
   );
 
   const totalWords = posts.reduce((sum, post) => sum + post.wordCount, 0);
-  const browsing = Boolean(query.trim() || year !== "all" || project !== "all" || sort !== "newest");
+  const browsing = Boolean(
+    query.trim() ||
+      year !== "all" ||
+      project !== "all" ||
+      category !== "all" ||
+      sort !== "newest",
+  );
 
   if (posts.length === 0) {
     return <p className="post-archive-empty">{labels.empty}</p>;
@@ -208,8 +247,35 @@ export function PostArchive({
               ))}
             </div>
           </div>
-          {years.length > 0 || projects.length > 0 ? (
+          {years.length > 0 || projects.length > 0 || categories.length > 0 ? (
             <div className="post-archive-filters">
+              {categories.length > 0 ? (
+                <div
+                  className="post-archive-chips"
+                  role="tablist"
+                  aria-label={chrome.category ?? chrome.all}
+                >
+                  <button
+                    type="button"
+                    className={`post-archive-chip${category === "all" ? " is-active" : ""}`}
+                    onClick={() => setCategory("all")}
+                  >
+                    {chrome.category ?? chrome.all}
+                    <span>{posts.length}</span>
+                  </button>
+                  {categories.map((item) => (
+                    <button
+                      key={item.slug}
+                      type="button"
+                      className={`post-archive-chip${category === item.slug ? " is-active" : ""}`}
+                      onClick={() => setCategory(item.slug)}
+                    >
+                      {item.title}
+                      <span>{item.count}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
               {years.length > 0 ? (
                 <div className="post-archive-chips" role="tablist" aria-label={chrome.all}>
                   <button

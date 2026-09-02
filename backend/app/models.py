@@ -10,6 +10,8 @@ from pydantic import BaseModel, Field
 from app.avatar import avatar_public_url, hero_visual_public_url
 
 LOCALES = ("zh-Hant", "en")
+DEFAULT_ARTICLE_CATEGORY_SLUG = "taiko"
+DEFAULT_ARTICLE_CATEGORY_TITLE = {"zh-Hant": "太鼓", "en": "Taiko"}
 
 
 def empty_localized() -> dict[str, str]:
@@ -216,6 +218,32 @@ class Project(Document):
         }
 
 
+class ArticleCategory(Document):
+    slug: str = ""
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    order: int = 0
+    protected: bool = False
+
+    class Settings:
+        name = "article_categories"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "slug": self.slug,
+            "title": self.title,
+            "order": self.order,
+            "protected": self.protected,
+        }
+
+    def resolve(self, locale: str) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "title": pick_localized(self.title, locale),
+            "order": self.order,
+        }
+
+
 class Article(Document):
     slug: str = ""
     title: dict[str, str] = Field(default_factory=empty_localized)
@@ -224,6 +252,7 @@ class Article(Document):
     status: str = "draft"
     order: int = 0
     related_project_slug: str = ""
+    category_slug: str = DEFAULT_ARTICLE_CATEGORY_SLUG
     published_at: datetime | None = None
 
     class Settings:
@@ -239,6 +268,7 @@ class Article(Document):
             "status": self.status,
             "order": self.order,
             "relatedProjectSlug": self.related_project_slug,
+            "categorySlug": self.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG,
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
@@ -252,6 +282,8 @@ class Article(Document):
             "body": body_text,
             "order": self.order,
             "relatedProject": None,
+            "categorySlug": self.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG,
+            "categoryTitle": "",
             "publishedAt": when.isoformat(),
             "wordCount": chars,
             "readingMinutes": reading_minutes(chars),

@@ -27,10 +27,13 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
-from app.mailer import ConsoleMailer, Mailer, SmtpMailer
+from app.mailer import ConsoleMailer, Mailer, SmtpMailer, SmtpThenConsoleMailer
 from app.models import (
+    DEFAULT_ARTICLE_CATEGORY_SLUG,
+    DEFAULT_ARTICLE_CATEGORY_TITLE,
     STATUSES,
     Article,
+    ArticleCategory,
     Comment,
     Journal,
     LinkItem,
@@ -39,6 +42,7 @@ from app.models import (
     SourceRepo,
     dated,
     empty_localized,
+    pick_localized,
 )
 from app.store import bind_store, build_store, current_store, new_document
 
@@ -118,6 +122,13 @@ class ArticleBody(BaseModel):
     status: str = "draft"
     order: int = 0
     relatedProjectSlug: str = ""
+    categorySlug: str = DEFAULT_ARTICLE_CATEGORY_SLUG
+
+
+class ArticleCategoryBody(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    order: int = 0
 
 
 class CommentSubmitBody(BaseModel):
@@ -168,12 +179,15 @@ def create_app(
     elif settings.mail_backend.lower() == "console":
         resolved_mailer = ConsoleMailer()
     else:
-        resolved_mailer = SmtpMailer(
-            host=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            from_addr=settings.smtp_from,
+        resolved_mailer = SmtpThenConsoleMailer(
+            SmtpMailer(
+                host=settings.smtp_host,
+                port=settings.smtp_port,
+                username=settings.smtp_user,
+                password=settings.smtp_password,
+                from_addr=settings.smtp_from,
+            ),
+            ConsoleMailer(),
         )
     resolved_github: GitHubClient = github or HttpGitHub(
         client_id=settings.github_client_id,
@@ -191,7 +205,14 @@ def create_app(
             mongo = AsyncMongoClient(settings.mongo_uri)
             await init_beanie(
                 database=mongo[settings.mongo_db],
-                document_models=[SiteProfile, Project, Article, Journal, Comment],
+                document_models=[
+                    SiteProfile,
+                    Project,
+                    ArticleCategory,
+                    Article,
+                    Journal,
+                    Comment,
+                ],
             )
         bind_store(store)
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
@@ -211,11 +232,18 @@ def create_app(
             f"[mail] backend={settings.mail_backend} mailer={type(resolved_mailer).__name__}",
             flush=True,
         )
+        if settings.mail_backend.lower() != "console":
+            print(
+                "[mail] SMTP from GCP Compute Engine often times out "
+                "(outbound 25/465/587 blocked); OTP will print to logs on failure.",
+                flush=True,
+            )
         print(
             f"[store] kind={store.kind} mongo={'on' if settings.uses_mongo else 'off'}",
             flush=True,
         )
         try:
+            await ensure_default_article_category()
             yield
         finally:
             await redis.aclose()
@@ -774,17 +802,53 @@ def create_app(
         await current_store().save(project)
         return project.to_owner_dict()
 
-    def apply_article_body(article: Article, body: ArticleBody) -> None:
+    async def ensure_default_article_category() -> ArticleCategory:
+        store = current_store()
+        existing = await store.find_one(
+            ArticleCategory, slug=DEFAULT_ARTICLE_CATEGORY_SLUG
+        )
+        if existing is not None:
+            if not existing.protected:
+                existing.protected = True
+                if not pick_localized(existing.title, "zh-Hant"):
+                    existing.title = dict(DEFAULT_ARTICLE_CATEGORY_TITLE)
+                await store.save(existing)
+            return existing
+        category = new_document(ArticleCategory)
+        category.slug = DEFAULT_ARTICLE_CATEGORY_SLUG
+        category.title = dict(DEFAULT_ARTICLE_CATEGORY_TITLE)
+        category.order = 0
+        category.protected = True
+        await store.insert(category)
+        return category
+
+    def normalize_slug(value: str, *, detail: str = "invalid_slug") -> str:
+        slug = value.strip().lower()
+        if not slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=detail,
+            )
+        return slug
+
+    async def apply_article_body(article: Article, body: ArticleBody) -> None:
         if body.status not in STATUSES:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="invalid_status",
             )
-        slug = body.slug.strip().lower()
-        if not slug:
+        slug = normalize_slug(body.slug)
+        await ensure_default_article_category()
+        category_slug = normalize_slug(
+            body.categorySlug or DEFAULT_ARTICLE_CATEGORY_SLUG
+        )
+        category = await current_store().find_one(
+            ArticleCategory, slug=category_slug
+        )
+        if category is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="invalid_slug",
+                detail="unknown_category",
             )
         article.slug = slug
         article.title = body.title
@@ -793,6 +857,7 @@ def create_app(
         article.status = body.status
         article.order = body.order
         article.related_project_slug = body.relatedProjectSlug.strip().lower()
+        article.category_slug = category_slug
         if body.status == "published" and article.published_at is None:
             article.published_at = datetime.now(timezone.utc)
 
@@ -800,6 +865,16 @@ def create_app(
         slug: str, exclude_id: str | None = None
     ) -> None:
         existing = await current_store().find_one(Article, slug=slug)
+        if existing is not None and str(existing.id) != exclude_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="slug_taken",
+            )
+
+    async def ensure_unique_category_slug(
+        slug: str, exclude_id: str | None = None
+    ) -> None:
+        existing = await current_store().find_one(ArticleCategory, slug=slug)
         if existing is not None and str(existing.id) != exclude_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -818,12 +893,41 @@ def create_app(
                     "slug": project.slug,
                     "title": project.resolve(locale)["title"],
                 }
+        await ensure_default_article_category()
+        category_slug = article.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG
+        category = await current_store().find_one(
+            ArticleCategory, slug=category_slug
+        )
+        payload["categorySlug"] = category_slug
+        payload["categoryTitle"] = (
+            pick_localized(category.title, locale) if category is not None else category_slug
+        )
         return payload
 
+    @app.get("/api/public/article-categories")
+    async def public_article_categories(
+        locale: str = "zh-Hant",
+    ) -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        await ensure_default_article_category()
+        categories = await current_store().find_all(ArticleCategory)
+        categories.sort(key=lambda item: (item.order, item.slug))
+        return [item.resolve(locale) for item in categories]
+
     @app.get("/api/public/articles")
-    async def public_articles(locale: str = "zh-Hant") -> list[dict[str, Any]]:
+    async def public_articles(
+        locale: str = "zh-Hant",
+        category: str | None = None,
+    ) -> list[dict[str, Any]]:
         locale = normalize_locale(locale)
         articles = await current_store().find(Article, status="published")
+        if category:
+            wanted = category.strip().lower()
+            articles = [
+                item
+                for item in articles
+                if (item.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG) == wanted
+            ]
         articles.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
         return [await public_article_payload(item, locale) for item in articles]
 
@@ -842,10 +946,86 @@ def create_app(
             )
         return await public_article_payload(article, locale)
 
+    @app.get("/api/owner/article-categories")
+    async def owner_list_article_categories(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        await ensure_default_article_category()
+        categories = await current_store().find_all(ArticleCategory)
+        categories.sort(key=lambda item: (item.order, item.slug))
+        return [item.to_owner_dict() for item in categories]
+
+    @app.post("/api/owner/article-categories")
+    async def owner_create_article_category(
+        body: ArticleCategoryBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        await ensure_default_article_category()
+        slug = normalize_slug(body.slug)
+        await ensure_unique_category_slug(slug)
+        category = new_document(ArticleCategory)
+        category.slug = slug
+        category.title = body.title
+        category.order = body.order
+        category.protected = slug == DEFAULT_ARTICLE_CATEGORY_SLUG
+        await current_store().insert(category)
+        return category.to_owner_dict()
+
+    @app.put("/api/owner/article-categories/{category_id}")
+    async def owner_update_article_category(
+        category_id: PydanticObjectId,
+        body: ArticleCategoryBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        await ensure_default_article_category()
+        category = await current_store().get(ArticleCategory, category_id)
+        if category is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        slug = normalize_slug(body.slug)
+        if category.protected and slug != category.slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="protected_category",
+            )
+        await ensure_unique_category_slug(slug, exclude_id=str(category.id))
+        category.slug = slug
+        category.title = body.title
+        category.order = body.order
+        await current_store().save(category)
+        return category.to_owner_dict()
+
+    @app.delete("/api/owner/article-categories/{category_id}")
+    async def owner_delete_article_category(
+        category_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        await ensure_default_article_category()
+        category = await current_store().get(ArticleCategory, category_id)
+        if category is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        if category.protected or category.slug == DEFAULT_ARTICLE_CATEGORY_SLUG:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="protected_category",
+            )
+        store = current_store()
+        for article in await store.find(Article, category_slug=category.slug):
+            article.category_slug = DEFAULT_ARTICLE_CATEGORY_SLUG
+            await store.save(article)
+        await store.delete(category)
+        return {"status": "deleted"}
+
     @app.get("/api/owner/articles")
     async def owner_list_articles(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
+        await ensure_default_article_category()
         articles = await current_store().find_all(Article)
         articles.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in articles]
@@ -856,7 +1036,7 @@ def create_app(
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
         article = new_document(Article)
-        apply_article_body(article, body)
+        await apply_article_body(article, body)
         await ensure_unique_article_slug(article.slug)
         await current_store().insert(article)
         return article.to_owner_dict()
@@ -873,7 +1053,7 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        apply_article_body(article, body)
+        await apply_article_body(article, body)
         await ensure_unique_article_slug(article.slug, exclude_id=str(article.id))
         await current_store().save(article)
         return article.to_owner_dict()

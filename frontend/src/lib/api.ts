@@ -469,6 +469,7 @@ export type OwnerArticle = {
   status: "draft" | "published";
   order: number;
   relatedProjectSlug: string;
+  categorySlug: string;
 };
 
 export type PublicArticle = {
@@ -478,9 +479,25 @@ export type PublicArticle = {
   body: string;
   order: number;
   relatedProject: RelatedProject | null;
+  categorySlug: string;
+  categoryTitle: string;
   publishedAt: string;
   wordCount: number;
   readingMinutes: number;
+};
+
+export type OwnerArticleCategory = {
+  id: string;
+  slug: string;
+  title: Localized;
+  order: number;
+  protected: boolean;
+};
+
+export type PublicArticleCategory = {
+  slug: string;
+  title: string;
+  order: number;
 };
 
 export function emptyOwnerArticle(): OwnerArticle {
@@ -493,7 +510,16 @@ export function emptyOwnerArticle(): OwnerArticle {
     status: "draft",
     order: 0,
     relatedProjectSlug: "",
+    categorySlug: "taiko",
   };
+}
+
+export function articleHref(
+  locale: string,
+  article: { categorySlug: string; slug: string },
+): string {
+  const category = article.categorySlug || "taiko";
+  return `/${locale}/articles/${category}/${article.slug}`;
 }
 
 export async function fetchPublicArticles(
@@ -525,6 +551,59 @@ export async function fetchPublicArticle(
   } catch {
     return null;
   }
+}
+
+export async function fetchPublicArticleCategories(
+  locale: string,
+): Promise<PublicArticleCategory[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/article-categories?locale=${encodeURIComponent(locale)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicArticleCategory[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchOwnerArticleCategories(
+  token: string,
+): Promise<OwnerArticleCategory[]> {
+  const res = await fetch(`${API_BASE}/api/owner/article-categories`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticleCategory[];
+}
+
+export async function createOwnerArticleCategory(
+  token: string,
+  body: { slug: string; title: Localized; order: number },
+): Promise<OwnerArticleCategory> {
+  const res = await fetch(`${API_BASE}/api/owner/article-categories`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticleCategory;
+}
+
+export async function deleteOwnerArticleCategory(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/article-categories/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
 }
 
 export async function fetchOwnerArticles(

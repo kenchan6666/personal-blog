@@ -4,13 +4,17 @@ import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import {
   createOwnerArticle,
+  createOwnerArticleCategory,
   deleteOwnerArticle,
+  deleteOwnerArticleCategory,
   emptyOwnerArticle,
+  fetchOwnerArticleCategories,
   fetchOwnerArticles,
   fetchOwnerProjects,
   getSessionToken,
   saveOwnerArticle,
   type OwnerArticle,
+  type OwnerArticleCategory,
   type OwnerProject,
 } from "@/lib/api";
 import { BilingualField } from "./bilingual-field";
@@ -30,24 +34,35 @@ function titleOf(article: OwnerArticle, fallback: string) {
   return article.title["zh-Hant"] || article.title.en || article.slug || fallback;
 }
 
+function categoryLabel(category: OwnerArticleCategory) {
+  return category.title["zh-Hant"] || category.title.en || category.slug;
+}
+
 export function ArticleEditor({ dict }: Props) {
   const a = dict.admin;
   const [articles, setArticles] = useState<OwnerArticle[]>([]);
   const [projects, setProjects] = useState<OwnerProject[]>([]);
+  const [categories, setCategories] = useState<OwnerArticleCategory[]>([]);
   const [current, setCurrent] = useState<OwnerArticle>(emptyOwnerArticle());
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newSlug, setNewSlug] = useState("");
+  const [newTitleZh, setNewTitleZh] = useState("");
+  const [newTitleEn, setNewTitleEn] = useState("");
+  const [addingCategory, setAddingCategory] = useState(false);
 
   async function reload(token: string) {
-    const [list, projectList] = await Promise.all([
+    const [list, projectList, categoryList] = await Promise.all([
       fetchOwnerArticles(token),
       fetchOwnerProjects(token),
+      fetchOwnerArticleCategories(token),
     ]);
     setArticles(list);
     setProjects(projectList);
+    setCategories(categoryList);
     return list;
   }
 
@@ -112,6 +127,50 @@ export function ArticleEditor({ dict }: Props) {
     }
   }
 
+  async function onAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    const token = getSessionToken();
+    if (!token) return;
+    const slug = newSlug.trim().toLowerCase();
+    if (!slug) return;
+    setAddingCategory(true);
+    setError(null);
+    try {
+      await createOwnerArticleCategory(token, {
+        slug,
+        title: { "zh-Hant": newTitleZh, en: newTitleEn },
+        order: categories.length,
+      });
+      setNewSlug("");
+      setNewTitleZh("");
+      setNewTitleEn("");
+      await reload(token);
+      setMessage(a.saved);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setAddingCategory(false);
+    }
+  }
+
+  async function onDeleteCategory(id: string) {
+    const token = getSessionToken();
+    if (!token) return;
+    setError(null);
+    try {
+      await deleteOwnerArticleCategory(token, id);
+      const list = await reload(token);
+      if (current.categorySlug) {
+        const still = list.some((item) => item.categorySlug === current.categorySlug);
+        if (!still) {
+          setCurrent({ ...current, categorySlug: "taiko" });
+        }
+      }
+    } catch {
+      setError(a.errorGeneric);
+    }
+  }
+
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
@@ -134,6 +193,56 @@ export function ArticleEditor({ dict }: Props) {
       {error && !open ? (
         <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
       ) : null}
+      <div className="cms-categories">
+        <p className="cms-categories-label">{a.articleCategories}</p>
+        <ul className="cms-category-list">
+          {categories.map((category) => (
+            <li key={category.id} className="cms-category-item">
+              <span>{categoryLabel(category)}</span>
+              {category.protected ? (
+                <em>{a.protectedCategory}</em>
+              ) : (
+                <button
+                  type="button"
+                  className="btn-ghost text-xs"
+                  onClick={() => void onDeleteCategory(category.id)}
+                >
+                  {a.deleteCategory}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <form className="cms-category-add" onSubmit={onAddCategory}>
+          <input
+            className="field field-tight"
+            value={newSlug}
+            onChange={(e) => setNewSlug(e.target.value)}
+            placeholder={a.categorySlug}
+            required
+          />
+          <input
+            className="field field-tight"
+            value={newTitleZh}
+            onChange={(e) => setNewTitleZh(e.target.value)}
+            placeholder={a.categoryTitleZh}
+            required
+          />
+          <input
+            className="field field-tight"
+            value={newTitleEn}
+            onChange={(e) => setNewTitleEn(e.target.value)}
+            placeholder={a.categoryTitleEn}
+          />
+          <button
+            type="submit"
+            className="btn-ghost text-sm"
+            disabled={addingCategory}
+          >
+            {a.newCategory}
+          </button>
+        </form>
+      </div>
       {loading ? (
         <p className="text-sm text-[var(--text-muted)]">{a.loadingArticles}</p>
       ) : articles.length === 0 ? (
@@ -225,6 +334,22 @@ export function ArticleEditor({ dict }: Props) {
               >
                 <option value="draft">{a.statusDraft}</option>
                 <option value="published">{a.statusPublished}</option>
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
+              {a.fieldCategory}
+              <select
+                className="field mt-2 font-normal"
+                value={current.categorySlug || "taiko"}
+                onChange={(e) =>
+                  setCurrent({ ...current, categorySlug: e.target.value })
+                }
+              >
+                {categories.map((category) => (
+                  <option key={category.id} value={category.slug}>
+                    {categoryLabel(category)}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block text-sm font-semibold">

@@ -1542,6 +1542,68 @@ a:visited {
   color: var(--text-muted);
 }
 
+.article-tag {
+  margin-left: 0.7rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: none;
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.cms-categories {
+  margin-bottom: 1.15rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.cms-categories-label {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+}
+
+.cms-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  list-style: none;
+}
+
+.cms-category-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-control);
+  font-size: 0.8rem;
+}
+
+.cms-category-item em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.cms-category-add {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+@media (min-width: 640px) {
+  .cms-category-add {
+    grid-template-columns: 7rem 1fr 1fr auto;
+    align-items: center;
+  }
+}
+
 .article-page {
   padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
     max(1.5rem, env(safe-area-inset-left));

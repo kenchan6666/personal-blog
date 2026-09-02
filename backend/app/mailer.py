@@ -58,3 +58,25 @@ class SmtpMailer:
                 smtp.send_message(msg)
 
         await asyncio.to_thread(_send)
+
+
+class SmtpThenConsoleMailer:
+    """Try SMTP, then print OTP. GCP Compute Engine blocks outbound 25/465/587."""
+
+    def __init__(self, smtp: Mailer, console: Mailer | None = None) -> None:
+        self.smtp = smtp
+        self.console = console or ConsoleMailer()
+
+    async def send_otp(self, *, to: str, code: str) -> None:
+        try:
+            await self.smtp.send_otp(to=to, code=code)
+        except Exception as exc:
+            print(
+                "[mail] SMTP failed "
+                f"({type(exc).__name__}: {exc}). "
+                "GCP Compute Engine blocks outbound TCP 25/465/587, "
+                "so Gmail SMTP from a VM usually times out. "
+                "OTP is printed below so Owner can still sign in.",
+                flush=True,
+            )
+            await self.console.send_otp(to=to, code=code)

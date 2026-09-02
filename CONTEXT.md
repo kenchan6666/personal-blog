@@ -21,8 +21,12 @@ _Avoid_: Portfolio item, case study（未单独建模前）, 与「GitHub 上有
 _Avoid_: 日常（作类型名时）, blog post（统称）
 
 **Article**:
-技术或项目向的深度公开写作。可与 Project 可选关联（`relatedProject`，不强制）。
+技术或项目向的深度公开写作。可与 Project 可选关联（`relatedProject`，不强制）。必属一个 ArticleCategory。
 _Avoid_: 技术笔记（作类型名时）, post（统称）
+
+**ArticleCategory**:
+Owner 维护的 Article 分组。站点预置太鼓，不可删除。访客在列表筛选；详情页仅轻量标示，列表卡片不展示分类。
+_Avoid_: tag（作实体名时）, topic, label, 栏目
 
 **Comment**:
 挂在已发布 Journal 或 Article 下的公开回复。访客以昵称 + 邮箱提交（邮箱不公开展示）；默认待审核，Owner Approve 后可见。Owner 可以站点身份回复。Project 不挂评论。
