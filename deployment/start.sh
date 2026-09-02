@@ -168,7 +168,7 @@ issue_letsencrypt() {
   if compose_prod run --rm --no-deps --entrypoint certbot certbot certonly \
     --webroot -w /var/www/certbot \
     --cert-name site \
-    --agree-tos --non-interactive --keep-until-expiry \
+    --agree-tos --non-interactive \
     --email "$email" \
     -d "$domain" -d "www.$domain"
   then
@@ -176,7 +176,7 @@ issue_letsencrypt() {
   elif compose_prod run --rm --no-deps --entrypoint certbot certbot certonly \
     --webroot -w /var/www/certbot \
     --cert-name site \
-    --agree-tos --non-interactive --keep-until-expiry \
+    --agree-tos --non-interactive \
     --email "$email" \
     -d "$domain"
   then

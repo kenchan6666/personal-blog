@@ -125,7 +125,7 @@ function IssueLetsEncrypt($Root, $Dir) {
         "run", "--rm", "--no-deps", "--entrypoint", "certbot", "certbot", "certonly",
         "--webroot", "-w", "/var/www/certbot",
         "--cert-name", "site",
-        "--agree-tos", "--non-interactive", "--keep-until-expiry",
+        "--agree-tos", "--non-interactive",
         "--email", $email,
         "-d", $domain, "-d", "www.$domain"
     )
@@ -134,7 +134,7 @@ function IssueLetsEncrypt($Root, $Dir) {
             "run", "--rm", "--no-deps", "--entrypoint", "certbot", "certbot", "certonly",
             "--webroot", "-w", "/var/www/certbot",
             "--cert-name", "site",
-            "--agree-tos", "--non-interactive", "--keep-until-expiry",
+            "--agree-tos", "--non-interactive",
             "--email", $email,
             "-d", $domain
         )
