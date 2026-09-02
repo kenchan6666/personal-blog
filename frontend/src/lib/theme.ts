@@ -1,6 +1,9 @@
 export const THEME_STORAGE_KEY = "site-theme";
+export const THEME_SWITCH_MS = 420;
 
 export type ThemeName = "light" | "dark";
+
+let switchTimer = 0;
 
 export function readStoredTheme(): ThemeName | null {
   try {
@@ -11,14 +14,8 @@ export function readStoredTheme(): ThemeName | null {
   }
 }
 
-export function systemTheme(): ThemeName {
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
-}
-
 export function resolveTheme(): ThemeName {
-  return readStoredTheme() ?? systemTheme();
+  return readStoredTheme() ?? "light";
 }
 
 export function applyTheme(theme: ThemeName) {
@@ -28,6 +25,15 @@ export function applyTheme(theme: ThemeName) {
 }
 
 export function persistTheme(theme: ThemeName) {
+  const root = document.documentElement;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!reduce) {
+    root.classList.add("theme-switching");
+    window.clearTimeout(switchTimer);
+    switchTimer = window.setTimeout(() => {
+      root.classList.remove("theme-switching");
+    }, THEME_SWITCH_MS);
+  }
   applyTheme(theme);
   try {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme);

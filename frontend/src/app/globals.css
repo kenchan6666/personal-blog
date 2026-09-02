@@ -78,6 +78,143 @@ html[data-theme="dark"] {
   --hljs-title: #7dd3fc;
 }
 
+@property --bg-deep {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f3f0fa;
+}
+@property --bg-mid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #eef4ff;
+}
+@property --bg-end {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #f8f2f6;
+}
+@property --glass {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.46);
+}
+@property --glass-tint {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.28);
+}
+@property --glass-border {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.78);
+}
+@property --glass-highlight {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.95);
+}
+@property --hairline {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(90, 70, 140, 0.12);
+}
+@property --field-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.55);
+}
+@property --code-bg {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(28, 22, 48, 0.05);
+}
+@property --text-primary {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #1a1630;
+}
+@property --text-muted {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(26, 22, 48, 0.62);
+}
+@property --accent-link {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #5b4cdb;
+}
+@property --chrome-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.82);
+}
+@property --panel-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.42);
+}
+@property --panel-fill-strong {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.72);
+}
+@property --solid {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #ffffff;
+}
+@property --shadow {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(90, 70, 140, 0.06);
+}
+@property --scrim {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(243, 240, 250, 0.45);
+}
+@property --sidebar-fill-start {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.92);
+}
+@property --sidebar-fill-end {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(248, 246, 255, 0.88);
+}
+@property --mermaid-fill {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: rgba(255, 255, 255, 0.58);
+}
+
+html.theme-switching {
+  transition:
+    --bg-deep 420ms ease,
+    --bg-mid 420ms ease,
+    --bg-end 420ms ease,
+    --glass 420ms ease,
+    --glass-tint 420ms ease,
+    --glass-border 380ms ease,
+    --glass-highlight 380ms ease,
+    --hairline 380ms ease,
+    --field-bg 380ms ease,
+    --code-bg 380ms ease,
+    --text-primary 380ms ease,
+    --text-muted 380ms ease,
+    --accent-link 380ms ease,
+    --chrome-fill 420ms ease,
+    --panel-fill 380ms ease,
+    --panel-fill-strong 380ms ease,
+    --solid 420ms ease,
+    --shadow 380ms ease,
+    --scrim 380ms ease,
+    --sidebar-fill-start 420ms ease,
+    --sidebar-fill-end 420ms ease,
+    --mermaid-fill 380ms ease;
+}
+
 html.locale-zh-Hans {
   --font-cjk: var(--font-noto-sans-sc);
   --font-body: var(--font-noto-sans-sc), var(--font-space-grotesk);
@@ -154,6 +291,7 @@ a:visited {
   filter: blur(72px);
   opacity: 0.85;
   will-change: transform;
+  transition: opacity 420ms ease;
 }
 
 .ambient-orb-a {
@@ -2513,6 +2651,39 @@ html.is-route-pending .site-main {
   justify-content: center;
 }
 
+.theme-toggle-icons {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.theme-toggle-sun,
+.theme-toggle-moon {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transition:
+    opacity 280ms ease,
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.theme-toggle-sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.55);
+}
+
+html[data-theme="dark"] .theme-toggle-sun {
+  opacity: 1;
+  transform: none;
+}
+
+html[data-theme="dark"] .theme-toggle-moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.55);
+}
+
 html[data-theme="dark"] .ambient-orb {
   opacity: 0.28;
 }
@@ -2581,5 +2752,11 @@ html[data-theme="dark"] .ambient-orb {
   .btn-cta:hover,
   .profile-contact:hover {
     transform: none;
+  }
+
+  html.theme-switching,
+  .theme-toggle-sun,
+  .theme-toggle-moon {
+    transition: none !important;
   }
 }

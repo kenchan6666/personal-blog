@@ -60,7 +60,14 @@ export function ThemeToggle({ dict }: Props) {
       title={toDark ? dict.theme.toDark : dict.theme.toLight}
       onClick={toggle}
     >
-      {toDark ? <MoonIcon /> : <SunIcon />}
+      <span className="theme-toggle-icons" aria-hidden>
+        <span className="theme-toggle-sun">
+          <SunIcon />
+        </span>
+        <span className="theme-toggle-moon">
+          <MoonIcon />
+        </span>
+      </span>
     </button>
   );
 }
