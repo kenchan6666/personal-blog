@@ -10,6 +10,7 @@ import {
   getSessionToken,
 } from "@/lib/api";
 import { AboutEditor } from "./about-editor";
+import { AgentChat } from "./agent-chat";
 import { ArticleEditor } from "./article-editor";
 import { CommentModerator } from "./comment-moderator";
 import { GitHubConnect } from "./github-connect";
@@ -22,7 +23,7 @@ type Props = {
   dict: Dictionary;
 };
 
-const TABS = ["site", "content", "comments", "github"] as const;
+const TABS = ["site", "content", "comments", "github", "agent"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -52,6 +53,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
     content: a.tabContent,
     comments: a.tabComments,
     github: a.tabGithub,
+    agent: a.tabAgent,
   };
 
   return (
@@ -84,6 +86,11 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
       </div>
 
       <div className="grid gap-5 lg:grid-cols-2">
+        {tab === "agent" ? (
+          <div className="lg:col-span-2">
+            <AgentChat />
+          </div>
+        ) : null}
         {tab === "github" ? (
           <div className="lg:col-span-2">
             <Suspense>

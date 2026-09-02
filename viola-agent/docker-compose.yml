@@ -1,0 +1,80 @@
+x-common-config: &common-config
+  build:
+    context: ..
+    dockerfile: viola-agent/Dockerfile
+  env_file:
+    - ../.env
+  volumes:
+    - ~/.viola:/home/viola/.viola
+    - /mnt/disks/data:/mnt/disks/data
+    - ../scripts/container-logs:/hourly-log:ro
+  cap_drop:
+    - ALL
+  cap_add:
+    - SYS_ADMIN
+  security_opt:
+    - apparmor=unconfined
+    - seccomp=unconfined
+
+services:
+  viola-gateway:
+    container_name: viola-gateway
+    <<: *common-config
+    command: ["gateway"]
+    restart: unless-stopped
+    ports:
+      - 18790:18790
+    environment:
+      CS_CONTAINER_LOG_DIR: /mnt/disks/data/_container_logs/viola-gateway
+      VIOLA_CONTAINER_LOG_SERVICE: viola-gateway
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  viola-api:
+    container_name: viola-api
+    <<: *common-config
+    command:
+      ["serve", "--host", "0.0.0.0", "-w", "/home/viola/.viola/api-workspace", "--verbose"]
+    restart: unless-stopped
+    ports:
+      - 127.0.0.1:8900:8900
+    environment:
+      # Lolanto 场景：仅客服回复，不允许客户触发后台写操作。
+      VIOLA_CUSTOMER_SERVICE_ONLY: "true"
+      # LLM：由上方 env_file ../.env 注入（OPENROUTER_CHAT_MODEL / OPENROUTER_* → viola loader）。
+      # 勿在此写 ${CHATGPT_MODEL:-…} 或硬编码模型：会盖掉 .env，曾默认落到 gpt-4o-mini。
+      VIOLA_AGENTS__DEFAULTS__PROVIDER: "uniapi"
+      # Force all business entity writes through MCP (projects_create etc.).
+      VIOLA_TOOLS__PERSISTENCE_VIA_MCP_ONLY: "true"
+      # Backend 协同: 迁移主链模式，供 /v1/diag 观测与行为开关读取。
+      CS_VIOLA_MAINLINE_MODE: "off"
+      CS_VIOLA_MAINLINE_FALLBACK_ENABLED: "true"
+      # Nanobot MCP rollout: default read-only; enable writes only in controlled rollout.
+      NANOBOT_WRITE_ENABLED: "false"
+      NANOBOT_READ_ONLY_MODE: "true"
+      # Optional: comma-separated allow-list for bearer values (Bearer prefix optional).
+      NANOBOT_ALLOWED_BEARERS: ""
+      CS_CONTAINER_LOG_DIR: /mnt/disks/data/_container_logs/viola-api
+      VIOLA_CONTAINER_LOG_SERVICE: viola-api
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  viola-cli:
+    <<: *common-config
+    profiles:
+      - cli
+    command: ["status"]
+    stdin_open: true
+    tty: true

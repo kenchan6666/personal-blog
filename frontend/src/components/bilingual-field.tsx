@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { localeLabels } from "@/i18n/config";
 import type { Localized } from "@/lib/api";
 import {
@@ -17,6 +17,8 @@ import {
   type MarkdownBlock,
 } from "@/lib/markdown-images";
 import { MarkdownBody } from "./markdown-body";
+import { AgentChat } from "./agent-chat";
+import { CmsModal } from "./cms-modal";
 
 type Props = {
   label: string;
@@ -58,6 +60,8 @@ export function BilingualField({
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [agentOpen, setAgentOpen] = useState(false);
+  const insertionRun = useRef(0);
   const showPreview = previewable && multiline;
   const visualImages = allowImages && multiline;
 
@@ -102,11 +106,34 @@ export function BilingualField({
     }
   }
 
+  async function insertAgentText(locale: keyof Localized, text: string) {
+    const run = ++insertionRun.current;
+    setAgentOpen(false);
+    setMode("edit");
+    const clean = text.trim();
+    for (let index = 1; index <= clean.length; index += 1) {
+      if (insertionRun.current !== run) return;
+      onChange({
+        ...emptyLocalized(),
+        ...value,
+        [locale]: clean.slice(0, index),
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 8));
+    }
+  }
+
   return (
     <div className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-[var(--text-primary)]">{label}</p>
         <span className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn-ghost ai-field-button text-sm"
+            onClick={() => setAgentOpen(true)}
+          >
+            ✦ AI
+          </button>
           {allowImages ? (
             <label className="btn-ghost cursor-pointer text-sm">
               {uploading ? uploadingImageLabel : uploadImageLabel}
@@ -201,6 +228,22 @@ export function BilingualField({
           </div>
         ))}
       </div>
+      <CmsModal
+        open={agentOpen}
+        title={`AI · ${label}`}
+        closeLabel="关闭"
+        elevated
+        onClose={() => {
+          insertionRun.current += 1;
+          setAgentOpen(false);
+        }}
+      >
+        <AgentChat
+          compact
+          context={{ label, value }}
+          onInsert={(locale, text) => void insertAgentText(locale, text)}
+        />
+      </CmsModal>
     </div>
   );
 }

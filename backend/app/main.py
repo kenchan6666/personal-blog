@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pymongo import AsyncMongoClient
 from redis.asyncio import Redis
 
+from app.agent_proxy import register_agent_routes
 from app.auth import AuthService
 from app.avatar import (
     ensure_avatar_dir,
@@ -320,7 +321,12 @@ def create_app(
         scheme, _, token = (authorization or "").partition(" ")
         if scheme.lower() != "bearer":
             token = ""
+        service_token = settings.agent_service_token.strip()
+        if service_token and secrets.compare_digest(token, service_token):
+            return settings.owner_email
         return await auth.resolve_session(token or None)
+
+    register_agent_routes(app, require_owner)
 
     @app.get("/api/health")
     async def health(response: Response) -> dict[str, str]:

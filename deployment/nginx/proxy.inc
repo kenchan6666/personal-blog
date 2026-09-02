@@ -10,7 +10,8 @@
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Authorization $http_authorization;
-        proxy_read_timeout 60s;
+        proxy_buffering off;
+        proxy_read_timeout 180s;
     }
 
     location / {

@@ -1020,3 +1020,85 @@ export async function deleteOwnerAboutModule(
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
+
+const AGENT_SESSION_KEY = "portfolio_agent_session";
+
+function agentSessionId(): string {
+  if (typeof window === "undefined") return "main";
+  let value = window.localStorage.getItem(AGENT_SESSION_KEY);
+  if (!value) {
+    value = window.crypto.randomUUID();
+    window.localStorage.setItem(AGENT_SESSION_KEY, value);
+  }
+  return value;
+}
+
+export async function streamOwnerAgent(
+  token: string,
+  message: string,
+  files: File[],
+  onDelta: (text: string) => void,
+): Promise<string> {
+  const sessionId = agentSessionId();
+  let body: BodyInit;
+  let headers: HeadersInit = { Authorization: `Bearer ${token}` };
+  if (files.length) {
+    const form = new FormData();
+    form.append("message", message);
+    form.append("session_id", sessionId);
+    for (const file of files) form.append("files", file);
+    body = form;
+  } else {
+    headers = { ...headers, "Content-Type": "application/json" };
+    body = JSON.stringify({ message, session_id: sessionId });
+  }
+
+  const response = await fetch(`${API_BASE}/api/owner/agent/chat`, {
+    method: "POST",
+    headers,
+    body,
+  });
+  if (!response.ok || !response.body) throw new Error(await parseError(response));
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let complete = "";
+  let streamError = "";
+
+  function consume(block: string) {
+    const lines = block.split(/\r?\n/);
+    const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+    const data = lines
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data || data === "[DONE]") return;
+    try {
+      const payload = JSON.parse(data);
+      if (event === "error") {
+        streamError = payload.message || "agent_error";
+        return;
+      }
+      const delta = payload.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        complete += delta;
+        onDelta(delta);
+      }
+    } catch {
+      /* Ignore incomplete or non-JSON SSE metadata. */
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) consume(block);
+    if (done) break;
+  }
+  if (buffer.trim()) consume(buffer);
+  if (streamError) throw new Error(streamError);
+  return complete;
+}

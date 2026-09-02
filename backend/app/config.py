@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     avatar_dir: str = "data/avatars"
     avatar_max_bytes: int = 2 * 1024 * 1024
 
+    # The browser never talks to Viola directly. Owner-authenticated API
+    # routes proxy chat traffic to this internal service.
+    agent_api_url: str = "http://127.0.0.1:8900"
+    agent_internal_token: str = ""
+    agent_service_token: str = ""
+    agent_upload_max_bytes: int = 10 * 1024 * 1024
+
     github_client_id: str = ""
     github_client_secret: str = ""
     github_oauth_callback_url: str = "http://127.0.0.1:8000/api/auth/github/callback"

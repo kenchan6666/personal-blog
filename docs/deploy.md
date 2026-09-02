@@ -1,6 +1,9 @@
 # Single-VM deploy (nginx + Compose)
 
-One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, **MongoDB**, and **Redis**. Browsers talk only to nginx: `/` → frontend, `/api/` → API. Owner OTP login uses the same origin, so sessions work without extra CORS.
+One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, the internal
+**Portfolio Agent**, **MongoDB**, and **Redis**. Browsers talk only to nginx:
+`/` → frontend, `/api/` → API. The Agent has no public port; Owner login and
+the API proxy protect every chat and upload.
 
 Local Mongo/Redis on host ports (`docker compose up -d`) is unchanged. This file is the **production/demo** stack.
 
@@ -29,7 +32,7 @@ docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d --bui
 
 Then open `http://<host>/zh-Hant`. Health: `http://<host>/api/health`.
 
-Logs: `docker compose -f docker-compose.prod.yml logs -f api web nginx`.
+Logs: `docker compose -f docker-compose.prod.yml logs -f api agent web nginx`.
 
 Stop: `.\deployment\stop.ps1 --prod` (or `bash deployment/stop.sh --prod`).
 
@@ -50,6 +53,27 @@ After you know `PUBLIC_ORIGIN`, set GitHub callback/success to that origin (not 
 
 Never commit `deployment/.env`. Rotate any secret that has been pasted into chat.
 
+## Portfolio Agent
+
+Set these values in `deployment/.env` before using the Agent tab:
+
+- `UNI_API_KEY`: your UniAPI key.
+- `UNI_API_BASE=https://api.uniapi.io`.
+- `VIOLA_AGENT_MODEL=gemini-2.0-flash` (change this only when UniAPI uses a
+  different exact model slug).
+- `AGENT_INTERNAL_TOKEN`: a random secret used by FastAPI when calling Viola.
+- `AGENT_SERVICE_TOKEN`: a different random secret used by the Portfolio MCP
+  when calling Owner APIs.
+
+Generate the two tokens with `openssl rand -hex 32`. They must be different and
+must never use a `NEXT_PUBLIC_` name. The Agent reads all Owner-visible content,
+including drafts and comment email addresses. It can create/update content
+through MCP, but new records are always Draft and no delete tool is exposed.
+
+Personal facts and preferred writing style can be added later to the persistent
+`USER.md` in the `agent_data` volume. Site facts should remain in the CMS; the
+Agent reads those live through MCP.
+
 ## Owner login on the deployed site
 
 1. Open `/zh-Hant/admin/login`.
@@ -66,7 +90,7 @@ Open GCP firewall **tcp:80** and **tcp:443**. Turn off GoDaddy HTTPS forwarding/
 ## Layout
 
 - `bash deployment/start.sh --prod` — one-command bring-up
-- `docker-compose.prod.yml` — mongo, redis, api, web, nginx
+- `docker-compose.prod.yml` — mongo, redis, api, agent, web, nginx
 - `deployment/nginx.conf` — reverse proxy
 - `deployment/env.example` — template for `deployment/.env`
 - `backend/Dockerfile`, `frontend/Dockerfile`

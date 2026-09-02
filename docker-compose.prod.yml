@@ -24,11 +24,37 @@ services:
       MONGO_DB: portfolio
       REDIS_URL: redis://redis:6379/0
       AVATAR_DIR: /data/avatars
+      AGENT_API_URL: http://agent:8900
     volumes:
       - ./data/media:/data/avatars
     depends_on:
       - mongo
       - redis
+
+  agent:
+    build:
+      context: .
+      dockerfile: viola-agent/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ./deployment/.env
+    environment:
+      BACKEND_API_BASE_URL: http://api:8000
+      PORTFOLIO_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN}
+      PORTFOLIO_WRITE_ENABLED: "true"
+      VIOLA_API_SERVER_KEY: ${AGENT_INTERNAL_TOKEN}
+      VIOLA_MEDIA_TOKEN_SECRET: ${AGENT_INTERNAL_TOKEN}
+      VIOLA_AGENTS__DEFAULTS__PROVIDER: uniapi
+      VIOLA_AGENTS__DEFAULTS__MODEL: ${VIOLA_AGENT_MODEL:-gemini-2.0-flash}
+      VIOLA_AGENTS__DEFAULTS__TIMEZONE: Asia/Hong_Kong
+      VIOLA_TOOLS__PERSISTENCE_VIA_MCP_ONLY: "true"
+      VIOLA_CUSTOMER_SERVICE_ONLY: "false"
+    command:
+      ["serve", "--host", "0.0.0.0", "-w", "/home/viola/.viola/portfolio", "--verbose"]
+    volumes:
+      - agent_data:/home/viola/.viola
+    depends_on:
+      - api
 
   web:
     build:
@@ -76,3 +102,4 @@ volumes:
   mongo_data:
   certbot_www:
   certbot_certs:
+  agent_data:

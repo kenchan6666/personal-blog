@@ -1,0 +1,26 @@
+{
+  "portfolio": {
+    "type": "stdio",
+    "command": "python3",
+    "args": ["-m", "mcp_portfolio.server"],
+    "env": {
+      "BACKEND_API_BASE_URL": "${BACKEND_API_BASE_URL}",
+      "PORTFOLIO_SERVICE_TOKEN": "${PORTFOLIO_SERVICE_TOKEN}",
+      "PORTFOLIO_WRITE_ENABLED": "${PORTFOLIO_WRITE_ENABLED}"
+    },
+    "toolTimeout": 120,
+    "enabledTools": [
+      "portfolio_overview",
+      "portfolio_get_site",
+      "portfolio_list_content",
+      "portfolio_get_content",
+      "portfolio_create_content",
+      "portfolio_update_content",
+      "portfolio_update_site",
+      "portfolio_list_comments",
+      "portfolio_get_project_source",
+      "portfolio_get_source_file",
+      "portfolio_comment_action"
+    ]
+  }
+}
