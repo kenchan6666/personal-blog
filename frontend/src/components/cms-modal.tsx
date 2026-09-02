@@ -42,6 +42,8 @@ export function CmsModal({
   const panelRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const lastFocus = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (open) {
@@ -63,14 +65,18 @@ export function CmsModal({
     document.body.style.overflow = "hidden";
 
     const panel = panelRef.current;
-    const first = panel ? focusablesIn(panel)[0] : null;
-    (first ?? panel)?.focus();
+    if (panel && !panel.contains(document.activeElement)) {
+      const firstField = panel.querySelector<HTMLElement>(
+        "input:not([type=hidden]), textarea, select",
+      );
+      (firstField ?? focusablesIn(panel)[0] ?? panel)?.focus();
+    }
 
     function onKey(event: KeyboardEvent) {
       const root = rootRef.current;
       if (root && !isTopmostModal(root)) return;
       if (event.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab" || !panelRef.current) return;
@@ -97,7 +103,7 @@ export function CmsModal({
       document.body.style.overflow = previous;
       lastFocus.current?.focus?.();
     };
-  }, [onClose, present]);
+  }, [present]);
 
   if (!present || typeof document === "undefined") return null;
 

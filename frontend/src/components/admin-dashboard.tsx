@@ -99,9 +99,11 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
         ) : null}
         {tab === "content" ? (
           <>
-            <ProjectEditor locale={locale} dict={dict} />
+            <div className="grid gap-5">
+              <ProjectEditor locale={locale} dict={dict} />
+              <JournalEditor dict={dict} />
+            </div>
             <ArticleEditor dict={dict} />
-            <JournalEditor dict={dict} />
           </>
         ) : null}
         {tab === "comments" ? <CommentModerator dict={dict} /> : null}
