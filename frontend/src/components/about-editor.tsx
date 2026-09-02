@@ -9,16 +9,13 @@ import {
   fetchOwnerAboutModules,
   getSessionToken,
   localizedText,
-  mediaUrl,
   saveOwnerAboutModule,
-  uploadOwnerMedia,
   type AboutKind,
   type OwnerAboutModule,
 } from "@/lib/api";
 import {
   ABOUT_KIND_BODIES,
   ABOUT_KIND_TITLES,
-  appendMarkdownToAll,
   localizedIsEmpty,
 } from "@/lib/about-templates";
 import { BilingualField } from "./bilingual-field";
@@ -62,8 +59,6 @@ export function AboutEditor({ dict }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
 
   async function reload(token: string) {
     const list = await fetchOwnerAboutModules(token);
@@ -83,7 +78,6 @@ export function AboutEditor({ dict }: Props) {
     setCurrent(module);
     setMessage(null);
     setError(null);
-    setImages([]);
     setOpen(true);
   }
 
@@ -91,7 +85,6 @@ export function AboutEditor({ dict }: Props) {
     setOpen(false);
     setMessage(null);
     setError(null);
-    setImages([]);
   }
 
   function applyKindTemplate() {
@@ -103,31 +96,6 @@ export function AboutEditor({ dict }: Props) {
         : current.title,
       body: ABOUT_KIND_BODIES[kind],
     });
-  }
-
-  async function onImageChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    const token = getSessionToken();
-    if (!token) return;
-    setUploading(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const { url } = await uploadOwnerMedia(token, file);
-      const alt = file.name.replace(/\.[^.]+$/, "");
-      const snippet = `\n\n![${alt}](${url})\n`;
-      setImages((prev) => [url, ...prev]);
-      setCurrent((prev) => ({
-        ...prev,
-        body: appendMarkdownToAll(prev.body, snippet),
-      }));
-    } catch {
-      setError(a.errorGeneric);
-    } finally {
-      setUploading(false);
-    }
   }
 
   async function onSave(e: React.FormEvent) {
@@ -173,6 +141,12 @@ export function AboutEditor({ dict }: Props) {
     editLabel: a.editTab,
     previewLabel: a.preview,
     emptyPreview: a.emptyPreview,
+  };
+  const imageProps = {
+    allowImages: true,
+    uploadImageLabel: a.uploadAboutImage,
+    uploadingImageLabel: a.uploadingAboutImage,
+    onImageError: () => setError(a.errorGeneric),
   };
 
   return (
@@ -333,24 +307,7 @@ export function AboutEditor({ dict }: Props) {
             >
               {a.applyAboutTemplate}
             </button>
-            <label className="btn-ghost cursor-pointer text-sm">
-              {uploading ? a.uploadingAboutImage : a.uploadAboutImage}
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="sr-only"
-                onChange={onImageChange}
-                disabled={uploading}
-              />
-            </label>
           </div>
-          {images.length > 0 ? (
-            <div className="about-image-previews mb-6">
-              {images.map((url) => (
-                <img key={url} src={mediaUrl(url)} alt="" />
-              ))}
-            </div>
-          ) : null}
           <p className="mb-4 text-xs text-[var(--text-muted)]">
             {a.localeFallbackHint}
           </p>
@@ -367,6 +324,7 @@ export function AboutEditor({ dict }: Props) {
             previewable
             rows={10}
             {...previewProps}
+            {...imageProps}
           />
         </form>
       </CmsModal>

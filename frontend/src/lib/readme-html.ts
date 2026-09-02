@@ -1,4 +1,8 @@
-const SAFE_SRC = /^(https?:\/\/|\/)/i;
+const SAFE_SRC = /^(https?:\/\/|\/\/|\/)/i;
+
+export function isSafeMarkdownImageUrl(url: string): boolean {
+  return SAFE_SRC.test(url.trim());
+}
 
 function attr(tag: string, name: string): string {
   const quoted = new RegExp(`${name}\\s*=\\s*["']([^"']*)["']`, "i").exec(tag);
@@ -8,6 +12,7 @@ function attr(tag: string, name: string): string {
 }
 
 export function isBadgeImage(url: string): boolean {
+  if (/\/api\/public\/media\//i.test(url)) return false;
   return /img\.shields\.io|badgen\.net|\/badge\/|shields\.io\//i.test(url);
 }
 

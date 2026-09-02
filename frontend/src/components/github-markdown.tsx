@@ -3,6 +3,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isBadgeImage, liftReadmeHtmlImages } from "@/lib/readme-html";
+import { MermaidOrPre } from "./mermaid-diagram";
 
 type Props = {
   source: string;
@@ -48,6 +49,7 @@ export function GithubMarkdown({ source, repoFullName, refName }: Props) {
               />
             );
           },
+          pre: MermaidOrPre,
         }}
       >
         {markdown}

@@ -1829,6 +1829,32 @@ html.is-route-pending .site-main {
   padding: 0.9rem 1rem;
 }
 
+.mermaid-wrap {
+  margin: 0.85em 0;
+  overflow-x: auto;
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--hairline);
+}
+
+.mermaid-wrap svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-pending {
+  min-height: 4.5rem;
+}
+
+.mermaid-fallback {
+  overflow-x: auto;
+  background: var(--code-bg);
+  border-radius: var(--radius-card);
+  padding: 0.9rem 1rem;
+}
+
 .gfm pre code {
   background: none;
   padding: 0;

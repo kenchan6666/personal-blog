@@ -3,7 +3,12 @@ import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractMarkdownHeadings } from "@/lib/headings";
-import { isBadgeImage, liftReadmeHtmlImages } from "@/lib/readme-html";
+import {
+  isBadgeImage,
+  isSafeMarkdownImageUrl,
+  liftReadmeHtmlImages,
+} from "@/lib/readme-html";
+import { MermaidOrPre } from "./mermaid-diagram";
 
 function headingText(children: ReactNode): string {
   return Array.isArray(children)
@@ -52,12 +57,8 @@ export function MarkdownBody({ source }: { source: string }) {
       );
     },
     img: ({ src, alt }) => {
-      const url = typeof src === "string" ? src : "";
-      const safe =
-        url.startsWith("http://") ||
-        url.startsWith("https://") ||
-        url.startsWith("/");
-      if (!safe) return null;
+      const url = typeof src === "string" ? src.trim() : "";
+      if (!isSafeMarkdownImageUrl(url)) return null;
       return (
         <img
           src={url}
@@ -66,11 +67,16 @@ export function MarkdownBody({ source }: { source: string }) {
         />
       );
     },
+    pre: MermaidOrPre,
   };
 
   return (
     <div className="markdown-body typeset-reading">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        urlTransform={(url) => (isSafeMarkdownImageUrl(url) || url.startsWith("#") || url.startsWith("mailto:") ? url : "")}
+        components={components}
+      >
         {markdown}
       </ReactMarkdown>
     </div>

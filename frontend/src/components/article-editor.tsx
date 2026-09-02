@@ -204,6 +204,12 @@ export function ArticleEditor({ dict }: Props) {
     previewLabel: a.preview,
     emptyPreview: a.emptyPreview,
   };
+  const imageProps = {
+    allowImages: true,
+    uploadImageLabel: a.uploadAboutImage,
+    uploadingImageLabel: a.uploadingAboutImage,
+    onImageError: () => setError(a.errorGeneric),
+  };
 
   return (
     <>
@@ -432,6 +438,7 @@ export function ArticleEditor({ dict }: Props) {
             previewable
             rows={12}
             {...previewProps}
+            {...imageProps}
           />
         </form>
       </CmsModal>

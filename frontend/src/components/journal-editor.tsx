@@ -110,6 +110,12 @@ export function JournalEditor({ dict }: Props) {
     previewLabel: a.preview,
     emptyPreview: a.emptyPreview,
   };
+  const imageProps = {
+    allowImages: true,
+    uploadImageLabel: a.uploadAboutImage,
+    uploadingImageLabel: a.uploadingAboutImage,
+    onImageError: () => setError(a.errorGeneric),
+  };
 
   return (
     <CmsCard
@@ -257,6 +263,7 @@ export function JournalEditor({ dict }: Props) {
             previewable
             rows={12}
             {...previewProps}
+            {...imageProps}
           />
         </form>
       </CmsModal>

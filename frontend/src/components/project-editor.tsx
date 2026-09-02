@@ -178,6 +178,12 @@ export function ProjectEditor({ locale, dict }: Props) {
     previewLabel: a.preview,
     emptyPreview: a.emptyPreview,
   };
+  const imageProps = {
+    allowImages: true,
+    uploadImageLabel: a.uploadAboutImage,
+    uploadingImageLabel: a.uploadingAboutImage,
+    onImageError: () => setError(a.errorGeneric),
+  };
 
   const modalTitle =
     step === "pick"
@@ -416,6 +422,7 @@ export function ProjectEditor({ locale, dict }: Props) {
               previewable
               rows={8}
               {...previewProps}
+              {...imageProps}
             />
           </form>
         )}
