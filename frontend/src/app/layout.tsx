@@ -34,6 +34,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "陳逸楠 · Portfolio",
   description: "Job-seeking personal portfolio — projects, articles, journals.",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+    ],
+    apple: { url: "/apple-icon.png", sizes: "180x180" },
+  },
 };
 
 export const viewport: Viewport = {
