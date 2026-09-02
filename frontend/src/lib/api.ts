@@ -142,22 +142,30 @@ export class PublicApiError extends Error {
 }
 
 const PUBLIC_REVALIDATE = 60;
+const PUBLIC_FETCH_MS = 8_000;
+
+function publicFetch(url: string, init?: RequestInit) {
+  return fetch(url, {
+    ...init,
+    signal: AbortSignal.timeout(PUBLIC_FETCH_MS),
+  });
+}
 
 async function publicJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
+  const res = await publicFetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }
 
 async function publicJsonOrNull<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
+  const res = await publicFetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
   if (res.status === 404) return null;
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }
 
 async function publicJsonLive<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await publicFetch(url, { cache: "no-store" });
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }

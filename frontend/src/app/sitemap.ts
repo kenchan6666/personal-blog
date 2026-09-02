@@ -8,6 +8,8 @@ import {
 } from "@/lib/api";
 import { pathWithoutLocale, siteOrigin } from "@/lib/seo";
 
+export const dynamic = "force-dynamic";
+
 const STATIC_PATHS = [
   "",
   "/about",
