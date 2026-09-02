@@ -36,10 +36,10 @@ export const metadata: Metadata = {
   description: "Job-seeking personal portfolio — projects, articles, journals.",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "32x32" },
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/mascot.png", type: "image/png", sizes: "512x512" },
     ],
-    apple: { url: "/apple-icon.png", sizes: "180x180" },
+    apple: { url: "/mascot-apple.png", sizes: "180x180" },
   },
 };
 
