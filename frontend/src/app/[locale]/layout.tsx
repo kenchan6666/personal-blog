@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SiteShell } from "@/components/site-shell";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -7,6 +8,19 @@ import { brandForShell } from "@/lib/site-content";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale: raw } = await params;
+  if (!isLocale(raw)) return { title: "ken" };
+  const locale = raw as Locale;
+  const dict = getDictionary(locale);
+  const site = await fetchPublicSite(locale);
+  return { title: brandForShell(dict, site) };
 }
 
 export default async function LocaleLayout({

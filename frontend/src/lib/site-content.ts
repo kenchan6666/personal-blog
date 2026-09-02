@@ -1,11 +1,19 @@
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { PublicSite } from "@/lib/api";
 
+const LEGACY_BRANDS = new Set(["陳逸楠", "陈逸楠", "YN Chan"]);
+
+export function publicBrand(value: string | undefined, fallback = "ken"): string {
+  const brand = value?.trim() || fallback;
+  if (LEGACY_BRANDS.has(brand)) return "ken";
+  return brand || "ken";
+}
+
 /** When API is unreachable, keep shell chrome. Once CMS responds, never invent copy. */
 export function mergeHeroContent(dict: Dictionary, site: PublicSite | null) {
   if (!site) {
     return {
-      brand: dict.brand,
+      brand: publicBrand(dict.brand),
       headline: dict.hero.headline,
       support: dict.hero.support,
       ctaProjects: dict.hero.ctaProjects,
@@ -13,7 +21,7 @@ export function mergeHeroContent(dict: Dictionary, site: PublicSite | null) {
     };
   }
   return {
-    brand: site.brand,
+    brand: publicBrand(site.brand, dict.brand),
     headline: site.hero.headline,
     support: site.hero.support,
     ctaProjects: site.hero.ctaProjects,
@@ -39,8 +47,7 @@ export function mergeProfileContent(dict: Dictionary, site: PublicSite | null) {
 }
 
 export function brandForShell(dict: Dictionary, site: PublicSite | null): string {
-  if (!site) return dict.brand;
-  return site.brand;
+  return publicBrand(site?.brand, dict.brand);
 }
 
 export function pageCopy(

@@ -40,7 +40,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "陳逸楠 · Portfolio",
+  title: "ken",
   description: "Job-seeking personal portfolio — projects, articles, journals.",
   icons: {
     icon: [

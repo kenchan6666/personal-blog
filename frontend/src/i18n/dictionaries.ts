@@ -1,7 +1,7 @@
 import type { Locale } from "./config";
 
 const zhHant = {
-  brand: "陳逸楠",
+  brand: "ken",
   nav: {
     home: "首頁",
     projects: "項目",
@@ -258,7 +258,7 @@ const zhHant = {
 };
 
 const en = {
-  brand: "YN Chan",
+  brand: "ken",
   nav: {
     home: "Home",
     projects: "Projects",
@@ -517,7 +517,7 @@ const en = {
 
 const zhHans = {
   ...zhHant,
-  brand: "陈逸楠",
+  brand: "ken",
   localeName: "简中",
   openMenu: "打开菜单",
   closeMenu: "关闭菜单",
