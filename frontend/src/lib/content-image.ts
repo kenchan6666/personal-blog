@@ -14,8 +14,24 @@ export function toImageSrc(url: string): string {
   return url;
 }
 
+function pathnameOf(src: string): string {
+  if (src.startsWith("/")) return src.split("?")[0] ?? src;
+  try {
+    return new URL(src).pathname;
+  } catch {
+    return src;
+  }
+}
+
+export function isSiteMediaPath(src: string): boolean {
+  return pathnameOf(src).startsWith("/api/public/media/");
+}
+
 export function canOptimizeImage(url: string): boolean {
   const src = toImageSrc(url);
+  // FastAPI files behind the Next rewrite: `_next/image` fetches them as a
+  // local path, gets HTML/JSON back in Docker, and returns 400.
+  if (isSiteMediaPath(src)) return false;
   if (src.startsWith("/")) return true;
   try {
     const { protocol, hostname } = new URL(src);
