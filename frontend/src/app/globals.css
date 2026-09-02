@@ -655,6 +655,16 @@ html.is-route-pending .site-main {
   pointer-events: none;
 }
 
+html.is-locale-swap .site-main {
+  opacity: 0.88;
+  filter: none;
+}
+
+html.is-locale-hold .page-frame,
+html.is-locale-hold .article-page {
+  animation: none;
+}
+
 .route-progress {
   position: fixed;
   top: 0;
@@ -752,13 +762,9 @@ html.is-route-pending .site-main {
 @keyframes content-enter {
   from {
     opacity: 0;
-    transform: translateY(12px);
-    filter: blur(8px);
   }
   to {
     opacity: 1;
-    transform: none;
-    filter: none;
   }
 }
 
@@ -773,6 +779,10 @@ html.is-route-pending .site-main {
   html.is-route-pending .site-main {
     filter: none;
     opacity: 0.7;
+  }
+
+  html.is-locale-swap .site-main {
+    opacity: 1;
   }
 }
 
@@ -1001,6 +1011,9 @@ html.is-route-pending .site-main {
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+  transition:
+    background 180ms ease,
+    color 180ms ease;
 }
 
 .locale-chip:hover {
@@ -1428,7 +1441,7 @@ html.is-route-pending .site-main {
 .page-frame {
   padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
     max(1.5rem, env(safe-area-inset-left));
-  animation: content-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: content-enter 240ms ease both;
 }
 
 @media (min-width: 640px) {
@@ -2245,7 +2258,7 @@ html.is-route-pending .site-main {
 .article-page {
   padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
     max(1.5rem, env(safe-area-inset-left));
-  animation: content-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: content-enter 240ms ease both;
 }
 
 @media (min-width: 640px) {

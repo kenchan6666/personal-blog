@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
-import { localeLabels, locales, stripLocalePrefix } from "@/i18n/config";
 import { getSessionToken } from "@/lib/api";
+import { LocaleSwitcher } from "./locale-switcher";
 
 type Props = {
   locale: Locale;
@@ -123,24 +123,7 @@ export function Sidebar({
             })}
           </nav>
 
-          <div className="hairline-t mt-6 flex flex-wrap gap-2 pt-4">
-            {locales.map((item) => {
-              const rest = stripLocalePrefix(pathname);
-              const href = `/${item}${rest}`;
-              const active = item === locale;
-              return (
-                <Link
-                  key={item}
-                  href={href}
-                  onClick={onNavigate}
-                  tabIndex={open ? 0 : -1}
-                  className={`locale-chip ${active ? "locale-chip-active" : ""}`}
-                >
-                  {localeLabels[item]}
-                </Link>
-              );
-            })}
-          </div>
+          <LocaleSwitcher locale={locale} tabIndex={open ? 0 : -1} />
 
           {showAdmin ? (
             <Link

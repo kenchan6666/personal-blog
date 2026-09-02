@@ -6,6 +6,7 @@ import {
   Noto_Sans_TC,
   Space_Grotesk,
 } from "next/font/google";
+import { SiteShell } from "@/components/site-shell";
 import { ThemeScript } from "@/components/theme-script";
 import { defaultLocale, isLocale } from "@/i18n/config";
 import "./globals.css";
@@ -73,7 +74,7 @@ export default async function RootLayout({
           <span className="ambient-orb ambient-orb-b" />
           <span className="ambient-orb ambient-orb-c" />
         </div>
-        {children}
+        <SiteShell>{children}</SiteShell>
       </body>
     </html>
   );

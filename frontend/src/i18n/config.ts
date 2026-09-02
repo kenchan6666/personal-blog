@@ -17,3 +17,21 @@ export function isLocale(value: string): value is Locale {
 export function stripLocalePrefix(pathname: string): string {
   return pathname.replace(localePrefix, "") || "";
 }
+
+export function pathnameFromHref(href: string): string {
+  const raw = href.split("?")[0]?.split("#")[0] ?? href;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      return new URL(raw).pathname;
+    } catch {
+      return raw;
+    }
+  }
+  return raw.startsWith("/") ? raw : `/${raw}`;
+}
+
+/** Same page, only `/zh-Hant` ↔ `/zh-Hans` ↔ `/en`. */
+export function isLocaleOnlyPathChange(fromPath: string, toPath: string): boolean {
+  if (!fromPath || !toPath || fromPath === toPath) return false;
+  return stripLocalePrefix(fromPath) === stripLocalePrefix(toPath);
+}

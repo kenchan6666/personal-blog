@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Dictionary } from "@/i18n/dictionaries";
-import type { Locale } from "@/i18n/config";
+import { usePathname } from "next/navigation";
+import { getDictionary } from "@/i18n/dictionaries";
+import { defaultLocale, isLocale, type Locale } from "@/i18n/config";
+import type { PublicSite } from "@/lib/api";
+import { brandForShell, publicBrand } from "@/lib/site-content";
 import { LocaleHtml } from "./locale-html";
 import { RouteProgress } from "./route-progress";
 import { Sidebar } from "./sidebar";
@@ -10,14 +13,40 @@ import { SiteChrome } from "./site-chrome";
 
 const DESKTOP_NAV = "(min-width: 1024px)";
 
+function localeFromPath(pathname: string): Locale {
+  const segment = pathname.split("/").filter(Boolean)[0] ?? defaultLocale;
+  return isLocale(segment) ? segment : defaultLocale;
+}
+
 type Props = {
-  locale: Locale;
-  dict: Dictionary;
   children: React.ReactNode;
 };
 
-export function SiteShell({ locale, dict, children }: Props) {
+export function SiteShell({ children }: Props) {
+  const pathname = usePathname();
+  const locale = localeFromPath(pathname);
+  const dict = getDictionary(locale);
+  const [brand, setBrand] = useState(() => publicBrand(dict.brand));
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const next = getDictionary(locale);
+    setBrand(publicBrand(next.brand));
+    let ignore = false;
+    const ctrl = new AbortController();
+    fetch(`/api/public/site?locale=${encodeURIComponent(locale)}`, {
+      signal: ctrl.signal,
+    })
+      .then((res) => (res.ok ? (res.json() as Promise<PublicSite>) : null))
+      .then((site) => {
+        if (!ignore && site) setBrand(brandForShell(next, site));
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+      ctrl.abort();
+    };
+  }, [locale]);
 
   useEffect(() => {
     if (!open) return;
@@ -44,19 +73,21 @@ export function SiteShell({ locale, dict, children }: Props) {
     };
   }, [open]);
 
+  const shellDict = { ...dict, brand };
+
   return (
     <div className="relative z-10 min-h-screen">
       <LocaleHtml locale={locale} />
       <RouteProgress />
       <Sidebar
         locale={locale}
-        dict={dict}
+        dict={shellDict}
         open={open}
         onToggle={() => setOpen((v) => !v)}
         onNavigate={() => setOpen(false)}
       />
 
-      <SiteChrome locale={locale} dict={dict} />
+      <SiteChrome locale={locale} dict={shellDict} />
       <main className="site-main">{children}</main>
     </div>
   );

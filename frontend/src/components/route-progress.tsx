@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { isLocaleOnlyPathChange, pathnameFromHref } from "@/i18n/config";
 
 function isInternalNav(anchor: HTMLAnchorElement, pathname: string) {
   if (anchor.target && anchor.target !== "_self") return false;
@@ -10,16 +11,16 @@ function isInternalNav(anchor: HTMLAnchorElement, pathname: string) {
   if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
     return false;
   }
+  const path = pathnameFromHref(href);
   if (/^https?:/i.test(href)) {
     try {
-      const url = new URL(href);
+      const url = new URL(href, window.location.origin);
       if (url.origin !== window.location.origin) return false;
       return url.pathname !== pathname;
     } catch {
       return false;
     }
   }
-  const path = href.split("?")[0]?.split("#")[0] ?? href;
   return path !== pathname;
 }
 
@@ -29,6 +30,13 @@ export function RouteProgress() {
 
   useEffect(() => {
     setPhase((current) => (current === "pending" ? "done" : current));
+    if (!document.documentElement.classList.contains("is-locale-swap")) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      document.documentElement.classList.remove("is-locale-swap");
+    }, 200);
+    return () => window.clearTimeout(timer);
   }, [pathname]);
 
   useEffect(() => {
@@ -37,6 +45,14 @@ export function RouteProgress() {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as HTMLElement | null)?.closest("a");
       if (!anchor || !isInternalNav(anchor, pathname)) return;
+      const nextPath = pathnameFromHref(
+        anchor.getAttribute("href") ?? "",
+      );
+      if (isLocaleOnlyPathChange(pathname, nextPath)) {
+        document.documentElement.classList.add("is-locale-swap", "is-locale-hold");
+        return;
+      }
+      document.documentElement.classList.remove("is-locale-swap", "is-locale-hold");
       setPhase("pending");
     }
     document.addEventListener("click", onClick);
