@@ -6,7 +6,7 @@ import { MarkdownBody } from "@/components/markdown-body";
 import { ReadingProgress } from "@/components/reading-progress";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { articleHref, fetchPublicArticle } from "@/lib/api";
+import { articleHref, fetchPublicArticle, type PublicArticle } from "@/lib/api";
 import { extractMarkdownHeadings } from "@/lib/headings";
 import { formatCount, formatPostDate } from "@/lib/post-meta";
 
@@ -24,24 +24,31 @@ export default async function ArticlePathPage({
   if (path.length === 1) {
     const article = await fetchPublicArticle(locale, path[0]);
     if (!article) notFound();
-    redirect(articleHref(locale, article));
+    if (article.categorySlug) {
+      redirect(articleHref(locale, article));
+    }
+    return renderArticle(locale, article);
   }
 
   if (path.length !== 2) notFound();
 
   const [category, slug] = path;
-  const dict = getDictionary(locale);
   const article = await fetchPublicArticle(locale, slug);
   if (!article) notFound();
 
-  const canonical = article.categorySlug || "taiko";
+  const canonical = article.categorySlug || "";
   if (category !== canonical) {
     redirect(articleHref(locale, article));
   }
 
+  return renderArticle(locale, article);
+}
+
+function renderArticle(locale: Locale, article: PublicArticle) {
+  const dict = getDictionary(locale);
   const headings = extractMarkdownHeadings(article.body);
   const showToc = headings.length >= 2;
-  const showTaikoTag = canonical === "taiko" && article.categoryTitle;
+  const showCategory = Boolean(article.categoryTitle);
 
   return (
     <article className="article-page">
@@ -53,7 +60,7 @@ export default async function ArticlePathPage({
         <header className="article-header">
           <p className="article-kicker">
             {dict.articles.title}
-            {showTaikoTag ? (
+            {showCategory ? (
               <span className="article-tag">{article.categoryTitle}</span>
             ) : null}
           </p>

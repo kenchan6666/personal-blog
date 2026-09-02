@@ -94,7 +94,7 @@ Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `publ
 - `GET /api/public/articles/{slug}?locale=` — includes `relatedProject` when that Project is Published
 - `GET/POST /api/owner/articles`, `PUT/DELETE /api/owner/articles/{id}` (Bearer)
 
-Optional `relatedProjectSlug`. A Draft related Project is omitted from the public payload.
+Optional `relatedProjectSlug` and `categorySlug`. A missing or deleted category leaves the Article untagged. A Draft related Project is omitted from the public payload.
 
 ## Journals
 

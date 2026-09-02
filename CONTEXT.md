@@ -25,11 +25,11 @@ _Avoid_: Portfolio item, case study（未单独建模前）, 与「GitHub 上有
 _Avoid_: 日常（作类型名时）, blog post（统称）
 
 **Article**:
-技术或项目向的深度公开写作。可与 Project 可选关联（`relatedProject`，不强制）。必属一个 ArticleCategory。
+技术或项目向的深度公开写作。可与 Project 可选关联（`relatedProject`，不强制）。可属一个 ArticleCategory，也可没有分类。
 _Avoid_: 技术笔记（作类型名时）, post（统称）
 
 **ArticleCategory**:
-Owner 维护的 Article 分组。站点预置太鼓，不可删除。访客在列表筛选；详情页仅轻量标示，列表卡片不展示分类。
+Owner 维护的 Article 分组，全部可改可删。删除后，原属该分类的 Article 变为无分类。访客在列表筛选；详情页仅轻量标示，列表卡片不展示分类。
 _Avoid_: tag（作实体名时）, topic, label, 栏目
 
 **Comment**:

@@ -161,8 +161,8 @@ async def test_published_article_shows_related_project(
         "/api/public/articles/craft-notes", params={"locale": "zh-Hant"}
     )
     assert zh_detail.json()["relatedProject"]["title"] == "玻璃 API"
-    assert zh_detail.json()["categorySlug"] == "taiko"
-    assert zh_detail.json()["categoryTitle"] == "太鼓"
+    assert zh_detail.json()["categorySlug"] == ""
+    assert zh_detail.json()["categoryTitle"] == ""
 
 
 @pytest.mark.asyncio
@@ -190,24 +190,61 @@ async def test_related_draft_project_is_hidden_on_public_article(
 
 
 @pytest.mark.asyncio
-async def test_owner_sees_seeded_taiko_category_and_cannot_delete_it(
+async def test_article_categories_are_optional_and_deletable(
     client, mailer, settings
 ):
     token = await _owner_token(client, mailer, settings)
     headers = {"Authorization": f"Bearer {token}"}
     listed = await client.get("/api/owner/article-categories", headers=headers)
     assert listed.status_code == 200
-    categories = listed.json()
-    assert [item["slug"] for item in categories] == ["taiko"]
-    assert categories[0]["title"]["zh-Hant"] == "太鼓"
-    assert categories[0]["protected"] is True
+    assert listed.json() == []
 
-    blocked = await client.delete(
-        f"/api/owner/article-categories/{categories[0]['id']}",
+    created = await client.post(
+        "/api/owner/article-categories",
+        json={
+            "slug": "taiko",
+            "title": {"zh-Hant": "太鼓", "en": "Taiko"},
+            "order": 0,
+        },
         headers=headers,
     )
-    assert blocked.status_code == 400
-    assert blocked.json()["detail"] == "protected_category"
+    assert created.status_code == 200
+    assert created.json()["slug"] == "taiko"
+    assert created.json()["protected"] is False
+    category_id = created.json()["id"]
+
+    tagged = await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="rip-hero", categorySlug="taiko"),
+        headers=headers,
+    )
+    assert tagged.status_code == 200
+    assert tagged.json()["categorySlug"] == "taiko"
+
+    missing = await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="ghost", categorySlug="missing"),
+        headers=headers,
+    )
+    assert missing.status_code == 200
+    assert missing.json()["categorySlug"] == ""
+
+    deleted = await client.delete(
+        f"/api/owner/article-categories/{category_id}",
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+
+    owner_articles = await client.get("/api/owner/articles", headers=headers)
+    by_slug = {item["slug"]: item for item in owner_articles.json()}
+    assert by_slug["rip-hero"]["categorySlug"] == ""
+
+    public = await client.get(
+        "/api/public/articles/rip-hero", params={"locale": "zh-Hant"}
+    )
+    assert public.status_code == 200
+    assert public.json()["categorySlug"] == ""
+    assert public.json()["categoryTitle"] == ""
 
 
 @pytest.mark.asyncio
@@ -231,7 +268,7 @@ async def test_owner_can_add_article_category_and_visitors_can_filter(
 
     await client.post(
         "/api/owner/articles",
-        json=_article_payload(slug="taiko-piece"),
+        json=_article_payload(slug="plain-piece"),
         headers=headers,
     )
     await client.post(
@@ -240,20 +277,12 @@ async def test_owner_can_add_article_category_and_visitors_can_filter(
         headers=headers,
     )
 
-    unknown = await client.post(
-        "/api/owner/articles",
-        json=_article_payload(slug="ghost", categorySlug="missing"),
-        headers=headers,
-    )
-    assert unknown.status_code == 400
-    assert unknown.json()["detail"] == "unknown_category"
-
     public_cats = await client.get(
         "/api/public/article-categories", params={"locale": "zh-Hant"}
     )
     assert public_cats.status_code == 200
-    assert [item["slug"] for item in public_cats.json()] == ["taiko", "notes"]
-    assert public_cats.json()[0]["title"] == "太鼓"
+    assert [item["slug"] for item in public_cats.json()] == ["notes"]
+    assert public_cats.json()[0]["title"] == "筆記"
 
     notes = await client.get(
         "/api/public/articles",
@@ -263,8 +292,48 @@ async def test_owner_can_add_article_category_and_visitors_can_filter(
     assert notes.json()[0]["categorySlug"] == "notes"
     assert notes.json()[0]["categoryTitle"] == "筆記"
 
-    taiko = await client.get(
-        "/api/public/articles",
-        params={"locale": "zh-Hant", "category": "taiko"},
+    all_public = await client.get(
+        "/api/public/articles", params={"locale": "zh-Hant"}
     )
-    assert [item["slug"] for item in taiko.json()] == ["taiko-piece"]
+    listed_public = {item["slug"]: item for item in all_public.json()}
+    assert set(listed_public) == {"plain-piece", "note-piece"}
+    assert listed_public["plain-piece"]["categorySlug"] == ""
+
+
+@pytest.mark.asyncio
+async def test_public_article_resolves_slug_with_leading_slash(
+    client, app, mailer, settings
+):
+    from app.models import Article
+
+    token = await _owner_token(client, mailer, settings)
+    created = await client.post(
+        "/api/owner/articles",
+        json=_article_payload(slug="/rip-hero"),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert created.status_code == 200
+    assert created.json()["slug"] == "rip-hero"
+
+    clean = await client.get(
+        "/api/public/articles/rip-hero", params={"locale": "zh-Hant"}
+    )
+    assert clean.status_code == 200
+    assert clean.json()["slug"] == "rip-hero"
+
+    stored = await app.state.store.find_one(Article, slug="rip-hero")
+    assert stored is not None
+    stored.slug = "/rip-hero"
+    await app.state.store.save(stored)
+
+    listed = await client.get(
+        "/api/public/articles", params={"locale": "zh-Hant"}
+    )
+    assert listed.status_code == 200
+    assert [item["slug"] for item in listed.json()] == ["rip-hero"]
+
+    recovered = await client.get(
+        "/api/public/articles/rip-hero", params={"locale": "zh-Hant"}
+    )
+    assert recovered.status_code == 200
+    assert recovered.json()["slug"] == "rip-hero"

@@ -542,16 +542,22 @@ export function emptyOwnerArticle(): OwnerArticle {
     status: "draft",
     order: 0,
     relatedProjectSlug: "",
-    categorySlug: "taiko",
+    categorySlug: "",
   };
+}
+
+function pathSegment(value: string): string {
+  return value.trim().replace(/^\/+|\/+$/g, "");
 }
 
 export function articleHref(
   locale: string,
   article: { categorySlug: string; slug: string },
 ): string {
-  const category = article.categorySlug || "taiko";
-  return `/${locale}/articles/${category}/${article.slug}`;
+  const slug = pathSegment(article.slug);
+  const category = pathSegment(article.categorySlug || "");
+  if (!category) return `/${locale}/articles/${slug}`;
+  return `/${locale}/articles/${category}/${slug}`;
 }
 
 export async function fetchPublicArticles(
@@ -617,6 +623,23 @@ export async function createOwnerArticleCategory(
 ): Promise<OwnerArticleCategory> {
   const res = await fetch(`${API_BASE}/api/owner/article-categories`, {
     method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerArticleCategory;
+}
+
+export async function saveOwnerArticleCategory(
+  token: string,
+  id: string,
+  body: { slug: string; title: Localized; order: number },
+): Promise<OwnerArticleCategory> {
+  const res = await fetch(`${API_BASE}/api/owner/article-categories/${id}`, {
+    method: "PUT",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",

@@ -31,8 +31,6 @@ from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGi
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer, SmtpThenConsoleMailer
 from app.models import (
     ABOUT_KINDS,
-    DEFAULT_ARTICLE_CATEGORY_SLUG,
-    DEFAULT_ARTICLE_CATEGORY_TITLE,
     LOCALES,
     STATUSES,
     AboutModule,
@@ -129,7 +127,7 @@ class ArticleBody(BaseModel):
     status: str = "draft"
     order: int = 0
     relatedProjectSlug: str = ""
-    categorySlug: str = DEFAULT_ARTICLE_CATEGORY_SLUG
+    categorySlug: str = ""
 
 
 class ArticleCategoryBody(BaseModel):
@@ -260,7 +258,6 @@ def create_app(
             flush=True,
         )
         try:
-            await ensure_default_article_category()
             yield
         finally:
             await redis.aclose()
@@ -848,34 +845,50 @@ def create_app(
         await current_store().save(project)
         return project.to_owner_dict()
 
-    async def ensure_default_article_category() -> ArticleCategory:
-        store = current_store()
-        existing = await store.find_one(
-            ArticleCategory, slug=DEFAULT_ARTICLE_CATEGORY_SLUG
-        )
-        if existing is not None:
-            if not existing.protected:
-                existing.protected = True
-                if not pick_localized(existing.title, "zh-Hant"):
-                    existing.title = dict(DEFAULT_ARTICLE_CATEGORY_TITLE)
-                await store.save(existing)
-            return existing
-        category = new_document(ArticleCategory)
-        category.slug = DEFAULT_ARTICLE_CATEGORY_SLUG
-        category.title = dict(DEFAULT_ARTICLE_CATEGORY_TITLE)
-        category.order = 0
-        category.protected = True
-        await store.insert(category)
-        return category
-
     def normalize_slug(value: str, *, detail: str = "invalid_slug") -> str:
-        slug = value.strip().lower()
+        slug = value.strip().lower().strip("/")
         if not slug:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=detail,
             )
         return slug
+
+    def slug_candidates(value: str) -> list[str]:
+        raw = value.strip()
+        clean = raw.lower().strip("/")
+        seen: list[str] = []
+        for item in (raw, clean, f"/{clean}"):
+            if item and item not in seen:
+                seen.append(item)
+        return seen
+
+    async def find_article_by_slug(
+        slug: str, *, published_only: bool = False
+    ) -> Article | None:
+        store = current_store()
+        extras = {"status": "published"} if published_only else {}
+        for candidate in slug_candidates(slug):
+            article = await store.find_one(Article, slug=candidate, **extras)
+            if article is not None:
+                return article
+        wanted = slug.strip().lower().strip("/")
+        articles = (
+            await store.find(Article, **extras)
+            if extras
+            else await store.find_all(Article)
+        )
+        for article in articles:
+            if (article.slug or "").strip().lower().strip("/") == wanted:
+                return article
+        return None
+
+    async def heal_article_slug(article: Article) -> str:
+        clean = normalize_slug(article.slug)
+        if article.slug != clean:
+            article.slug = clean
+            await current_store().save(article)
+        return clean
 
     async def apply_article_body(article: Article, body: ArticleBody) -> None:
         if body.status not in STATUSES:
@@ -884,18 +897,15 @@ def create_app(
                 detail="invalid_status",
             )
         slug = normalize_slug(body.slug)
-        await ensure_default_article_category()
-        category_slug = normalize_slug(
-            body.categorySlug or DEFAULT_ARTICLE_CATEGORY_SLUG
-        )
-        category = await current_store().find_one(
-            ArticleCategory, slug=category_slug
-        )
-        if category is None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="unknown_category",
+        raw_category = (body.categorySlug or "").strip()
+        category_slug = ""
+        if raw_category:
+            wanted = normalize_slug(raw_category)
+            category = await current_store().find_one(
+                ArticleCategory, slug=wanted
             )
+            if category is not None:
+                category_slug = category.slug
         article.slug = slug
         article.title = body.title
         article.summary = body.summary
@@ -929,6 +939,7 @@ def create_app(
 
     async def public_article_payload(article: Article, locale: str) -> dict[str, Any]:
         payload = article.resolve(locale)
+        payload["slug"] = await heal_article_slug(article)
         related_slug = article.related_project_slug
         if related_slug:
             project = await current_store().find_one(
@@ -939,15 +950,21 @@ def create_app(
                     "slug": project.slug,
                     "title": project.resolve(locale)["title"],
                 }
-        await ensure_default_article_category()
-        category_slug = article.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG
-        category = await current_store().find_one(
-            ArticleCategory, slug=category_slug
+        raw_category = (article.category_slug or "").strip()
+        category = (
+            await current_store().find_one(ArticleCategory, slug=raw_category)
+            if raw_category
+            else None
         )
-        payload["categorySlug"] = category_slug
-        payload["categoryTitle"] = (
-            pick_localized(category.title, locale) if category is not None else category_slug
-        )
+        if category is None:
+            if article.category_slug:
+                article.category_slug = ""
+                await current_store().save(article)
+            payload["categorySlug"] = ""
+            payload["categoryTitle"] = ""
+        else:
+            payload["categorySlug"] = category.slug
+            payload["categoryTitle"] = pick_localized(category.title, locale)
         return payload
 
     @app.get("/api/public/article-categories")
@@ -955,7 +972,6 @@ def create_app(
         locale: str = "zh-Hant",
     ) -> list[dict[str, Any]]:
         locale = normalize_locale(locale)
-        await ensure_default_article_category()
         categories = await current_store().find_all(ArticleCategory)
         categories.sort(key=lambda item: (item.order, item.slug))
         return [item.resolve(locale) for item in categories]
@@ -972,7 +988,7 @@ def create_app(
             articles = [
                 item
                 for item in articles
-                if (item.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG) == wanted
+                if (item.category_slug or "") == wanted
             ]
         articles.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
         return [await public_article_payload(item, locale) for item in articles]
@@ -982,9 +998,7 @@ def create_app(
         slug: str, locale: str = "zh-Hant"
     ) -> dict[str, Any]:
         locale = normalize_locale(locale)
-        article = await current_store().find_one(
-            Article, slug=slug, status="published"
-        )
+        article = await find_article_by_slug(slug, published_only=True)
         if article is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -996,7 +1010,6 @@ def create_app(
     async def owner_list_article_categories(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        await ensure_default_article_category()
         categories = await current_store().find_all(ArticleCategory)
         categories.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in categories]
@@ -1006,14 +1019,13 @@ def create_app(
         body: ArticleCategoryBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        await ensure_default_article_category()
         slug = normalize_slug(body.slug)
         await ensure_unique_category_slug(slug)
         category = new_document(ArticleCategory)
         category.slug = slug
         category.title = body.title
         category.order = body.order
-        category.protected = slug == DEFAULT_ARTICLE_CATEGORY_SLUG
+        category.protected = False
         await current_store().insert(category)
         return category.to_owner_dict()
 
@@ -1023,7 +1035,6 @@ def create_app(
         body: ArticleCategoryBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        await ensure_default_article_category()
         category = await current_store().get(ArticleCategory, category_id)
         if category is None:
             raise HTTPException(
@@ -1031,16 +1042,18 @@ def create_app(
                 detail="not_found",
             )
         slug = normalize_slug(body.slug)
-        if category.protected and slug != category.slug:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="protected_category",
-            )
         await ensure_unique_category_slug(slug, exclude_id=str(category.id))
+        old_slug = category.slug
         category.slug = slug
         category.title = body.title
         category.order = body.order
+        category.protected = False
         await current_store().save(category)
+        if old_slug != slug:
+            store = current_store()
+            for article in await store.find(Article, category_slug=old_slug):
+                article.category_slug = slug
+                await store.save(article)
         return category.to_owner_dict()
 
     @app.delete("/api/owner/article-categories/{category_id}")
@@ -1048,21 +1061,15 @@ def create_app(
         category_id: PydanticObjectId,
         _: str = Depends(require_owner),
     ) -> dict[str, str]:
-        await ensure_default_article_category()
         category = await current_store().get(ArticleCategory, category_id)
         if category is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        if category.protected or category.slug == DEFAULT_ARTICLE_CATEGORY_SLUG:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="protected_category",
-            )
         store = current_store()
         for article in await store.find(Article, category_slug=category.slug):
-            article.category_slug = DEFAULT_ARTICLE_CATEGORY_SLUG
+            article.category_slug = ""
             await store.save(article)
         await store.delete(category)
         return {"status": "deleted"}
@@ -1071,7 +1078,6 @@ def create_app(
     async def owner_list_articles(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        await ensure_default_article_category()
         articles = await current_store().find_all(Article)
         articles.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in articles]
@@ -1327,9 +1333,7 @@ def create_app(
 
     async def published_comment_target(target_type: str, slug: str):
         if target_type == "article":
-            return await current_store().find_one(
-                Article, slug=slug, status="published"
-            )
+            return await find_article_by_slug(slug, published_only=True)
         if target_type == "journal":
             return await current_store().find_one(
                 Journal, slug=slug, status="published"

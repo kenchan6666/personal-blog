@@ -7,6 +7,7 @@ import {
   createOwnerArticleCategory,
   deleteOwnerArticle,
   deleteOwnerArticleCategory,
+  emptyLocalized,
   emptyOwnerArticle,
   fetchOwnerArticleCategories,
   fetchOwnerArticles,
@@ -14,6 +15,7 @@ import {
   getSessionToken,
   localizedText,
   saveOwnerArticle,
+  saveOwnerArticleCategory,
   type OwnerArticle,
   type OwnerArticleCategory,
   type OwnerProject,
@@ -50,11 +52,15 @@ export function ArticleEditor({ dict }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [newSlug, setNewSlug] = useState("");
-  const [newTitleZh, setNewTitleZh] = useState("");
-  const [newTitleHans, setNewTitleHans] = useState("");
-  const [newTitleEn, setNewTitleEn] = useState("");
-  const [addingCategory, setAddingCategory] = useState(false);
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<OwnerArticleCategory | null>(
+    null,
+  );
+  const [categoryDraft, setCategoryDraft] = useState({
+    slug: "",
+    title: emptyLocalized(),
+  });
+  const [savingCategory, setSavingCategory] = useState(false);
 
   async function reload(token: string) {
     const [list, projectList, categoryList] = await Promise.all([
@@ -129,34 +135,51 @@ export function ArticleEditor({ dict }: Props) {
     }
   }
 
-  async function onAddCategory(e: React.FormEvent) {
+  function openNewCategory() {
+    setEditingCategory(null);
+    setCategoryDraft({ slug: "", title: emptyLocalized() });
+    setCategoryOpen(true);
+    setMessage(null);
+    setError(null);
+  }
+
+  function openEditCategory(category: OwnerArticleCategory) {
+    setEditingCategory(category);
+    setCategoryDraft({ slug: category.slug, title: category.title });
+    setCategoryOpen(true);
+    setMessage(null);
+    setError(null);
+  }
+
+  async function onSaveCategory(e: React.FormEvent) {
     e.preventDefault();
     const token = getSessionToken();
     if (!token) return;
-    const slug = newSlug.trim().toLowerCase();
+    const slug = categoryDraft.slug.trim().toLowerCase();
     if (!slug) return;
-    setAddingCategory(true);
+    setSavingCategory(true);
     setError(null);
     try {
-      await createOwnerArticleCategory(token, {
+      const body = {
         slug,
-        title: {
-          "zh-Hant": newTitleZh,
-          "zh-Hans": newTitleHans,
-          en: newTitleEn,
-        },
-        order: categories.length,
-      });
-      setNewSlug("");
-      setNewTitleZh("");
-      setNewTitleHans("");
-      setNewTitleEn("");
+        title: categoryDraft.title,
+        order: editingCategory?.order ?? categories.length,
+      };
+      const saved = editingCategory
+        ? await saveOwnerArticleCategory(token, editingCategory.id, body)
+        : await createOwnerArticleCategory(token, body);
       await reload(token);
+      if (!editingCategory) {
+        setCurrent((prev) => ({ ...prev, categorySlug: saved.slug }));
+      } else if (current.categorySlug === editingCategory.slug) {
+        setCurrent((prev) => ({ ...prev, categorySlug: saved.slug }));
+      }
+      setCategoryOpen(false);
       setMessage(a.saved);
     } catch {
       setError(a.errorGeneric);
     } finally {
-      setAddingCategory(false);
+      setSavingCategory(false);
     }
   }
 
@@ -165,13 +188,11 @@ export function ArticleEditor({ dict }: Props) {
     if (!token) return;
     setError(null);
     try {
+      const removed = categories.find((item) => item.id === id);
       await deleteOwnerArticleCategory(token, id);
-      const list = await reload(token);
-      if (current.categorySlug) {
-        const still = list.some((item) => item.categorySlug === current.categorySlug);
-        if (!still) {
-          setCurrent({ ...current, categorySlug: "taiko" });
-        }
+      await reload(token);
+      if (removed && current.categorySlug === removed.slug) {
+        setCurrent((prev) => ({ ...prev, categorySlug: "" }));
       }
     } catch {
       setError(a.errorGeneric);
@@ -185,6 +206,7 @@ export function ArticleEditor({ dict }: Props) {
   };
 
   return (
+    <>
     <CmsCard
       title={a.articleEditor}
       action={
@@ -201,60 +223,43 @@ export function ArticleEditor({ dict }: Props) {
         <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
       ) : null}
       <div className="cms-categories">
-        <p className="cms-categories-label">{a.articleCategories}</p>
-        <ul className="cms-category-list">
-          {categories.map((category) => (
-            <li key={category.id} className="cms-category-item">
-              <span>{categoryLabel(category)}</span>
-              {category.protected ? (
-                <em>{a.protectedCategory}</em>
-              ) : (
-                <button
-                  type="button"
-                  className="btn-ghost text-xs"
-                  onClick={() => void onDeleteCategory(category.id)}
-                >
-                  {a.deleteCategory}
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-        <form className="cms-category-add" onSubmit={onAddCategory}>
-          <input
-            className="field field-tight"
-            value={newSlug}
-            onChange={(e) => setNewSlug(e.target.value)}
-            placeholder={a.categorySlug}
-            required
-          />
-          <input
-            className="field field-tight"
-            value={newTitleZh}
-            onChange={(e) => setNewTitleZh(e.target.value)}
-            placeholder={a.categoryTitleZh}
-            required
-          />
-          <input
-            className="field field-tight"
-            value={newTitleHans}
-            onChange={(e) => setNewTitleHans(e.target.value)}
-            placeholder={a.categoryTitleHans}
-          />
-          <input
-            className="field field-tight"
-            value={newTitleEn}
-            onChange={(e) => setNewTitleEn(e.target.value)}
-            placeholder={a.categoryTitleEn}
-          />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="cms-categories-label">{a.articleCategories}</p>
           <button
-            type="submit"
+            type="button"
             className="btn-ghost text-sm"
-            disabled={addingCategory}
+            onClick={openNewCategory}
           >
             {a.newCategory}
           </button>
-        </form>
+        </div>
+        {categories.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">{a.noCategories}</p>
+        ) : (
+          <ul className="cms-category-list">
+            {categories.map((category) => (
+              <li key={category.id} className="cms-category-item">
+                <span>{categoryLabel(category)}</span>
+                <span className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-ghost text-xs"
+                    onClick={() => openEditCategory(category)}
+                  >
+                    {a.editCategory}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost text-xs"
+                    onClick={() => void onDeleteCategory(category.id)}
+                  >
+                    {a.deleteCategory}
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
       {loading ? (
         <p className="text-sm text-[var(--text-muted)]">{a.loadingArticles}</p>
@@ -353,17 +358,25 @@ export function ArticleEditor({ dict }: Props) {
               {a.fieldCategory}
               <select
                 className="field mt-2 font-normal"
-                value={current.categorySlug || "taiko"}
+                value={current.categorySlug || ""}
                 onChange={(e) =>
                   setCurrent({ ...current, categorySlug: e.target.value })
                 }
               >
+                <option value="">{a.noCategory}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.slug}>
                     {categoryLabel(category)}
                   </option>
                 ))}
               </select>
+              <button
+                type="button"
+                className="btn-ghost mt-2 text-xs"
+                onClick={openNewCategory}
+              >
+                {a.newCategory}
+              </button>
             </label>
             <label className="block text-sm font-semibold">
               {a.fieldOrder}
@@ -423,5 +436,50 @@ export function ArticleEditor({ dict }: Props) {
         </form>
       </CmsModal>
     </CmsCard>
+    <CmsModal
+      open={categoryOpen}
+      title={editingCategory ? a.editCategory : a.newCategory}
+      closeLabel={a.close}
+      onClose={() => setCategoryOpen(false)}
+      footer={
+        <>
+          <button
+            type="submit"
+            form="category-form"
+            className="btn-cta"
+            disabled={savingCategory}
+          >
+            {savingCategory ? a.saving : a.save}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setCategoryOpen(false)}
+          >
+            {a.close}
+          </button>
+        </>
+      }
+    >
+      <form id="category-form" onSubmit={onSaveCategory}>
+        <label className="mb-6 block text-sm font-semibold">
+          {a.categorySlug}
+          <input
+            className="field mt-2 font-normal"
+            value={categoryDraft.slug}
+            onChange={(e) =>
+              setCategoryDraft({ ...categoryDraft, slug: e.target.value })
+            }
+            required
+          />
+        </label>
+        <BilingualField
+          label={a.fieldCategory}
+          value={categoryDraft.title}
+          onChange={(title) => setCategoryDraft({ ...categoryDraft, title })}
+        />
+      </form>
+    </CmsModal>
+    </>
   );
 }

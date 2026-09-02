@@ -11,12 +11,6 @@ from zhconv import convert as zhconv_convert
 from app.avatar import avatar_public_url, hero_visual_public_url
 
 LOCALES = ("zh-Hant", "zh-Hans", "en")
-DEFAULT_ARTICLE_CATEGORY_SLUG = "taiko"
-DEFAULT_ARTICLE_CATEGORY_TITLE = {
-    "zh-Hant": "太鼓",
-    "zh-Hans": "太鼓",
-    "en": "Taiko",
-}
 ABOUT_KINDS = ("summary", "education", "achievement", "experience", "custom")
 LOCALE_FALLBACK = {
     "zh-Hans": ("zh-Hans", "zh-Hant", "en"),
@@ -287,7 +281,7 @@ class Article(Document):
     status: str = "draft"
     order: int = 0
     related_project_slug: str = ""
-    category_slug: str = DEFAULT_ARTICLE_CATEGORY_SLUG
+    category_slug: str = ""
     published_at: datetime | None = None
 
     class Settings:
@@ -303,7 +297,7 @@ class Article(Document):
             "status": self.status,
             "order": self.order,
             "relatedProjectSlug": self.related_project_slug,
-            "categorySlug": self.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG,
+            "categorySlug": self.category_slug or "",
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
@@ -317,7 +311,7 @@ class Article(Document):
             "body": body_text,
             "order": self.order,
             "relatedProject": None,
-            "categorySlug": self.category_slug or DEFAULT_ARTICLE_CATEGORY_SLUG,
+            "categorySlug": self.category_slug or "",
             "categoryTitle": "",
             "publishedAt": when.isoformat(),
             "wordCount": chars,
