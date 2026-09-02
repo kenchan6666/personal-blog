@@ -8,6 +8,15 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 
 ContentKind = Literal["project", "article", "journal", "about", "category"]
+KnowledgeCategory = Literal[
+    "identity",
+    "experience",
+    "education",
+    "skills",
+    "project",
+    "preference",
+    "other",
+]
 
 _COLLECTION_PATHS: dict[ContentKind, str] = {
     "project": "/api/owner/projects",
@@ -207,6 +216,56 @@ def create_server() -> FastMCP:
         if target_type != "all":
             items = [item for item in items if item.get("targetType") == target_type]
         return {"items": items[: max(1, min(limit, 200))], "total": len(items)}
+
+    @server.tool()
+    def portfolio_list_knowledge() -> dict[str, Any]:
+        """Read the Owner's modular About Me knowledge records used for RAG."""
+        items = api.request("GET", "/api/owner/agent/knowledge")
+        return {"items": items, "total": len(items)}
+
+    @server.tool()
+    def portfolio_remember_knowledge(
+        title: str,
+        category: KnowledgeCategory,
+        content: str,
+        tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Save a personal fact or experience after the Owner explicitly asks to remember it."""
+        api.require_write()
+        return api.request(
+            "POST",
+            "/api/owner/agent/knowledge",
+            json={
+                "title": title,
+                "category": category,
+                "content": content,
+                "tags": tags or [],
+                "order": 0,
+            },
+        )
+
+    @server.tool()
+    def portfolio_update_knowledge(
+        record_id: str,
+        title: str,
+        category: KnowledgeCategory,
+        content: str,
+        tags: list[str] | None = None,
+        order: int = 0,
+    ) -> dict[str, Any]:
+        """Update one About Me record after the Owner identifies the record and desired change."""
+        api.require_write()
+        return api.request(
+            "PUT",
+            f"/api/owner/agent/knowledge/{record_id}",
+            json={
+                "title": title,
+                "category": category,
+                "content": content,
+                "tags": tags or [],
+                "order": order,
+            },
+        )
 
     @server.tool()
     def portfolio_get_project_source(

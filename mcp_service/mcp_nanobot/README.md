@@ -17,9 +17,11 @@
 - `portfolio_update_site`
 - `portfolio_get_project_source` / `portfolio_get_source_file`
 - `portfolio_list_comments` / `portfolio_comment_action`
+- `portfolio_list_knowledge` / `portfolio_remember_knowledge` / `portfolio_update_knowledge`
 
 创建项目、文章、日志和 About 模块时固定为 Draft。没有删除工具。评论审核、拒绝
-和站长回复必须由 Agent 根据 Owner 的明确指令调用。
+和站长回复必须由 Agent 根据 Owner 的明确指令调用。个人资料只在 Owner 明确要求
+记住或修改时写入“关于我”知识库。
 
 ## 本地运行
 

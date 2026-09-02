@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     agent_internal_token: str = ""
     agent_service_token: str = ""
     agent_upload_max_bytes: int = 10 * 1024 * 1024
+    uni_api_key: str = ""
+    uni_api_base: str = "https://api.uniapi.io"
+    agent_embedding_model: str = "text-embedding-004"
+    qdrant_url: str = "http://127.0.0.1:6333"
+    qdrant_collection: str = "portfolio_about_me"
 
     github_client_id: str = ""
     github_client_secret: str = ""

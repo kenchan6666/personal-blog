@@ -1,7 +1,7 @@
 # Single-VM deploy (nginx + Compose)
 
 One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, the internal
-**Portfolio Agent**, **MongoDB**, and **Redis**. Browsers talk only to nginx:
+**Portfolio Agent**, **MongoDB**, **Qdrant**, and **Redis**. Browsers talk only to nginx:
 `/` → frontend, `/api/` → API. The Agent has no public port; Owner login and
 the API proxy protect every chat and upload.
 
@@ -64,15 +64,18 @@ Set these values in `deployment/.env` before using the Agent tab:
 - `AGENT_INTERNAL_TOKEN`: a random secret used by FastAPI when calling Viola.
 - `AGENT_SERVICE_TOKEN`: a different random secret used by the Portfolio MCP
   when calling Owner APIs.
+- `AGENT_EMBEDDING_MODEL=text-embedding-004`: UniAPI 中可用的 Embedding 模型。
+- `QDRANT_URL=http://qdrant:6333`: Compose 内部向量数据库地址。
 
 Generate the two tokens with `openssl rand -hex 32`. They must be different and
 must never use a `NEXT_PUBLIC_` name. The Agent reads all Owner-visible content,
 including drafts and comment email addresses. It can create/update content
 through MCP, but new records are always Draft and no delete tool is exposed.
 
-Personal facts and preferred writing style can be added later to the persistent
-`USER.md` in the `agent_data` volume. Site facts should remain in the CMS; the
-Agent reads those live through MCP.
+后台 Agent 页面会持久保存多组会话与消息。右侧“关于我”用于查看、添加和修改
+模块化个人资料；资料正文保存在 MongoDB，并同步向量到 Qdrant。若 Embedding
+服务暂时不可用，资料仍会保存，Agent 自动降级为关键词检索。站点事实仍应保留
+在 CMS 中，Agent 会通过 MCP 实时读取。
 
 ## Owner login on the deployed site
 
@@ -90,7 +93,7 @@ Open GCP firewall **tcp:80** and **tcp:443**. Turn off GoDaddy HTTPS forwarding/
 ## Layout
 
 - `bash deployment/start.sh --prod` — one-command bring-up
-- `docker-compose.prod.yml` — mongo, redis, api, agent, web, nginx
+- `docker-compose.prod.yml` — mongo, redis, qdrant, api, agent, web, nginx
 - `deployment/nginx.conf` — reverse proxy
 - `deployment/env.example` — template for `deployment/.env`
 - `backend/Dockerfile`, `frontend/Dockerfile`

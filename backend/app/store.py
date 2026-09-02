@@ -8,10 +8,30 @@ from beanie import PydanticObjectId
 from bson import ObjectId
 from pydantic import TypeAdapter
 
-from app.models import Article, ArticleCategory, AboutModule, Comment, Journal, Project, SiteProfile
+from app.models import (
+    AboutModule,
+    AgentConversation,
+    Article,
+    ArticleCategory,
+    Comment,
+    Journal,
+    KnowledgeRecord,
+    Project,
+    SiteProfile,
+)
 
 DocumentModel = TypeVar("DocumentModel")
-MODELS = (SiteProfile, Project, ArticleCategory, Article, Journal, AboutModule, Comment)
+MODELS = (
+    SiteProfile,
+    Project,
+    ArticleCategory,
+    Article,
+    Journal,
+    AboutModule,
+    Comment,
+    AgentConversation,
+    KnowledgeRecord,
+)
 
 _STORE: "Store | None" = None
 

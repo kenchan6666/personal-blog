@@ -14,22 +14,30 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
 
+  qdrant:
+    image: qdrant/qdrant:v1.15.4
+    restart: unless-stopped
+    volumes:
+      - qdrant_data:/qdrant/storage
+
   api:
     build: ./backend
     restart: unless-stopped
     env_file:
-      - ./deployment/.env
+      - ${DEPLOY_ENV_FILE:-./deployment/.env}
     environment:
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: portfolio
       REDIS_URL: redis://redis:6379/0
       AVATAR_DIR: /data/avatars
       AGENT_API_URL: http://agent:8900
+      QDRANT_URL: http://qdrant:6333
     volumes:
       - ./data/media:/data/avatars
     depends_on:
       - mongo
       - redis
+      - qdrant
 
   agent:
     build:
@@ -37,7 +45,7 @@ services:
       dockerfile: viola-agent/Dockerfile
     restart: unless-stopped
     env_file:
-      - ./deployment/.env
+      - ${DEPLOY_ENV_FILE:-./deployment/.env}
     environment:
       BACKEND_API_BASE_URL: http://api:8000
       PORTFOLIO_SERVICE_TOKEN: ${AGENT_SERVICE_TOKEN}
@@ -103,3 +111,4 @@ volumes:
   certbot_www:
   certbot_certs:
   agent_data:
+  qdrant_data:

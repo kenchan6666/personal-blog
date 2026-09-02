@@ -418,3 +418,76 @@ class Comment(Document):
             "targetType": self.target_type,
             "targetSlug": self.target_slug,
         }
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+class AgentMessage(BaseModel):
+    role: str
+    content: str
+    files: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role": self.role,
+            "content": self.content,
+            "files": self.files,
+            "createdAt": self.created_at.isoformat(),
+        }
+
+
+class AgentConversation(Document):
+    title: str = "新对话"
+    messages: list[AgentMessage] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "agent_conversations"
+
+    def to_summary_dict(self) -> dict[str, Any]:
+        preview = self.messages[-1].content if self.messages else ""
+        return {
+            "id": str(self.id),
+            "title": self.title,
+            "preview": preview[:120],
+            "messageCount": len(self.messages),
+            "createdAt": self.created_at.isoformat(),
+            "updatedAt": self.updated_at.isoformat(),
+        }
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            **self.to_summary_dict(),
+            "messages": [message.to_dict() for message in self.messages],
+        }
+
+
+class KnowledgeRecord(Document):
+    title: str = ""
+    category: str = "other"
+    content: str = ""
+    tags: list[str] = Field(default_factory=list)
+    order: int = 0
+    vector_synced: bool = False
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "agent_knowledge"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "title": self.title,
+            "category": self.category,
+            "content": self.content,
+            "tags": self.tags,
+            "order": self.order,
+            "vectorSynced": self.vector_synced,
+            "createdAt": self.created_at.isoformat(),
+            "updatedAt": self.updated_at.isoformat(),
+        }

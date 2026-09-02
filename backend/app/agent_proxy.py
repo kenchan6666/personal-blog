@@ -1,15 +1,55 @@
 from __future__ import annotations
 
+import codecs
 import json
 import re
 from collections.abc import AsyncIterator, Callable
-from typing import Any
+from typing import Any, Literal
 
 import httpx
+from beanie import PydanticObjectId
 from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, Field
+
+from app.agent_rag import AgentRag, knowledge_context
+from app.models import AgentConversation, AgentMessage, KnowledgeRecord, utc_now
+from app.store import current_store, new_document
 
 _SESSION_RE = re.compile(r"[^a-zA-Z0-9_-]")
+_KNOWLEDGE_CATEGORIES = {
+    "identity",
+    "experience",
+    "education",
+    "skills",
+    "project",
+    "preference",
+    "other",
+}
+
+
+class ConversationCreate(BaseModel):
+    title: str = "新对话"
+
+
+class ConversationUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+
+
+class KnowledgeWrite(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
+    category: Literal[
+        "identity",
+        "experience",
+        "education",
+        "skills",
+        "project",
+        "preference",
+        "other",
+    ] = "other"
+    content: str = Field(min_length=1, max_length=20000)
+    tags: list[str] = Field(default_factory=list, max_length=20)
+    order: int = 0
 
 
 def _agent_headers(token: str) -> dict[str, str]:
@@ -21,10 +61,147 @@ def _session_id(value: Any) -> str:
     return f"portfolio-owner-{clean or 'main'}"
 
 
+def _not_found(detail: str) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
+
+
+def _sse_delta(block: str) -> str:
+    data = "\n".join(
+        line[5:].lstrip()
+        for line in block.splitlines()
+        if line.startswith("data:")
+    )
+    if not data or data == "[DONE]":
+        return ""
+    try:
+        payload = json.loads(data)
+        value = payload.get("choices", [{}])[0].get("delta", {}).get("content")
+        return value if isinstance(value, str) else ""
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError):
+        return ""
+
+
+async def _sync_knowledge(rag: AgentRag, record: KnowledgeRecord) -> None:
+    record.vector_synced = await rag.sync(record)
+    await current_store().save(record)
+
+
 def register_agent_routes(
     app: FastAPI,
     require_owner: Callable[..., Any],
 ) -> None:
+    rag = AgentRag(app.state.settings)
+
+    @app.get("/api/owner/agent/conversations")
+    async def list_conversations(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        rows = await current_store().find_all(AgentConversation)
+        rows.sort(key=lambda row: row.updated_at, reverse=True)
+        return [row.to_summary_dict() for row in rows]
+
+    @app.post("/api/owner/agent/conversations")
+    async def create_conversation(
+        body: ConversationCreate,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        title = body.title.strip()[:80] or "新对话"
+        row = new_document(AgentConversation, title=title)
+        await current_store().insert(row)
+        return row.to_owner_dict()
+
+    @app.get("/api/owner/agent/conversations/{conversation_id}")
+    async def get_conversation(
+        conversation_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(AgentConversation, conversation_id)
+        if row is None:
+            raise _not_found("agent_conversation_not_found")
+        return row.to_owner_dict()
+
+    @app.patch("/api/owner/agent/conversations/{conversation_id}")
+    async def update_conversation(
+        conversation_id: PydanticObjectId,
+        body: ConversationUpdate,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(AgentConversation, conversation_id)
+        if row is None:
+            raise _not_found("agent_conversation_not_found")
+        row.title = body.title.strip()
+        row.updated_at = utc_now()
+        await current_store().save(row)
+        return row.to_summary_dict()
+
+    @app.delete("/api/owner/agent/conversations/{conversation_id}")
+    async def delete_conversation(
+        conversation_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, bool]:
+        row = await current_store().get(AgentConversation, conversation_id)
+        if row is None:
+            raise _not_found("agent_conversation_not_found")
+        await current_store().delete(row)
+        return {"ok": True}
+
+    @app.get("/api/owner/agent/knowledge")
+    async def list_knowledge(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        rows = await current_store().find_all(KnowledgeRecord)
+        rows.sort(key=lambda row: (row.order, row.updated_at), reverse=True)
+        return [row.to_owner_dict() for row in rows]
+
+    @app.post("/api/owner/agent/knowledge")
+    async def create_knowledge(
+        body: KnowledgeWrite,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = new_document(
+            KnowledgeRecord,
+            title=body.title.strip(),
+            category=body.category,
+            content=body.content.strip(),
+            tags=[tag.strip()[:40] for tag in body.tags if tag.strip()],
+            order=body.order,
+        )
+        await current_store().insert(row)
+        await _sync_knowledge(rag, row)
+        return row.to_owner_dict()
+
+    @app.put("/api/owner/agent/knowledge/{record_id}")
+    async def update_knowledge(
+        record_id: PydanticObjectId,
+        body: KnowledgeWrite,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(KnowledgeRecord, record_id)
+        if row is None:
+            raise _not_found("agent_knowledge_not_found")
+        row.title = body.title.strip()
+        row.category = body.category
+        row.content = body.content.strip()
+        row.tags = [tag.strip()[:40] for tag in body.tags if tag.strip()]
+        row.order = body.order
+        row.updated_at = utc_now()
+        row.vector_synced = False
+        await current_store().save(row)
+        await _sync_knowledge(rag, row)
+        return row.to_owner_dict()
+
+    @app.delete("/api/owner/agent/knowledge/{record_id}")
+    async def delete_knowledge(
+        record_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, bool]:
+        row = await current_store().get(KnowledgeRecord, record_id)
+        if row is None:
+            raise _not_found("agent_knowledge_not_found")
+        await current_store().delete(row)
+        await rag.delete(str(record_id))
+        return {"ok": True}
+
     @app.post("/api/owner/agent/chat")
     async def owner_agent_chat(
         request: Request,
@@ -37,16 +214,15 @@ def register_agent_routes(
                 detail="agent_not_configured",
             )
 
-        target = f"{settings.agent_api_url.rstrip('/')}/v1/chat/completions"
         content_type = request.headers.get("content-type", "")
-        headers = _agent_headers(settings.agent_internal_token)
-
+        files: list[tuple[str, tuple[str, bytes, str]]] = []
         if content_type.startswith("multipart/form-data"):
             form = await request.form()
             message = str(form.get("message") or "").strip()
-            session = _session_id(form.get("session_id"))
-            files: list[tuple[str, tuple[str, bytes, str]]] = []
+            editor_context = str(form.get("context") or "").strip()
+            conversation_id = str(form.get("conversation_id") or "")
             total_bytes = 0
+            file_names: list[str] = []
             for _, item in form.multi_items():
                 if not isinstance(item, UploadFile):
                     continue
@@ -57,6 +233,7 @@ def register_agent_routes(
                         status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                         detail="agent_file_too_large",
                     )
+                file_names.append(item.filename or "upload.bin")
                 files.append(
                     (
                         "files",
@@ -67,12 +244,6 @@ def register_agent_routes(
                         ),
                     )
                 )
-            data = {
-                "message": message or "请分析我上传的内容。",
-                "session_id": session,
-                "stream": "true",
-            }
-            request_kwargs: dict[str, Any] = {"data": data, "files": files}
         else:
             try:
                 body = await request.json()
@@ -82,21 +253,64 @@ def register_agent_routes(
                     detail="invalid_agent_request",
                 ) from None
             message = str(body.get("message") or "").strip()
-            if not message:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="agent_message_required",
-                )
+            editor_context = str(body.get("context") or "").strip()
+            conversation_id = str(body.get("conversation_id") or "")
+            file_names = []
+
+        if not message and not files:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="agent_message_required",
+            )
+        try:
+            parsed_id = PydanticObjectId(conversation_id)
+        except (ValueError, TypeError):
+            raise _not_found("agent_conversation_not_found") from None
+        conversation = await current_store().get(AgentConversation, parsed_id)
+        if conversation is None:
+            raise _not_found("agent_conversation_not_found")
+
+        display_message = message or "请分析这些文件。"
+        conversation.messages.append(
+            AgentMessage(role="user", content=display_message, files=file_names)
+        )
+        if not conversation.messages[:-1] and conversation.title == "新对话":
+            conversation.title = display_message.replace("\n", " ")[:36]
+        conversation.updated_at = utc_now()
+        await current_store().save(conversation)
+
+        knowledge = await current_store().find_all(KnowledgeRecord)
+        matches = await rag.search(display_message, knowledge)
+        additions = [knowledge_context(matches)]
+        if editor_context:
+            additions.append(
+                "\n\n以下是用户当前正在编辑的内容，仅用于本轮回答：\n"
+                + editor_context
+            )
+        forwarded_message = display_message + "".join(additions)
+        target = f"{settings.agent_api_url.rstrip('/')}/v1/chat/completions"
+        headers = _agent_headers(settings.agent_internal_token)
+        if files:
+            data = {
+                "message": forwarded_message,
+                "session_id": _session_id(conversation_id),
+                "stream": "true",
+            }
+            request_kwargs: dict[str, Any] = {"data": data, "files": files}
+        else:
             request_kwargs = {
                 "json": {
                     "model": "viola",
                     "stream": True,
-                    "session_id": _session_id(body.get("session_id")),
-                    "messages": [{"role": "user", "content": message}],
+                    "session_id": _session_id(conversation_id),
+                    "messages": [{"role": "user", "content": forwarded_message}],
                 }
             }
 
         async def relay() -> AsyncIterator[bytes]:
+            assistant = ""
+            buffer = ""
+            decoder = codecs.getincrementaldecoder("utf-8")()
             timeout = httpx.Timeout(180.0, connect=10.0)
             try:
                 async with (
@@ -110,21 +324,50 @@ def register_agent_routes(
                 ):
                     if upstream.status_code >= 400:
                         raw = await upstream.aread()
-                        message = "Agent service unavailable"
+                        error_message = "Agent service unavailable"
                         try:
                             payload = json.loads(raw)
-                            message = str(payload.get("error", {}).get("message") or message)
-                        except (json.JSONDecodeError, UnicodeDecodeError, AttributeError):
-                            message = "Agent service unavailable"
+                            error_message = str(
+                                payload.get("error", {}).get("message")
+                                or error_message
+                            )
+                        except (
+                            json.JSONDecodeError,
+                            UnicodeDecodeError,
+                            AttributeError,
+                        ):
+                            pass
                         yield (
                             "event: error\n"
-                            f"data: {json.dumps({'message': message})}\n\n"
+                            f"data: {json.dumps({'message': error_message})}\n\n"
                         ).encode()
                         return
                     async for chunk in upstream.aiter_bytes():
+                        text = decoder.decode(chunk)
+                        buffer += text
+                        blocks = re.split(r"\r?\n\r?\n", buffer)
+                        buffer = blocks.pop()
+                        assistant += "".join(_sse_delta(block) for block in blocks)
                         yield chunk
+                    buffer += decoder.decode(b"", final=True)
+                    if buffer.strip():
+                        assistant += _sse_delta(buffer)
             except httpx.HTTPError:
-                yield b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
+                yield (
+                    b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
+                )
+                return
+            if assistant.strip():
+                latest = await current_store().get(
+                    AgentConversation,
+                    parsed_id,
+                )
+                if latest is not None:
+                    latest.messages.append(
+                        AgentMessage(role="assistant", content=assistant)
+                    )
+                    latest.updated_at = utc_now()
+                    await current_store().save(latest)
 
         return StreamingResponse(
             relay(),
@@ -148,16 +391,14 @@ def register_agent_routes(
                 headers=_agent_headers(settings.agent_internal_token),
             )
         if response.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="agent_media_not_found",
-            )
+            raise _not_found("agent_media_not_found")
         return Response(
             content=response.content,
             media_type=response.headers.get("content-type", "application/octet-stream"),
             headers={
                 "Content-Disposition": response.headers.get(
-                    "content-disposition", "attachment"
+                    "content-disposition",
+                    "attachment",
                 )
             },
         )

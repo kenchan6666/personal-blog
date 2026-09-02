@@ -57,7 +57,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
   };
 
   return (
-    <div className="w-full max-w-6xl">
+    <div className={`w-full ${tab === "agent" ? "max-w-[92rem]" : "max-w-6xl"}`}>
       <div className="glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
         <div>
           <h1 className="display-font mb-1 text-2xl font-bold">

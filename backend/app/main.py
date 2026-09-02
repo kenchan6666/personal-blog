@@ -41,10 +41,12 @@ from app.models import (
     LOCALES,
     STATUSES,
     AboutModule,
+    AgentConversation,
     Article,
     ArticleCategory,
     Comment,
     Journal,
+    KnowledgeRecord,
     LinkItem,
     Project,
     SiteProfile,
@@ -257,6 +259,8 @@ def create_app(
                     Journal,
                     AboutModule,
                     Comment,
+                    AgentConversation,
+                    KnowledgeRecord,
                 ],
             )
         bind_store(store)

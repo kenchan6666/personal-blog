@@ -1021,36 +1021,167 @@ export async function deleteOwnerAboutModule(
   if (!res.ok) throw new Error(await parseError(res));
 }
 
-const AGENT_SESSION_KEY = "portfolio_agent_session";
+export type AgentMessage = {
+  role: "user" | "assistant";
+  content: string;
+  files: string[];
+  createdAt: string;
+};
 
-function agentSessionId(): string {
-  if (typeof window === "undefined") return "main";
-  let value = window.localStorage.getItem(AGENT_SESSION_KEY);
-  if (!value) {
-    value = window.crypto.randomUUID();
-    window.localStorage.setItem(AGENT_SESSION_KEY, value);
-  }
-  return value;
+export type AgentConversationSummary = {
+  id: string;
+  title: string;
+  preview: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentConversation = AgentConversationSummary & {
+  messages: AgentMessage[];
+};
+
+export type AgentKnowledge = {
+  id: string;
+  title: string;
+  category: string;
+  content: string;
+  tags: string[];
+  order: number;
+  vectorSynced: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentKnowledgeInput = {
+  title: string;
+  category: string;
+  content: string;
+  tags: string[];
+  order: number;
+};
+
+async function ownerAgentJson<T>(
+  token: string,
+  path: string,
+  init?: RequestInit,
+): Promise<T> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+  if (!response.ok) throw new Error(await parseError(response));
+  return (await response.json()) as T;
+}
+
+export function listAgentConversations(token: string) {
+  return ownerAgentJson<AgentConversationSummary[]>(
+    token,
+    "/api/owner/agent/conversations",
+  );
+}
+
+export function createAgentConversation(token: string, title = "新对话") {
+  return ownerAgentJson<AgentConversation>(
+    token,
+    "/api/owner/agent/conversations",
+    { method: "POST", body: JSON.stringify({ title }) },
+  );
+}
+
+export function getAgentConversation(token: string, id: string) {
+  return ownerAgentJson<AgentConversation>(
+    token,
+    `/api/owner/agent/conversations/${id}`,
+  );
+}
+
+export function renameAgentConversation(
+  token: string,
+  id: string,
+  title: string,
+) {
+  return ownerAgentJson<AgentConversationSummary>(
+    token,
+    `/api/owner/agent/conversations/${id}`,
+    { method: "PATCH", body: JSON.stringify({ title }) },
+  );
+}
+
+export async function deleteAgentConversation(token: string, id: string) {
+  await ownerAgentJson<{ ok: boolean }>(
+    token,
+    `/api/owner/agent/conversations/${id}`,
+    { method: "DELETE" },
+  );
+}
+
+export function listAgentKnowledge(token: string) {
+  return ownerAgentJson<AgentKnowledge[]>(
+    token,
+    "/api/owner/agent/knowledge",
+  );
+}
+
+export function createAgentKnowledge(
+  token: string,
+  input: AgentKnowledgeInput,
+) {
+  return ownerAgentJson<AgentKnowledge>(
+    token,
+    "/api/owner/agent/knowledge",
+    { method: "POST", body: JSON.stringify(input) },
+  );
+}
+
+export function updateAgentKnowledge(
+  token: string,
+  id: string,
+  input: AgentKnowledgeInput,
+) {
+  return ownerAgentJson<AgentKnowledge>(
+    token,
+    `/api/owner/agent/knowledge/${id}`,
+    { method: "PUT", body: JSON.stringify(input) },
+  );
+}
+
+export async function deleteAgentKnowledge(token: string, id: string) {
+  await ownerAgentJson<{ ok: boolean }>(
+    token,
+    `/api/owner/agent/knowledge/${id}`,
+    { method: "DELETE" },
+  );
 }
 
 export async function streamOwnerAgent(
   token: string,
+  conversationId: string,
   message: string,
+  context: string,
   files: File[],
   onDelta: (text: string) => void,
 ): Promise<string> {
-  const sessionId = agentSessionId();
   let body: BodyInit;
   let headers: HeadersInit = { Authorization: `Bearer ${token}` };
   if (files.length) {
     const form = new FormData();
     form.append("message", message);
-    form.append("session_id", sessionId);
+    form.append("conversation_id", conversationId);
+    if (context) form.append("context", context);
     for (const file of files) form.append("files", file);
     body = form;
   } else {
     headers = { ...headers, "Content-Type": "application/json" };
-    body = JSON.stringify({ message, session_id: sessionId });
+    body = JSON.stringify({
+      message,
+      context,
+      conversation_id: conversationId,
+    });
   }
 
   const response = await fetch(`${API_BASE}/api/owner/agent/chat`, {
