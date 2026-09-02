@@ -6,6 +6,8 @@ backend/.env
 backend/data/
 deploy/.env
 deployment/.env
+deployment/nginx-runtime/default.conf
+deployment/.tls-ready
 *.pyc
 
 # Node

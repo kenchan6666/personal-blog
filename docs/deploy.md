@@ -56,9 +56,11 @@ Never commit `deployment/.env`. Rotate any secret that has been pasted into chat
 3. If SMTP is set, read the code from the Owner inbox.
 4. After login, CMS and GitHub connect use `/api` on the same host.
 
-## TLS (later)
+## TLS
 
-Point DNS at the VM, put certificates on the host, and extend `deployment/nginx.conf` with `listen 443 ssl`. Until then, HTTP on port 80 is enough for a private demo.
+`bash deployment/start.sh --prod` requests a Let's Encrypt certificate for the host in `PUBLIC_ORIGIN` (must be a domain, not a raw IP). HTTP-01 is served at `/.well-known/acme-challenge/`. After issuance, nginx listens on **443** and redirects HTTP to HTTPS.
+
+Open GCP firewall **tcp:80** and **tcp:443**. Turn off GoDaddy HTTPS forwarding/parking first, or certbot cannot prove the domain. Set `TLS_EMAIL` (or `OWNER_EMAIL`) in `deployment/.env`. GitHub OAuth callback must use `https://`.
 
 ## Layout
 

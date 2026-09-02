@@ -123,15 +123,71 @@ wait_http() {
 
 start_prod() {
   ensure_prod_env
-  echo "starting production stack (nginx :80)…"
+  mkdir -p "$DIR/nginx-runtime"
+  cp "$DIR/nginx/http.conf" "$DIR/nginx-runtime/default.conf"
+
+  echo "starting production stack (nginx :80/:443)…"
   compose_prod up -d --build
   if wait_http "http://127.0.0.1/api/health" 45; then
-    echo "ready: http://127.0.0.1/zh-Hant"
     echo "health: http://127.0.0.1/api/health"
+    issue_letsencrypt || echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
+    echo "ready: http://127.0.0.1/zh-Hant"
   else
     echo "containers are up; health check timed out. logs:"
     compose_prod logs --tail 40 api web nginx
   fi
+}
+
+host_from_origin() {
+  local origin="$1"
+  origin="${origin#http://}"
+  origin="${origin#https://}"
+  origin="${origin%/}"
+  printf '%s' "$origin"
+}
+
+issue_letsencrypt() {
+  local origin domain email
+  origin="$(read_dotenv_value "$DIR/.env" "PUBLIC_ORIGIN")"
+  domain="$(host_from_origin "$origin")"
+  email="$(read_dotenv_value "$DIR/.env" "TLS_EMAIL")"
+  if [ -z "$email" ]; then
+    email="$(read_dotenv_value "$DIR/.env" "OWNER_EMAIL")"
+  fi
+  case "$domain" in
+    ""|YOUR_PUBLIC_IP|*localhost*|*[0-9].*[0-9].*[0-9].*[0-9]*)
+      echo "PUBLIC_ORIGIN=$origin is not a domain — skipping Let's Encrypt"
+      return 1
+      ;;
+  esac
+  if [ -z "$email" ]; then
+    echo "TLS_EMAIL / OWNER_EMAIL empty — skipping Let's Encrypt"
+    return 1
+  fi
+  echo "requesting Let's Encrypt cert for $domain …"
+  if compose_prod run --rm --no-deps --entrypoint certbot certbot certonly \
+    --webroot -w /var/www/certbot \
+    --cert-name site \
+    --agree-tos --non-interactive --keep-until-expiry \
+    --email "$email" \
+    -d "$domain" -d "www.$domain"
+  then
+    :
+  elif compose_prod run --rm --no-deps --entrypoint certbot certbot certonly \
+    --webroot -w /var/www/certbot \
+    --cert-name site \
+    --agree-tos --non-interactive --keep-until-expiry \
+    --email "$email" \
+    -d "$domain"
+  then
+    :
+  else
+    return 1
+  fi
+  cp "$DIR/nginx/ssl.conf" "$DIR/nginx-runtime/default.conf"
+  compose_prod exec -T nginx nginx -s reload
+  echo "TLS ready: https://$domain"
+  return 0
 }
 
 stop_prod() {

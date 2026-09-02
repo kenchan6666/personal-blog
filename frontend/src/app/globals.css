@@ -674,6 +674,11 @@ a:visited {
   stroke-linejoin: round;
 }
 
+.profile-contact svg .icon-solid {
+  fill: currentColor;
+  stroke: none;
+}
+
 .profile-contact:hover,
 .profile-contact:focus-visible {
   color: var(--accent-link);

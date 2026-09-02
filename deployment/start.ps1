@@ -81,15 +81,69 @@ function WaitHttp([string]$Url, [int]$Tries = 60) {
 }
 
 function RunProdUp($Root, $Dir) {
-    Write-Host "starting production stack (nginx :80)..."
+    EnsureProdEnv $Dir
+    $runtime = Join-Path $Dir "nginx-runtime"
+    New-Item -ItemType Directory -Force -Path $runtime | Out-Null
+    Copy-Item (Join-Path $Dir "nginx\http.conf") (Join-Path $runtime "default.conf") -Force
+
+    Write-Host "starting production stack (nginx :80/:443)..."
     ComposeProd $Root $Dir @("up", "-d", "--build")
     if (WaitHttp "http://127.0.0.1/api/health" 45) {
-        Write-Host "ready: http://127.0.0.1/zh-Hant"
         Write-Host "health: http://127.0.0.1/api/health"
+        if (-not (IssueLetsEncrypt $Root $Dir)) {
+            Write-Host "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443)."
+        }
+        Write-Host "ready: http://127.0.0.1/zh-Hant"
     } else {
         Write-Host "containers are up; health check timed out. logs:"
         ComposeProd $Root $Dir @("logs", "--tail", "40", "api", "web", "nginx")
     }
+}
+
+function HostFromOrigin([string]$Origin) {
+    $hostName = $Origin.Trim()
+    $hostName = $hostName -replace '^https?://', ''
+    return $hostName.TrimEnd('/')
+}
+
+function IssueLetsEncrypt($Root, $Dir) {
+    $envFile = Join-Path $Dir ".env"
+    $origin = ReadDotEnvValue $envFile "PUBLIC_ORIGIN"
+    $domain = HostFromOrigin $origin
+    $email = ReadDotEnvValue $envFile "TLS_EMAIL"
+    if (-not $email) { $email = ReadDotEnvValue $envFile "OWNER_EMAIL" }
+    if (-not $domain -or $domain -eq "YOUR_PUBLIC_IP" -or $domain -match 'localhost' -or $domain -match '^\d+\.\d+\.\d+\.\d+$') {
+        Write-Host "PUBLIC_ORIGIN=$origin is not a domain — skipping Let's Encrypt"
+        return $false
+    }
+    if (-not $email) {
+        Write-Host "TLS_EMAIL / OWNER_EMAIL empty — skipping Let's Encrypt"
+        return $false
+    }
+    Write-Host "requesting Let's Encrypt cert for $domain ..."
+    ComposeProd $Root $Dir @(
+        "run", "--rm", "--no-deps", "--entrypoint", "certbot", "certbot", "certonly",
+        "--webroot", "-w", "/var/www/certbot",
+        "--cert-name", "site",
+        "--agree-tos", "--non-interactive", "--keep-until-expiry",
+        "--email", $email,
+        "-d", $domain, "-d", "www.$domain"
+    )
+    if ($LASTEXITCODE -ne 0) {
+        ComposeProd $Root $Dir @(
+            "run", "--rm", "--no-deps", "--entrypoint", "certbot", "certbot", "certonly",
+            "--webroot", "-w", "/var/www/certbot",
+            "--cert-name", "site",
+            "--agree-tos", "--non-interactive", "--keep-until-expiry",
+            "--email", $email,
+            "-d", $domain
+        )
+    }
+    if ($LASTEXITCODE -ne 0) { return $false }
+    Copy-Item (Join-Path $Dir "nginx\ssl.conf") (Join-Path $Dir "nginx-runtime\default.conf") -Force
+    ComposeProd $Root $Dir @("exec", "-T", "nginx", "nginx", "-s", "reload")
+    Write-Host "TLS ready: https://$domain"
+    return $true
 }
 
 function RunProdDown($Root, $Dir) {
