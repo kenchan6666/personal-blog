@@ -352,13 +352,15 @@ def create_app(
 
     @app.post("/api/owner/translate")
     async def owner_translate(
-        body: dict[str, str],
+        body: dict[str, Any],
         _: str = Depends(require_owner),
     ) -> dict[str, object]:
+        overwrite = bool(body.get("overwrite", True))
         try:
             filled, source, warnings = await fill_localized(
-                body,
+                {locale: str(body.get(locale) or "") for locale in LOCALES},
                 translator=app.state.translator,
+                overwrite=overwrite,
             )
         except ValueError as exc:
             raise HTTPException(

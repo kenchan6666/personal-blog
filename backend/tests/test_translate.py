@@ -73,6 +73,7 @@ async def test_does_not_overwrite_filled_english(client, mailer, settings):
             "zh-Hant": "玻璃工藝",
             "zh-Hans": "",
             "en": "Glass craft",
+            "overwrite": False,
         },
         headers={"Authorization": f"Bearer {token}"},
     )
@@ -80,6 +81,50 @@ async def test_does_not_overwrite_filled_english(client, mailer, settings):
     payload = response.json()
     assert payload["en"] == "Glass craft"
     assert payload["zh-Hans"] == convert_chinese_script("玻璃工藝", "zh-Hans")
+
+
+@pytest.mark.asyncio
+async def test_overwrite_replaces_copied_locales(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    source = "玻璃工藝"
+    response = await client.post(
+        "/api/owner/translate",
+        json={
+            "zh-Hant": source,
+            "zh-Hans": source,
+            "en": source,
+            "overwrite": True,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "zh-Hant"
+    assert payload["zh-Hant"] == source
+    assert payload["zh-Hans"] == convert_chinese_script(source, "zh-Hans")
+    assert payload["en"] == f"en:{source}"
+
+
+@pytest.mark.asyncio
+async def test_overwrite_fills_image_only_locales(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    image = "![alt](</api/public/media/content/abc.jpg>)"
+    source = f"封面\n\n{image}"
+    response = await client.post(
+        "/api/owner/translate",
+        json={
+            "zh-Hant": source,
+            "zh-Hans": image,
+            "en": image,
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["source"] == "zh-Hant"
+    assert "封面" in payload["zh-Hans"]
+    assert "封面" in payload["en"] or payload["en"].startswith("en:")
+    assert "/api/public/media/content/abc.jpg" in payload["zh-Hans"]
 
 
 @pytest.mark.asyncio

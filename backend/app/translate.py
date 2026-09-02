@@ -95,11 +95,20 @@ def _restore(text: str, held: list[str]) -> str:
     return text
 
 
-def _first_filled(fields: dict[str, str], order: tuple[str, ...] = LOCALES) -> str | None:
-    for locale in order:
-        if (fields.get(locale) or "").strip():
-            return locale
-    return None
+def _plain_len(text: str) -> int:
+    shielded, _ = _shield(text)
+    return len(re.sub(r"\s+", "", shielded))
+
+
+def _pick_source(fields: dict[str, str]) -> str | None:
+    best: str | None = None
+    best_len = -1
+    for locale in LOCALES:
+        length = _plain_len(fields.get(locale) or "")
+        if length > best_len:
+            best_len = length
+            best = locale
+    return best if best_len > 0 else None
 
 
 def _normalize(fields: dict[str, str]) -> dict[str, str]:
@@ -110,12 +119,13 @@ async def fill_localized(
     fields: dict[str, str],
     *,
     translator: MachineTranslator,
+    overwrite: bool = True,
 ) -> tuple[dict[str, str], str, list[str]]:
     current = _normalize(fields)
     total = sum(len(value) for value in current.values())
     if total > MAX_CHARS:
         raise ValueError("too_long")
-    source = _first_filled(current)
+    source = _pick_source(current)
     if source is None:
         raise ValueError("empty_source")
 
@@ -123,31 +133,41 @@ async def fill_localized(
     warnings: list[str] = []
 
     async def write(target: str, origin: str) -> None:
-        if filled[target].strip():
+        if target == origin:
+            return
+        existing = filled[target]
+        origin_text = filled[origin]
+        if not origin_text.strip():
+            return
+        if (
+            not overwrite
+            and _plain_len(existing)
+            and existing.strip() != origin_text.strip()
+        ):
             return
         try:
             filled[target] = await _render(
-                filled[origin],
+                origin_text,
                 source=origin,
                 target=target,
                 translator=translator,
             )
-        except Exception:
+        except Exception as exc:
+            print(
+                f"[translate] {origin}->{target} failed: {type(exc).__name__}: {exc}",
+                flush=True,
+            )
             warnings.append(f"{target}_failed")
 
-    if filled["zh-Hant"].strip() and not filled["zh-Hans"].strip():
-        await write("zh-Hans", "zh-Hant")
-    elif filled["zh-Hans"].strip() and not filled["zh-Hant"].strip():
-        await write("zh-Hant", "zh-Hans")
-    elif not filled["zh-Hant"].strip() and not filled["zh-Hans"].strip():
+    if source == "en":
         await write("zh-Hant", "en")
-        if filled["zh-Hant"].strip():
-            await write("zh-Hans", "zh-Hant")
-
-    if not filled["en"].strip():
-        origin = _first_filled(filled, ("zh-Hant", "zh-Hans"))
-        if origin:
-            await write("en", origin)
+        await write("zh-Hans", "zh-Hant" if filled["zh-Hant"].strip() else "en")
+    elif source == "zh-Hant":
+        await write("zh-Hans", "zh-Hant")
+        await write("en", "zh-Hant")
+    else:
+        await write("zh-Hant", "zh-Hans")
+        await write("en", "zh-Hans")
 
     return filled, source, warnings
 

@@ -315,7 +315,7 @@ export async function translateOwnerLocalized(
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(value),
+    body: JSON.stringify({ ...value, overwrite: true }),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as TranslateResult;
