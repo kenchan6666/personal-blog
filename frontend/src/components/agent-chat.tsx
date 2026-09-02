@@ -52,13 +52,20 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const SYNC_ERROR_LABELS: Record<string, string> = {
-  embedding_not_configured: "Embedding 未配置",
+  embedding_not_configured: "未配置 UNI_API_KEY",
   embedding_unavailable: "Embedding 服务不可用",
+  embedding_unauthorized: "UniAPI 密钥无效",
+  embedding_model_unavailable:
+    "当前 Embedding 模型无可用渠道，已尝试备用模型仍失败",
   embedding_invalid_response: "Embedding 返回格式异常",
   vector_dimension_mismatch: "向量维度不兼容",
   vector_store_rejected: "Qdrant 拒绝写入",
   vector_store_unavailable: "Qdrant 不可用",
 };
+
+function syncErrorText(code: string): string {
+  return SYNC_ERROR_LABELS[code] ?? "向量同步失败";
+}
 
 function messageRows(messages: AgentMessage[]): DisplayMessage[] {
   return messages.map((message, index) => ({
@@ -332,10 +339,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       setEditingKnowledgeId(null);
       setKnowledgeDraft(EMPTY_KNOWLEDGE);
       if (!saved.vectorSynced) {
-        setError(
-          SYNC_ERROR_LABELS[saved.vectorSyncError] ??
-            "资料已保存，但向量同步失败。",
-        );
+        setError(syncErrorText(saved.vectorSyncError));
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法保存资料。");
@@ -355,9 +359,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         current.map((record) => (record.id === id ? synced : record)),
       );
       if (!synced.vectorSynced) {
-        setError(
-          SYNC_ERROR_LABELS[synced.vectorSyncError] ?? "向量同步失败。",
-        );
+        setError(syncErrorText(synced.vectorSyncError));
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "向量同步失败。");
@@ -380,10 +382,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       setKnowledge(rows);
       const failed = rows.find((record) => !record.vectorSynced);
       if (failed) {
-        setError(
-          SYNC_ERROR_LABELS[failed.vectorSyncError] ??
-            "部分资料未能同步到向量数据库。",
-        );
+        setError(syncErrorText(failed.vectorSyncError));
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "批量同步失败。");
@@ -722,6 +721,11 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                   </div>
                   <h3>{record.title}</h3>
                   <p>{record.content}</p>
+                  {!record.vectorSynced && record.vectorSyncError && !syncing ? (
+                    <p className="agent-sync-error">
+                      {syncErrorText(record.vectorSyncError)}
+                    </p>
+                  ) : null}
                   {record.tags.length ? (
                     <div className="agent-tags">
                       {record.tags.map((tag) => (

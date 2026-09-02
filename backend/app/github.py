@@ -132,6 +132,12 @@ class RecordingGitHub:
                 "src/app.py": "print('empty')\n",
             },
         },
+        "kenchan6666/secret-lab": {
+            "main": {
+                "README.md": "# Secret\nprivate notes\n",
+                "secret.txt": "do-not-leak\n",
+            },
+        },
     }
 
     async def repo_is_private(

@@ -179,6 +179,11 @@ def register_agent_routes(
         if row is None:
             raise _not_found("agent_knowledge_not_found")
         await _sync_knowledge(rag, row)
+        if (
+            row.vector_sync_error == "vector_dimension_mismatch"
+            and await rag.reset_collection()
+        ):
+            await _sync_knowledge(rag, row)
         return row.to_owner_dict()
 
     @app.post("/api/owner/agent/knowledge")

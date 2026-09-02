@@ -127,6 +127,25 @@ async def test_private_source_repo_hides_tree_and_blob_from_visitors(
     )
     assert blob.status_code == 404
 
+    owner = await client.get(
+        "/api/owner/projects/secret-work/source",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert owner.status_code == 200
+    assert owner.json()["private"] is True
+    assert "private notes" in owner.json()["readme"]["content"]
+    secret = await client.get(
+        "/api/owner/projects/secret-work/source/blob",
+        headers={"Authorization": f"Bearer {token}"},
+        params={"path": "secret.txt"},
+    )
+    assert secret.status_code == 200
+    assert secret.json()["content"] == "do-not-leak\n"
+    assert secret.json()["private"] is True
+
+    anonymous = await client.get("/api/owner/projects/secret-work/source")
+    assert anonymous.status_code == 401
+
 
 @pytest.mark.asyncio
 async def test_draft_project_source_is_not_browsable(client, mailer, settings):

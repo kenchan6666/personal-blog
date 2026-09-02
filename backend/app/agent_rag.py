@@ -2,40 +2,119 @@ from __future__ import annotations
 
 import re
 import uuid
+from collections.abc import Callable
 
 import httpx
 
 from app.config import Settings
 from app.models import KnowledgeRecord
 
+_EMBEDDING_FALLBACKS = (
+    "text-embedding-3-small",
+    "gemini-embedding-001",
+    "text-embedding-004",
+    "jina-embeddings-v3",
+)
+
+
+class EmbeddingError(RuntimeError):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
 
 class AgentRag:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        client_factory: Callable[..., httpx.AsyncClient] | None = None,
+    ) -> None:
         self.settings = settings
+        self._client_factory = client_factory or httpx.AsyncClient
+        self._resolved_model = ""
 
     def _embedding_url(self) -> str:
         base = self.settings.uni_api_base.rstrip("/")
         return f"{base}/embeddings" if base.endswith("/v1") else f"{base}/v1/embeddings"
 
+    def _models_to_try(self) -> list[str]:
+        preferred = self._resolved_model or self.settings.agent_embedding_model
+        ordered: list[str] = []
+        for model in (preferred, *_EMBEDDING_FALLBACKS):
+            name = model.strip()
+            if name and name not in ordered:
+                ordered.append(name)
+        return ordered
+
     def _point_id(self, record_id: str) -> str:
         return str(uuid.uuid5(uuid.NAMESPACE_URL, f"portfolio-knowledge:{record_id}"))
 
+    def _parse_vector(self, payload: object) -> list[float] | None:
+        embedding: object = None
+        if isinstance(payload, dict):
+            data = payload.get("data")
+            if isinstance(data, list) and data:
+                first = data[0]
+                if isinstance(first, dict):
+                    embedding = first.get("embedding")
+            if embedding is None:
+                embedding = payload.get("embedding")
+        if isinstance(embedding, dict):
+            embedding = embedding.get("values")
+        if not isinstance(embedding, list) or not embedding:
+            return None
+        try:
+            return [float(value) for value in embedding]
+        except (TypeError, ValueError):
+            return None
+
+    def _embed_error_code(self, response: httpx.Response) -> str:
+        if response.status_code in {401, 403}:
+            return "embedding_unauthorized"
+        body = response.text.casefold()
+        if any(
+            marker in body
+            for marker in (
+                "无可用渠道",
+                "無可用渠道",
+                "model",
+                "not found",
+                "does not exist",
+                "unknown",
+            )
+        ):
+            return "embedding_model_unavailable"
+        return "embedding_unavailable"
+
     async def _embed(self, text: str) -> list[float]:
         if not self.settings.uni_api_key.strip():
-            raise RuntimeError("UNI_API_KEY is not configured")
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                self._embedding_url(),
-                headers={"Authorization": f"Bearer {self.settings.uni_api_key}"},
-                json={
-                    "model": self.settings.agent_embedding_model,
-                    "input": text,
-                },
-            )
-            response.raise_for_status()
-        payload = response.json()
-        vector = payload["data"][0]["embedding"]
-        return [float(value) for value in vector]
+            raise EmbeddingError("embedding_not_configured")
+        last_code = "embedding_unavailable"
+        async with self._client_factory(timeout=30.0) as client:
+            for model in self._models_to_try():
+                try:
+                    response = await client.post(
+                        self._embedding_url(),
+                        headers={
+                            "Authorization": f"Bearer {self.settings.uni_api_key}"
+                        },
+                        json={"model": model, "input": text},
+                    )
+                except httpx.HTTPError as exc:
+                    last_code = "embedding_unavailable"
+                    raise EmbeddingError(last_code) from exc
+                if response.status_code >= 400:
+                    last_code = self._embed_error_code(response)
+                    if last_code == "embedding_unauthorized":
+                        raise EmbeddingError(last_code)
+                    continue
+                vector = self._parse_vector(response.json())
+                if vector is None:
+                    last_code = "embedding_invalid_response"
+                    continue
+                self._resolved_model = model
+                return vector
+        raise EmbeddingError(last_code)
 
     async def sync(self, record: KnowledgeRecord) -> bool:
         synced, _ = await self.sync_with_status(record)
@@ -47,19 +126,15 @@ class AgentRag:
     ) -> tuple[bool, str]:
         try:
             vector = await self._embed(f"{record.title}\n{record.content}")
-        except RuntimeError:
-            return False, "embedding_not_configured"
-        except httpx.HTTPError:
-            return False, "embedding_unavailable"
-        except (KeyError, IndexError, TypeError, ValueError):
-            return False, "embedding_invalid_response"
+        except EmbeddingError as exc:
+            return False, exc.code
 
         try:
             collection_url = (
                 f"{self.settings.qdrant_url.rstrip('/')}/collections/"
                 f"{self.settings.qdrant_collection}"
             )
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with self._client_factory(timeout=15.0) as client:
                 exists = await client.get(collection_url)
                 if exists.status_code == 404:
                     created = await client.put(
@@ -107,7 +182,7 @@ class AgentRag:
                 f"{self.settings.qdrant_url.rstrip('/')}/collections/"
                 f"{self.settings.qdrant_collection}/points/delete?wait=true"
             )
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with self._client_factory(timeout=10.0) as client:
                 await client.post(
                     url,
                     json={"points": [self._point_id(record_id)]},
@@ -121,7 +196,7 @@ class AgentRag:
             f"{self.settings.qdrant_collection}"
         )
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with self._client_factory(timeout=15.0) as client:
                 response = await client.delete(url)
             if response.status_code not in {200, 404}:
                 response.raise_for_status()
@@ -144,7 +219,7 @@ class AgentRag:
                 f"{self.settings.qdrant_url.rstrip('/')}/collections/"
                 f"{self.settings.qdrant_collection}/points/search"
             )
-            async with httpx.AsyncClient(timeout=15.0) as client:
+            async with self._client_factory(timeout=15.0) as client:
                 response = await client.post(
                     url,
                     json={
@@ -161,7 +236,7 @@ class AgentRag:
                     matches.append(record)
             if matches:
                 return matches
-        except (httpx.HTTPError, KeyError, TypeError, ValueError, RuntimeError):
+        except (httpx.HTTPError, EmbeddingError, KeyError, TypeError, ValueError):
             pass
         return self._lexical_search(query, records, limit)
 

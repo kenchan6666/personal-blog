@@ -45,7 +45,7 @@ flowchart LR
 | MongoDB | Profile / Project / Article / Journal / Comment / 對話 / 知識正文 |
 | Redis | OTP、session、GitHub 快取、公開導覽限流與並發鎖 |
 | Qdrant | 「關於我」向量；失敗時關鍵詞檢索降級 |
-| UniAPI | Chat（`gemini-2.5-flash`）與 Embedding（`gemini-embedding-001`） |
+| UniAPI | Chat（`gemini-2.5-flash`）與 Embedding（`text-embedding-3-small`） |
 | nginx | `:80/:443` 入口；`/` → web，`/api/` → API |
 
 ### 入站決策
@@ -80,7 +80,7 @@ flowchart TD
 | `PORTFOLIO_WRITE_ENABLED` | MCP 寫入；Compose 生產為 `true` |
 | `UNI_API_KEY` | 缺則 Owner RAG 與公開 Guide 無法呼叫模型 |
 
-## 本版本：硬編碼 Prompt 與大模型（1.0.0）
+## 本版本：硬編碼 Prompt 與大模型（1.0.1）
 
 > 運行時以 `deployment/.env` 為準；下表為本版本基線。  
 > **憲法原則**：凡修改 prompt 模板或變更本節記載的大模型基線，必須在同一變更集更新本節、新增版本檔，並更新 [docs/prompt-model-versions/](docs/prompt-model-versions/)。
@@ -89,7 +89,7 @@ flowchart TD
 | --- | --- | --- | --- | --- |
 | Owner Agent chat | `gemini-2.5-flash` | UniAPI | `VIOLA_AGENT_MODEL` | `docker-compose.prod.yml` → Viola `serve` |
 | Public Guide chat | `gemini-2.5-flash` | UniAPI | `PUBLIC_AGENT_MODEL` | `backend/app/public_agent.py` |
-| RAG embedding | `gemini-embedding-001` | UniAPI | `AGENT_EMBEDDING_MODEL` | `backend/app/agent_rag.py` |
+| RAG embedding | `text-embedding-3-small`（回退 `gemini-embedding-001` / `text-embedding-004` / `jina-embeddings-v3`） | UniAPI | `AGENT_EMBEDDING_MODEL` | `backend/app/agent_rag.py` |
 
 | Prompt | 路徑 |
 | --- | --- |
@@ -170,7 +170,7 @@ python -m pytest -v
 | `VIOLA_AGENT_MODEL` | `gemini-2.5-flash` | Owner Agent |
 | `AGENT_INTERNAL_TOKEN` | 隨機 hex | FastAPI → Viola |
 | `AGENT_SERVICE_TOKEN` | 另一組隨機 hex | MCP → Owner API |
-| `AGENT_EMBEDDING_MODEL` | `gemini-embedding-001` | RAG 向量 |
+| `AGENT_EMBEDDING_MODEL` | `text-embedding-3-small` | RAG 向量 |
 | `QDRANT_URL` / `QDRANT_COLLECTION` | `portfolio_about_me` | 向量庫 |
 | `PUBLIC_AGENT_ENABLED` | `true` | 公開導覽總開關 |
 | `PUBLIC_AGENT_RATE_MINUTE` / `_HOUR` / `_DAY` | 4 / 20 / 40 | IP 與訪客標識限流 |

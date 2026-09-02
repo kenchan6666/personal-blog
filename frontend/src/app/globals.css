@@ -3520,7 +3520,7 @@ html[data-theme="dark"] .ambient-orb {
   font-weight: 750;
 }
 
-.agent-knowledge-card > p {
+.agent-knowledge-card > p:not(.agent-sync-error) {
   display: -webkit-box;
   overflow: hidden;
   margin-top: 0.4rem;
@@ -3529,6 +3529,13 @@ html[data-theme="dark"] .ambient-orb {
   line-height: 1.55;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 5;
+}
+
+.agent-sync-error {
+  margin-top: 0.45rem;
+  color: var(--danger);
+  font-size: 0.68rem;
+  line-height: 1.45;
 }
 
 .agent-tags {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+
 from app.github import HttpGitHub
 from app.models import Project
 from app.public_agent import (
@@ -71,6 +72,7 @@ def test_public_prompt_is_read_only_and_source_bound() -> None:
     assert "read-only" in prompt
     assert "You have no tools" in prompt
     assert "Use only the PUBLIC_CONTEXT" in prompt
+    assert "Private GitHub repositories are out of scope" in prompt
 
 
 def test_github_anonymous_requests_do_not_send_empty_bearer() -> None:

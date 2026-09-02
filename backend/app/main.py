@@ -645,6 +645,76 @@ def create_app(
             ) from None
         return repo, access
 
+    async def owner_browsable_source(slug: str) -> tuple[Project, SourceRepo, str]:
+        project = await current_store().find_one(Project, slug=slug)
+        repo = project.source_repo if project is not None else None
+        if repo is None or not repo.full_name:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            )
+        return project, repo, access
+
+    async def github_source_overview(
+        repo: SourceRepo,
+        access: str,
+        ref: str,
+    ) -> dict[str, Any]:
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        branches = await cached_github(
+            kind="branches",
+            full_name=repo.full_name,
+            ref="-",
+            path="",
+            loader=lambda: github_client.list_branches(
+                access_token=access,
+                owner=repo.owner,
+                name=repo.name,
+            ),
+        )
+        try:
+            readme = await cached_github(
+                kind="readme",
+                full_name=repo.full_name,
+                ref=branch,
+                path="",
+                loader=lambda: github_client.get_readme(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                ),
+            )
+        except GitHubBrowseError:
+            readme = {"path": "", "content": ""}
+        tree = await cached_github(
+            kind="tree",
+            full_name=repo.full_name,
+            ref=branch,
+            path="",
+            loader=lambda: github_client.list_tree(
+                access_token=access,
+                owner=repo.owner,
+                name=repo.name,
+                ref=branch,
+                path="",
+            ),
+        )
+        return {
+            "defaultBranch": repo.default_branch,
+            "ref": branch,
+            "branches": branches,
+            "readme": readme,
+            "tree": tree,
+        }
+
     async def cached_github(
         *,
         kind: str,
@@ -667,60 +737,13 @@ def create_app(
         slug: str, ref: str = ""
     ) -> dict[str, Any]:
         repo, access = await published_browsable_source(slug)
-        github_client: GitHubClient = app.state.github
-        branch = ref or repo.default_branch or "main"
         try:
-            branches = await cached_github(
-                kind="branches",
-                full_name=repo.full_name,
-                ref="-",
-                path="",
-                loader=lambda: github_client.list_branches(
-                    access_token=access,
-                    owner=repo.owner,
-                    name=repo.name,
-                ),
-            )
-            try:
-                readme = await cached_github(
-                    kind="readme",
-                    full_name=repo.full_name,
-                    ref=branch,
-                    path="",
-                    loader=lambda: github_client.get_readme(
-                        access_token=access,
-                        owner=repo.owner,
-                        name=repo.name,
-                        ref=branch,
-                    ),
-                )
-            except GitHubBrowseError:
-                readme = {"path": "", "content": ""}
-            tree = await cached_github(
-                kind="tree",
-                full_name=repo.full_name,
-                ref=branch,
-                path="",
-                loader=lambda: github_client.list_tree(
-                    access_token=access,
-                    owner=repo.owner,
-                    name=repo.name,
-                    ref=branch,
-                    path="",
-                ),
-            )
+            return await github_source_overview(repo, access, ref)
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             ) from None
-        return {
-            "defaultBranch": repo.default_branch,
-            "ref": branch,
-            "branches": branches,
-            "readme": readme,
-            "tree": tree,
-        }
 
     @app.get("/api/public/projects/{slug}/source/tree")
     async def public_project_source_tree(
@@ -782,6 +805,98 @@ def create_app(
                 detail="not_found",
             ) from None
         return blob
+
+    @app.get("/api/owner/projects/{slug}/source")
+    async def owner_project_source(
+        slug: str,
+        ref: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        project, repo, access = await owner_browsable_source(slug)
+        try:
+            payload = await github_source_overview(repo, access, ref)
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        payload["private"] = bool(repo.private)
+        payload["status"] = project.status
+        payload["htmlUrl"] = repo.html_url
+        payload["fullName"] = repo.full_name
+        return payload
+
+    @app.get("/api/owner/projects/{slug}/source/tree")
+    async def owner_project_source_tree(
+        slug: str,
+        ref: str = "",
+        path: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        _project, repo, access = await owner_browsable_source(slug)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            tree = await cached_github(
+                kind="tree",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.list_tree(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {
+            "ref": branch,
+            "path": path,
+            "tree": tree,
+            "private": bool(repo.private),
+        }
+
+    @app.get("/api/owner/projects/{slug}/source/blob")
+    async def owner_project_source_blob(
+        slug: str,
+        ref: str = "",
+        path: str = "",
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        if not path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="path_required",
+            )
+        _project, repo, access = await owner_browsable_source(slug)
+        github_client: GitHubClient = app.state.github
+        branch = ref or repo.default_branch or "main"
+        try:
+            blob = await cached_github(
+                kind="blob",
+                full_name=repo.full_name,
+                ref=branch,
+                path=path,
+                loader=lambda: github_client.get_blob(
+                    access_token=access,
+                    owner=repo.owner,
+                    name=repo.name,
+                    ref=branch,
+                    path=path,
+                ),
+            )
+        except GitHubBrowseError:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            ) from None
+        return {**blob, "private": bool(repo.private)}
 
     @app.get("/api/owner/projects")
     async def owner_list_projects(

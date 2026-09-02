@@ -273,7 +273,7 @@ def create_server() -> FastMCP:
         ref: str = "",
         path: str = "",
     ) -> dict[str, Any]:
-        """Read a published public project's SourceRepo overview or directory tree."""
+        """Read a bound SourceRepo overview or directory. Private repos are allowed here."""
         suffix = "/source"
         if path:
             suffix += "/tree"
@@ -281,7 +281,7 @@ def create_server() -> FastMCP:
         slug = quote(project_slug.strip(), safe="")
         return api.request(
             "GET",
-            f"/api/public/projects/{slug}{suffix}?{params}",
+            f"/api/owner/projects/{slug}{suffix}?{params}",
         )
 
     @server.tool()
@@ -290,12 +290,12 @@ def create_server() -> FastMCP:
         path: str,
         ref: str = "",
     ) -> dict[str, Any]:
-        """Read one file from a published public project's connected SourceRepo."""
+        """Read one file from a bound SourceRepo, including private repositories."""
         params = httpx.QueryParams({"ref": ref, "path": path})
         slug = quote(project_slug.strip(), safe="")
         return api.request(
             "GET",
-            f"/api/public/projects/{slug}/source/blob?{params}",
+            f"/api/owner/projects/{slug}/source/blob?{params}",
         )
 
     @server.tool()

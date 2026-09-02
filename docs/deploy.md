@@ -64,7 +64,7 @@ Set these values in `deployment/.env` before using the Agent tab:
 - `AGENT_INTERNAL_TOKEN`: a random secret used by FastAPI when calling Viola.
 - `AGENT_SERVICE_TOKEN`: a different random secret used by the Portfolio MCP
   when calling Owner APIs.
-- `AGENT_EMBEDDING_MODEL=gemini-embedding-001`: UniAPI 中可用的 Embedding 模型。
+- `AGENT_EMBEDDING_MODEL=text-embedding-3-small`: UniAPI 中已验证可用的 Embedding 模型。`gemini-embedding-001` 在部分账号无渠道，同步时会自动回退。
 - `QDRANT_URL=http://qdrant:6333`: Compose 内部向量数据库地址。
 
 Generate the two tokens with `openssl rand -hex 32`. They must be different and
@@ -84,7 +84,9 @@ MongoDB 全量恢复向量，不会删除资料正文。
 
 公开站点侧栏另有一个只读 Portfolio Guide。它不复用 Owner Agent 权限，只读取
 Published 的 Profile、About、Project、Article、Journal，以及已绑定公开仓库的
-README。访客不能上传、写入内容或访问私有 RAG。Redis 默认按 IP 和匿名浏览器
+README。访客不能上传、写入内容或访问私有 RAG / 私有 GitHub 源码。后台 Owner
+Agent 经同一套 GitHub OAuth 读取已绑定仓库，包括 private；GitHub token 不离开
+FastAPI。
 标识限制每分钟 4 次、每小时 20 次、每天 40 次，并以
 `PUBLIC_AGENT_DAILY_BUDGET` 设置全站每日模型调用上限。可在
 `deployment/.env` 中调整所有 `PUBLIC_AGENT_*` 值；设
