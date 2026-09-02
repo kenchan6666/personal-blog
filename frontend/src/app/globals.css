@@ -415,6 +415,24 @@ a:visited {
   touch-action: manipulation;
 }
 
+.sidebar-body {
+  display: flex;
+  height: 100%;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  flex-direction: column;
+  box-sizing: border-box;
+  padding: 3.75rem 1.15rem 1.15rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.sidebar-body.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .sidebar-fab {
   position: fixed;
   top: max(0.85rem, env(safe-area-inset-top));
@@ -806,6 +824,14 @@ html.is-locale-hold .article-page {
     transition: width 300ms ease-out;
   }
 
+  .sidebar-body {
+    transition: opacity 160ms ease;
+  }
+
+  .site-nav:not(.is-open) .sidebar-body {
+    transition-duration: 80ms;
+  }
+
   .site-main {
     padding-left: calc(var(--sidebar-rail) + 1.75rem);
   }
@@ -1002,15 +1028,25 @@ html.is-locale-hold .article-page {
   color: var(--accent-link);
 }
 
+.locale-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.3rem;
+  margin-top: 1.35rem;
+  padding-top: 0.95rem;
+  border-top: 1px solid var(--hairline);
+}
+
 .locale-chip {
-  flex: 1;
+  min-width: 0;
   border-radius: var(--radius-control);
-  padding: 0.5rem 0.75rem;
+  padding: 0.5rem 0.2rem;
   text-align: center;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--text-muted);
+  white-space: nowrap;
   transition:
     background 180ms ease,
     color 180ms ease;

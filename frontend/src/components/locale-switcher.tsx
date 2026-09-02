@@ -33,7 +33,7 @@ export function LocaleSwitcher({ locale, tabIndex }: Props) {
   }, [locale, rest, router]);
 
   return (
-    <div className="hairline-t mt-6 flex flex-wrap gap-2 pt-4" role="group">
+    <div className="locale-switch" role="group">
       {locales.map((item) => {
         const href = `/${item}${rest}`;
         const active = (pending ?? locale) === item;

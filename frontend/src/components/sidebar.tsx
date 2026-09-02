@@ -89,9 +89,7 @@ export function Sidebar({
         </button>
 
         <div
-          className={`flex h-full flex-col p-5 pt-16 transition-opacity duration-300 ease-out ${
-            open ? "opacity-100" : "pointer-events-none opacity-0"
-          }`}
+          className={`sidebar-body${open ? " is-open" : ""}`}
         >
           <Link
             href={`/${locale}`}
