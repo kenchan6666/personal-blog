@@ -56,6 +56,7 @@ async def test_about_me_knowledge_can_be_edited(client, settings) -> None:
     assert created.status_code == 200
     record_id = created.json()["id"]
     assert created.json()["vectorSynced"] is False
+    assert created.json()["vectorSyncError"] == "embedding_not_configured"
 
     body["content"] = "我使用 Python、FastAPI 和 MongoDB 开发个人项目。"
     updated = await client.put(
@@ -69,3 +70,17 @@ async def test_about_me_knowledge_can_be_edited(client, settings) -> None:
     listed = await client.get("/api/owner/agent/knowledge", headers=headers)
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == record_id
+
+    retried = await client.post(
+        f"/api/owner/agent/knowledge/{record_id}/sync",
+        headers=headers,
+    )
+    assert retried.status_code == 200
+    assert retried.json()["vectorSyncError"] == "embedding_not_configured"
+
+    synced_all = await client.post(
+        "/api/owner/agent/knowledge/sync",
+        headers=headers,
+    )
+    assert synced_all.status_code == 200
+    assert synced_all.json()[0]["id"] == record_id

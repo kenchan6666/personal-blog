@@ -14,6 +14,7 @@ type Props = {
   open: boolean;
   onToggle: () => void;
   onNavigate: () => void;
+  onGuide: () => void;
 };
 
 const links = [
@@ -42,6 +43,7 @@ export function Sidebar({
   open,
   onToggle,
   onNavigate,
+  onGuide,
 }: Props) {
   const pathname = usePathname();
   const [showAdmin, setShowAdmin] = useState(false);
@@ -120,6 +122,24 @@ export function Sidebar({
               );
             })}
           </nav>
+
+          <button
+            type="button"
+            className="sidebar-guide-entry"
+            tabIndex={open ? 0 : -1}
+            onClick={onGuide}
+          >
+            <span className="sidebar-guide-orb" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span>
+              <small>AI GUIDE</small>
+              <strong>{dict.guide.entry}</strong>
+            </span>
+            <b aria-hidden="true">↗</b>
+          </button>
 
           <LocaleSwitcher locale={locale} tabIndex={open ? 0 : -1} />
 

@@ -57,7 +57,9 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
   };
 
   return (
-    <div className={`w-full ${tab === "agent" ? "max-w-[92rem]" : "max-w-6xl"}`}>
+    <div
+      className={`admin-dashboard-shell${tab === "agent" ? " is-agent" : ""}`}
+    >
       <div className="glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
         <div>
           <h1 className="display-font mb-1 text-2xl font-bold">
@@ -85,7 +87,10 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div
+        key={tab}
+        className="admin-tab-panel grid gap-5 lg:grid-cols-2"
+      >
         {tab === "agent" ? (
           <div className="lg:col-span-2">
             <AgentChat />

@@ -10,6 +10,8 @@ import {
   getSessionToken,
   listAgentConversations,
   listAgentKnowledge,
+  syncAgentKnowledge,
+  syncAllAgentKnowledge,
   streamOwnerAgent,
   updateAgentKnowledge,
   type AgentConversationSummary,
@@ -49,6 +51,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: "其他",
 };
 
+const SYNC_ERROR_LABELS: Record<string, string> = {
+  embedding_not_configured: "Embedding 未配置",
+  embedding_unavailable: "Embedding 服务不可用",
+  embedding_invalid_response: "Embedding 返回格式异常",
+  vector_dimension_mismatch: "向量维度不兼容",
+  vector_store_rejected: "Qdrant 拒绝写入",
+  vector_store_unavailable: "Qdrant 不可用",
+};
+
 function messageRows(messages: AgentMessage[]): DisplayMessage[] {
   return messages.map((message, index) => ({
     ...message,
@@ -73,6 +84,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingKnowledge, setSavingKnowledge] = useState(false);
+  const [syncingAllKnowledge, setSyncingAllKnowledge] = useState(false);
+  const [syncingKnowledgeIds, setSyncingKnowledgeIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingConversation, setDeletingConversation] = useState(false);
   const [agentActivity, setAgentActivity] = useState("");
@@ -303,18 +318,77 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setSavingKnowledge(true);
     setError("");
     try {
+      let saved: AgentKnowledge;
       if (editingKnowledgeId) {
-        await updateAgentKnowledge(token, editingKnowledgeId, knowledgeDraft);
+        saved = await updateAgentKnowledge(
+          token,
+          editingKnowledgeId,
+          knowledgeDraft,
+        );
       } else {
-        await createAgentKnowledge(token, knowledgeDraft);
+        saved = await createAgentKnowledge(token, knowledgeDraft);
       }
       setKnowledge(await listAgentKnowledge(token));
       setEditingKnowledgeId(null);
       setKnowledgeDraft(EMPTY_KNOWLEDGE);
+      if (!saved.vectorSynced) {
+        setError(
+          SYNC_ERROR_LABELS[saved.vectorSyncError] ??
+            "资料已保存，但向量同步失败。",
+        );
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法保存资料。");
     } finally {
       setSavingKnowledge(false);
+    }
+  }
+
+  async function syncKnowledge(id: string) {
+    const token = getSessionToken();
+    if (!token || syncingAllKnowledge || syncingKnowledgeIds.has(id)) return;
+    setError("");
+    setSyncingKnowledgeIds((current) => new Set(current).add(id));
+    try {
+      const synced = await syncAgentKnowledge(token, id);
+      setKnowledge((current) =>
+        current.map((record) => (record.id === id ? synced : record)),
+      );
+      if (!synced.vectorSynced) {
+        setError(
+          SYNC_ERROR_LABELS[synced.vectorSyncError] ?? "向量同步失败。",
+        );
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "向量同步失败。");
+    } finally {
+      setSyncingKnowledgeIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
+  }
+
+  async function syncAllKnowledge() {
+    const token = getSessionToken();
+    if (!token || syncingAllKnowledge || syncingKnowledgeIds.size) return;
+    setError("");
+    setSyncingAllKnowledge(true);
+    try {
+      const rows = await syncAllAgentKnowledge(token);
+      setKnowledge(rows);
+      const failed = rows.find((record) => !record.vectorSynced);
+      if (failed) {
+        setError(
+          SYNC_ERROR_LABELS[failed.vectorSyncError] ??
+            "部分资料未能同步到向量数据库。",
+        );
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "批量同步失败。");
+    } finally {
+      setSyncingAllKnowledge(false);
     }
   }
 
@@ -406,7 +480,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           ) : null}
         </div>
 
-        <div className="agent-messages" aria-live="polite">
+        <div
+          className={`agent-messages${loading ? " is-transitioning" : ""}`}
+          aria-live="polite"
+        >
           {loading ? <div className="agent-empty">正在读取对话…</div> : null}
           {!loading && messages.length === 0 ? (
             <div className="agent-empty">
@@ -521,17 +598,28 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               <span className="eyebrow">PERSONAL RAG</span>
               <h2 className="display-font">关于我</h2>
             </div>
-            <button
-              type="button"
-              className="agent-new-button"
-              onClick={() => editKnowledge()}
-            >
-              ＋ 添加
-            </button>
+            <div className="agent-panel-actions">
+              <button
+                type="button"
+                className="agent-sync-button"
+                disabled={
+                  syncingAllKnowledge ||
+                  syncingKnowledgeIds.size > 0 ||
+                  knowledge.length === 0
+                }
+                onClick={() => void syncAllKnowledge()}
+              >
+                {syncingAllKnowledge ? "同步中…" : "同步全部"}
+              </button>
+              <button
+                type="button"
+                className="agent-new-button"
+                onClick={() => editKnowledge()}
+              >
+                ＋ 添加
+              </button>
+            </div>
           </div>
-          <p className="agent-panel-note">
-            以模块整理个人资料。绿色标记表示已同步到向量数据库。
-          </p>
           {editingKnowledgeId !== null ? (
             <form className="agent-knowledge-form" onSubmit={saveKnowledge}>
               <input
@@ -607,39 +695,61 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 还没有个人资料。添加后，Agent 会按问题检索相关内容。
               </div>
             ) : null}
-            {knowledge.map((record) => (
-              <article
-                key={record.id}
-                className={`agent-knowledge-card${
-                  recentKnowledgeIds.has(record.id) ? " is-live" : ""
-                }`}
-              >
-                <div className="agent-knowledge-meta">
-                  <span>{CATEGORY_LABELS[record.category] ?? "其他"}</span>
-                  <i
-                    className={record.vectorSynced ? "is-synced" : ""}
-                    title={
-                      record.vectorSynced ? "向量已同步" : "向量未同步，将使用文本检索"
-                    }
-                  />
-                </div>
-                <h3>{record.title}</h3>
-                <p>{record.content}</p>
-                {record.tags.length ? (
-                  <div className="agent-tags">
-                    {record.tags.map((tag) => <span key={tag}>{tag}</span>)}
+            {knowledge.map((record) => {
+              const syncing =
+                syncingAllKnowledge || syncingKnowledgeIds.has(record.id);
+              return (
+                <article
+                  key={record.id}
+                  className={`agent-knowledge-card${
+                    recentKnowledgeIds.has(record.id) ? " is-live" : ""
+                  }`}
+                >
+                  <div className="agent-knowledge-meta">
+                    <span>{CATEGORY_LABELS[record.category] ?? "其他"}</span>
+                    <span
+                      className={`agent-vector-status${
+                        record.vectorSynced ? " is-synced" : ""
+                      }${syncing ? " is-syncing" : ""}`}
+                    >
+                      <i />
+                      {syncing
+                        ? "同步中"
+                        : record.vectorSynced
+                          ? "已同步"
+                          : "未同步"}
+                    </span>
                   </div>
-                ) : null}
-                <div className="agent-card-actions">
-                  <button type="button" onClick={() => editKnowledge(record)}>
-                    编辑
-                  </button>
-                  <button type="button" onClick={() => removeKnowledge(record.id)}>
-                    删除
-                  </button>
-                </div>
-              </article>
-            ))}
+                  <h3>{record.title}</h3>
+                  <p>{record.content}</p>
+                  {record.tags.length ? (
+                    <div className="agent-tags">
+                      {record.tags.map((tag) => (
+                        <span key={tag}>{tag}</span>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="agent-card-actions">
+                    <button
+                      type="button"
+                      disabled={syncing}
+                      onClick={() => void syncKnowledge(record.id)}
+                    >
+                      {syncing ? "同步中…" : "同步"}
+                    </button>
+                    <button type="button" onClick={() => editKnowledge(record)}>
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeKnowledge(record.id)}
+                    >
+                      删除
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </aside>
       ) : null}

@@ -83,7 +83,8 @@ def _sse_delta(block: str) -> str:
 
 
 async def _sync_knowledge(rag: AgentRag, record: KnowledgeRecord) -> None:
-    record.vector_synced = await rag.sync(record)
+    record.vector_synced, record.vector_sync_error = await rag.sync_with_status(record)
+    record.updated_at = utc_now()
     await current_store().save(record)
 
 
@@ -154,6 +155,32 @@ def register_agent_routes(
         rows.sort(key=lambda row: (row.order, row.updated_at), reverse=True)
         return [row.to_owner_dict() for row in rows]
 
+    @app.post("/api/owner/agent/knowledge/sync")
+    async def sync_all_knowledge(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        rows = await current_store().find_all(KnowledgeRecord)
+        for row in rows:
+            await _sync_knowledge(rag, row)
+        if any(
+            row.vector_sync_error == "vector_dimension_mismatch" for row in rows
+        ) and await rag.reset_collection():
+            for row in rows:
+                await _sync_knowledge(rag, row)
+        rows.sort(key=lambda row: (row.order, row.updated_at), reverse=True)
+        return [row.to_owner_dict() for row in rows]
+
+    @app.post("/api/owner/agent/knowledge/{record_id}/sync")
+    async def sync_one_knowledge(
+        record_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(KnowledgeRecord, record_id)
+        if row is None:
+            raise _not_found("agent_knowledge_not_found")
+        await _sync_knowledge(rag, row)
+        return row.to_owner_dict()
+
     @app.post("/api/owner/agent/knowledge")
     async def create_knowledge(
         body: KnowledgeWrite,
@@ -187,6 +214,7 @@ def register_agent_routes(
         row.order = body.order
         row.updated_at = utc_now()
         row.vector_synced = False
+        row.vector_sync_error = ""
         await current_store().save(row)
         await _sync_knowledge(rag, row)
         return row.to_owner_dict()

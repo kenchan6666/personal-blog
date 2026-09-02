@@ -32,3 +32,15 @@ async def test_rag_falls_back_to_readable_keyword_search() -> None:
 
     assert [record.title for record in matches] == ["工作经历"]
     assert "不要虚构" in knowledge_context(matches)
+
+
+@pytest.mark.asyncio
+async def test_sync_reports_missing_embedding_configuration() -> None:
+    rag = AgentRag(Settings(uni_api_key=""))
+
+    synced, error = await rag.sync_with_status(
+        record("技能", "skills", "FastAPI", ["Python"])
+    )
+
+    assert synced is False
+    assert error == "embedding_not_configured"

@@ -38,8 +38,23 @@ class AgentRag:
         return [float(value) for value in vector]
 
     async def sync(self, record: KnowledgeRecord) -> bool:
+        synced, _ = await self.sync_with_status(record)
+        return synced
+
+    async def sync_with_status(
+        self,
+        record: KnowledgeRecord,
+    ) -> tuple[bool, str]:
         try:
             vector = await self._embed(f"{record.title}\n{record.content}")
+        except RuntimeError:
+            return False, "embedding_not_configured"
+        except httpx.HTTPError:
+            return False, "embedding_unavailable"
+        except (KeyError, IndexError, TypeError, ValueError):
+            return False, "embedding_invalid_response"
+
+        try:
             collection_url = (
                 f"{self.settings.qdrant_url.rstrip('/')}/collections/"
                 f"{self.settings.qdrant_collection}"
@@ -78,9 +93,13 @@ class AgentRag:
                     },
                 )
                 response.raise_for_status()
-            return True
-        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, RuntimeError):
-            return False
+            return True, ""
+        except httpx.HTTPStatusError as exc:
+            if "dimension" in exc.response.text.casefold():
+                return False, "vector_dimension_mismatch"
+            return False, "vector_store_rejected"
+        except httpx.HTTPError:
+            return False, "vector_store_unavailable"
 
     async def delete(self, record_id: str) -> None:
         try:
@@ -95,6 +114,20 @@ class AgentRag:
                 )
         except httpx.HTTPError:
             return
+
+    async def reset_collection(self) -> bool:
+        url = (
+            f"{self.settings.qdrant_url.rstrip('/')}/collections/"
+            f"{self.settings.qdrant_collection}"
+        )
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.delete(url)
+            if response.status_code not in {200, 404}:
+                response.raise_for_status()
+            return True
+        except httpx.HTTPError:
+            return False
 
     async def search(
         self,

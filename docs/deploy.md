@@ -64,7 +64,7 @@ Set these values in `deployment/.env` before using the Agent tab:
 - `AGENT_INTERNAL_TOKEN`: a random secret used by FastAPI when calling Viola.
 - `AGENT_SERVICE_TOKEN`: a different random secret used by the Portfolio MCP
   when calling Owner APIs.
-- `AGENT_EMBEDDING_MODEL=text-embedding-004`: UniAPI 中可用的 Embedding 模型。
+- `AGENT_EMBEDDING_MODEL=gemini-embedding-001`: UniAPI 中可用的 Embedding 模型。
 - `QDRANT_URL=http://qdrant:6333`: Compose 内部向量数据库地址。
 
 Generate the two tokens with `openssl rand -hex 32`. They must be different and
@@ -76,6 +76,19 @@ through MCP, but new records are always Draft and no delete tool is exposed.
 模块化个人资料；资料正文保存在 MongoDB，并同步向量到 Qdrant。若 Embedding
 服务暂时不可用，资料仍会保存，Agent 自动降级为关键词检索。站点事实仍应保留
 在 CMS 中，Agent 会通过 MCP 实时读取。
+
+新增或编辑资料时会立即自动尝试向量同步；失败不会阻止 MongoDB 保存。后台
+“关于我”可对单条资料点“同步”，也可点“同步全部”重试。批量同步检测到旧
+Embedding 模型造成的向量维度不兼容时，会仅重建 Qdrant collection，再从
+MongoDB 全量恢复向量，不会删除资料正文。
+
+公开站点侧栏另有一个只读 Portfolio Guide。它不复用 Owner Agent 权限，只读取
+Published 的 Profile、About、Project、Article、Journal，以及已绑定公开仓库的
+README。访客不能上传、写入内容或访问私有 RAG。Redis 默认按 IP 和匿名浏览器
+标识限制每分钟 4 次、每小时 20 次、每天 40 次，并以
+`PUBLIC_AGENT_DAILY_BUDGET` 设置全站每日模型调用上限。可在
+`deployment/.env` 中调整所有 `PUBLIC_AGENT_*` 值；设
+`PUBLIC_AGENT_ENABLED=false` 可立即关闭公开导览。
 
 ## Owner login on the deployed site
 

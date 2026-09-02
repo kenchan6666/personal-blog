@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { defaultLocale, isLocale, type Locale } from "@/i18n/config";
 import type { PublicSite } from "@/lib/api";
 import { brandForShell, publicBrand } from "@/lib/site-content";
 import { LocaleHtml } from "./locale-html";
+import { PublicGuide } from "./public-guide";
 import { RouteProgress } from "./route-progress";
 import { Sidebar } from "./sidebar";
 import { SiteChrome } from "./site-chrome";
@@ -28,6 +29,8 @@ export function SiteShell({ children }: Props) {
   const dict = getDictionary(locale);
   const [brand, setBrand] = useState(() => publicBrand(dict.brand));
   const [open, setOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const closeGuide = useCallback(() => setGuideOpen(false), []);
 
   useEffect(() => {
     const next = getDictionary(locale);
@@ -85,6 +88,16 @@ export function SiteShell({ children }: Props) {
         open={open}
         onToggle={() => setOpen((v) => !v)}
         onNavigate={() => setOpen(false)}
+        onGuide={() => {
+          setOpen(false);
+          setGuideOpen(true);
+        }}
+      />
+      <PublicGuide
+        locale={locale}
+        dict={shellDict.guide}
+        open={guideOpen}
+        onClose={closeGuide}
       />
 
       <SiteChrome locale={locale} dict={shellDict} />

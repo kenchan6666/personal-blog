@@ -473,6 +473,7 @@ class KnowledgeRecord(Document):
     tags: list[str] = Field(default_factory=list)
     order: int = 0
     vector_synced: bool = False
+    vector_sync_error: str = ""
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -488,6 +489,7 @@ class KnowledgeRecord(Document):
             "tags": self.tags,
             "order": self.order,
             "vectorSynced": self.vector_synced,
+            "vectorSyncError": self.vector_sync_error,
             "createdAt": self.created_at.isoformat(),
             "updatedAt": self.updated_at.isoformat(),
         }

@@ -221,6 +221,88 @@ export const fetchPublicSite = cache(async function fetchPublicSite(
   );
 });
 
+export type PublicGuideMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+const PUBLIC_GUIDE_VISITOR_KEY = "portfolio_public_guide_visitor";
+
+function publicGuideVisitorId(): string {
+  if (typeof window === "undefined") return "";
+  let value = window.localStorage.getItem(PUBLIC_GUIDE_VISITOR_KEY);
+  if (!value) {
+    value = window.crypto.randomUUID();
+    window.localStorage.setItem(PUBLIC_GUIDE_VISITOR_KEY, value);
+  }
+  return value;
+}
+
+export async function streamPublicGuide(
+  locale: string,
+  question: string,
+  history: PublicGuideMessage[],
+  onDelta: (text: string) => void,
+): Promise<string> {
+  const response = await fetch(`${API_BASE}/api/public/guide/chat`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Visitor-ID": publicGuideVisitorId(),
+    },
+    body: JSON.stringify({
+      locale,
+      question,
+      history: history.slice(-6),
+    }),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(await parseError(response));
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let complete = "";
+  let streamError = "";
+
+  function consume(block: string) {
+    const lines = block.split(/\r?\n/);
+    const event = lines.find((line) => line.startsWith("event:"))?.slice(6).trim();
+    const data = lines
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice(5).trimStart())
+      .join("\n");
+    if (!data || data === "[DONE]") return;
+    try {
+      const payload = JSON.parse(data);
+      if (event === "error") {
+        streamError = payload.message || "public_agent_unavailable";
+        return;
+      }
+      const delta = payload.choices?.[0]?.delta?.content;
+      if (typeof delta === "string" && delta) {
+        complete += delta;
+        onDelta(delta);
+      }
+    } catch {
+      /* Ignore incomplete upstream metadata. */
+    }
+  }
+
+  while (true) {
+    const { done, value } = await reader.read();
+    buffer += decoder.decode(value, { stream: !done });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() ?? "";
+    for (const block of blocks) consume(block);
+    if (done) break;
+  }
+  if (buffer.trim()) consume(buffer);
+  if (streamError) throw new Error(streamError);
+  return complete;
+}
+
 export async function fetchOwnerSite(token: string): Promise<OwnerSite> {
   const res = await fetch(`${API_BASE}/api/owner/site`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -1049,6 +1131,7 @@ export type AgentKnowledge = {
   tags: string[];
   order: number;
   vectorSynced: boolean;
+  vectorSyncError: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -1161,6 +1244,22 @@ export async function deleteAgentKnowledge(token: string, id: string) {
     token,
     `/api/owner/agent/knowledge/${id}`,
     { method: "DELETE" },
+  );
+}
+
+export function syncAgentKnowledge(token: string, id: string) {
+  return ownerAgentJson<AgentKnowledge>(
+    token,
+    `/api/owner/agent/knowledge/${id}/sync`,
+    { method: "POST" },
+  );
+}
+
+export function syncAllAgentKnowledge(token: string) {
+  return ownerAgentJson<AgentKnowledge[]>(
+    token,
+    "/api/owner/agent/knowledge/sync",
+    { method: "POST" },
   );
 }
 

@@ -294,11 +294,13 @@ class HttpGitHub:
         return bool(response.json().get("private"))
 
     def _headers(self, access_token: str) -> dict[str, str]:
-        return {
-            "Authorization": f"Bearer {access_token}",
+        headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
+        if access_token:
+            headers["Authorization"] = f"Bearer {access_token}"
+        return headers
 
     async def list_branches(
         self, *, access_token: str, owner: str, name: str

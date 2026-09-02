@@ -55,6 +55,7 @@ from app.models import (
     empty_localized,
     pick_localized,
 )
+from app.public_agent import register_public_agent_routes
 from app.store import bind_store, build_store, current_store, new_document
 from app.translate import (
     GoogleGtxTranslator,
@@ -331,6 +332,7 @@ def create_app(
         return await auth.resolve_session(token or None)
 
     register_agent_routes(app, require_owner)
+    register_public_agent_routes(app)
 
     @app.get("/api/health")
     async def health(response: Response) -> dict[str, str]:

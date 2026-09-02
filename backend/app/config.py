@@ -50,9 +50,16 @@ class Settings(BaseSettings):
     agent_upload_max_bytes: int = 10 * 1024 * 1024
     uni_api_key: str = ""
     uni_api_base: str = "https://api.uniapi.io"
-    agent_embedding_model: str = "text-embedding-004"
+    agent_embedding_model: str = "gemini-embedding-001"
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "portfolio_about_me"
+    public_agent_enabled: bool = True
+    public_agent_model: str = "gemini-2.5-flash"
+    public_agent_max_tokens: int = 350
+    public_agent_rate_minute: int = 4
+    public_agent_rate_hour: int = 20
+    public_agent_rate_day: int = 40
+    public_agent_daily_budget: int = 500
 
     github_client_id: str = ""
     github_client_secret: str = ""
