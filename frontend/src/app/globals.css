@@ -310,11 +310,19 @@ a:visited {
 .site-main {
   min-width: 0;
   min-height: 100svh;
+  transition:
+    opacity 280ms ease,
+    filter 280ms ease;
 }
 
-html.is-route-pending,
-html.is-route-pending * {
+html.is-route-pending {
   cursor: progress;
+}
+
+html.is-route-pending .site-main {
+  opacity: 0.38;
+  filter: blur(7px) saturate(130%);
+  pointer-events: none;
 }
 
 .route-progress {
@@ -323,122 +331,118 @@ html.is-route-pending * {
   left: 0;
   right: 0;
   z-index: 80;
-  height: 3px;
+  height: 2px;
   overflow: hidden;
   pointer-events: none;
-  background: rgba(255, 92, 122, 0.18);
+  background: transparent;
 }
 
 .route-progress span {
   display: block;
   height: 100%;
-  width: 40%;
+  width: 100%;
+  transform: scaleX(0.12);
+  transform-origin: left center;
   border-radius: 999px;
   background: linear-gradient(
     90deg,
     var(--accent-cta),
-    var(--accent-cta-end)
+    var(--accent-cta-end),
+    var(--accent-link)
   );
-  animation: route-progress-slide 1.05s ease-in-out infinite;
+  animation: route-progress-grow 7s cubic-bezier(0.12, 0.6, 0.2, 1) forwards;
 }
 
-.page-loading {
-  padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
-    max(1.5rem, env(safe-area-inset-left));
-  max-width: 56rem;
+.route-progress.is-done {
+  opacity: 0;
+  transition: opacity 240ms ease 60ms;
 }
 
-.page-loading-copy {
-  display: flex;
+.route-progress.is-done span {
+  transform: scaleX(1);
+  animation: none;
+  transition: transform 180ms ease;
+}
+
+.soft-loader {
+  display: inline-flex;
   align-items: center;
-  gap: 0.7rem;
-  margin-bottom: 1.5rem;
-  color: var(--text-muted);
-  font-size: 0.88rem;
-  font-weight: 600;
+  gap: 0.38rem;
 }
 
-.pixel-spinner {
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
+.soft-loader span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 999px;
   background: var(--accent-cta);
-  box-shadow:
-    0.55rem 0 var(--accent-cta-end),
-    0 0.55rem var(--accent-link),
-    0.55rem 0.55rem var(--accent-cta);
-  animation: pixel-spin 0.55s steps(4) infinite;
+  animation: soft-dot 1.05s ease-in-out infinite;
 }
 
-@keyframes pixel-spin {
+.soft-loader span:nth-child(2) {
+  background: var(--accent-cta-end);
+  animation-delay: 0.14s;
+}
+
+.soft-loader span:nth-child(3) {
+  background: var(--accent-link);
+  animation-delay: 0.28s;
+}
+
+@keyframes route-progress-grow {
+  0% {
+    transform: scaleX(0.08);
+  }
+  18% {
+    transform: scaleX(0.42);
+  }
+  48% {
+    transform: scaleX(0.68);
+  }
+  78% {
+    transform: scaleX(0.84);
+  }
+  100% {
+    transform: scaleX(0.92);
+  }
+}
+
+@keyframes soft-dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0) scale(0.72);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translateY(-0.28rem) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+    filter: blur(8px);
+  }
   to {
-    transform: rotate(90deg);
-  }
-}
-
-.skel {
-  border-radius: var(--radius-card);
-  background: linear-gradient(
-    100deg,
-    rgba(255, 255, 255, 0.28) 20%,
-    rgba(255, 255, 255, 0.72) 50%,
-    rgba(255, 255, 255, 0.28) 80%
-  );
-  background-size: 200% 100%;
-  animation: skel-shimmer 1.35s ease-in-out infinite;
-}
-
-.skel-kicker {
-  width: 5.5rem;
-  height: 0.7rem;
-  margin-bottom: 0.85rem;
-}
-
-.skel-title {
-  width: min(72%, 22rem);
-  height: 2.1rem;
-  margin-bottom: 0.85rem;
-}
-
-.skel-lead {
-  width: min(90%, 34rem);
-  height: 0.95rem;
-  margin-bottom: 1.6rem;
-}
-
-.skel-panel {
-  height: 9.5rem;
-  margin-bottom: 1rem;
-  border: 1px solid var(--hairline);
-}
-
-.skel-panel-short {
-  height: 5.5rem;
-}
-
-@keyframes route-progress-slide {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(320%);
-  }
-}
-
-@keyframes skel-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
+    opacity: 1;
+    transform: none;
+    filter: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .route-progress span,
-  .skel,
-  .pixel-spinner {
+  .soft-loader span,
+  .page-frame,
+  .article-page {
     animation: none;
+  }
+
+  html.is-route-pending .site-main {
+    filter: none;
+    opacity: 0.7;
   }
 }
 
@@ -852,6 +856,11 @@ html.is-route-pending * {
 
 .profile-contact {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: none;
   color: var(--text-muted);
   transition:
     color 160ms ease,
@@ -860,11 +869,13 @@ html.is-route-pending * {
 
 .profile-contact svg {
   display: block;
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  flex: none;
+  overflow: visible;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.55;
+  stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1082,6 +1093,7 @@ html.is-route-pending * {
 .page-frame {
   padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
     max(1.5rem, env(safe-area-inset-left));
+  animation: content-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (min-width: 640px) {
@@ -1458,32 +1470,25 @@ html.is-route-pending * {
 .gh-repo {
   width: 100%;
   position: relative;
+  transition:
+    opacity 240ms ease,
+    filter 240ms ease;
 }
 
 .gh-busy {
   pointer-events: none;
-  opacity: 0.55;
+  opacity: 0.48;
+  filter: blur(1.5px);
 }
 
 .source-loading {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  min-height: 8rem;
+  min-height: 4.5rem;
   color: var(--text-muted);
   font-size: 0.88rem;
   font-weight: 600;
-}
-
-.gh-busy-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.35);
-  backdrop-filter: blur(4px);
 }
 
 .gh-repo-header {
@@ -1829,6 +1834,7 @@ html.is-route-pending * {
 .article-page {
   padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
     max(1.5rem, env(safe-area-inset-left));
+  animation: content-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (min-width: 640px) {

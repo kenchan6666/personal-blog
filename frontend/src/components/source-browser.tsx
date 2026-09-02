@@ -10,7 +10,7 @@ import {
   type PublicSourceOverview,
   type SourceTreeEntry,
 } from "@/lib/api";
-import { PixelSpinner } from "./page-loading";
+import { SoftLoader } from "./page-loading";
 import { GithubMarkdown } from "./github-markdown";
 
 type Props = {
@@ -121,7 +121,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
     return (
       <section className="gh-repo">
         <div className="source-loading">
-          <PixelSpinner label={labels.sourceLoading} />
+          <SoftLoader label={labels.sourceLoading} />
           <p className="text-sm text-[var(--text-muted)]">
             {loadError ? labels.sourceUnavailable : labels.sourceLoading}
           </p>
@@ -137,11 +137,6 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
 
   return (
     <section className={`gh-repo${busy ? " gh-busy" : ""}`}>
-      {busy ? (
-        <div className="gh-busy-overlay">
-          <PixelSpinner label={labels.sourceLoading} />
-        </div>
-      ) : null}
       <div className="gh-repo-header">
         <div>
           <p className="gh-repo-name">
@@ -167,6 +162,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
             <span className="status-pill">{labels.publicRepo}</span>
           )}
         </div>
+        {busy ? <SoftLoader label={labels.sourceLoading} /> : null}
         <a
           className="btn-ghost text-sm"
           href={sourceRepo.htmlUrl}

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { MarkdownBody } from "@/components/markdown-body";
 import { PageFrame, PagePanel } from "@/components/page-frame";
-import { PixelSpinner } from "@/components/page-loading";
+import { SoftLoader } from "@/components/page-loading";
 import { SourceBrowser } from "@/components/source-browser";
 import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 function SourceFallback({ label }: { label: string }) {
   return (
     <div className="source-loading">
-      <PixelSpinner label={label} />
+      <SoftLoader label={label} />
       <p>{label}</p>
     </div>
   );

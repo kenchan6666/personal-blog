@@ -25,10 +25,10 @@ function isInternalNav(anchor: HTMLAnchorElement, pathname: string) {
 
 export function RouteProgress() {
   const pathname = usePathname();
-  const [pending, setPending] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "pending" | "done">("idle");
 
   useEffect(() => {
-    setPending(false);
+    setPhase((current) => (current === "pending" ? "done" : current));
   }, [pathname]);
 
   useEffect(() => {
@@ -37,26 +37,39 @@ export function RouteProgress() {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = (event.target as HTMLElement | null)?.closest("a");
       if (!anchor || !isInternalNav(anchor, pathname)) return;
-      setPending(true);
+      setPhase("pending");
     }
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
   }, [pathname]);
 
   useEffect(() => {
-    document.documentElement.classList.toggle("is-route-pending", pending);
+    document.documentElement.classList.toggle(
+      "is-route-pending",
+      phase === "pending",
+    );
     return () => document.documentElement.classList.remove("is-route-pending");
-  }, [pending]);
+  }, [phase]);
 
   useEffect(() => {
-    if (!pending) return;
-    const timer = window.setTimeout(() => setPending(false), 12000);
+    if (phase !== "done") return;
+    const timer = window.setTimeout(() => setPhase("idle"), 340);
     return () => window.clearTimeout(timer);
-  }, [pending]);
+  }, [phase]);
 
-  if (!pending) return null;
+  useEffect(() => {
+    if (phase !== "pending") return;
+    const timer = window.setTimeout(() => setPhase("idle"), 12000);
+    return () => window.clearTimeout(timer);
+  }, [phase]);
+
+  if (phase === "idle") return null;
   return (
-    <div className="route-progress" role="progressbar" aria-hidden>
+    <div
+      className={`route-progress${phase === "done" ? " is-done" : ""}`}
+      role="progressbar"
+      aria-hidden
+    >
       <span />
     </div>
   );
