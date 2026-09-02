@@ -29,6 +29,11 @@
   --glass-blur: 32px;
 }
 
+html.locale-zh-Hans {
+  --font-cjk: var(--font-noto-sans-sc);
+  --font-body: var(--font-source-sans), var(--font-noto-sans-sc);
+}
+
 @theme inline {
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono);
@@ -55,8 +60,11 @@ body {
   color: var(--text-primary);
   font-family:
     var(--font-body),
+    "PingFang SC",
     "PingFang TC",
+    "Hiragino Sans GB",
     "Hiragino Sans TC",
+    "Microsoft YaHei",
     "Microsoft JhengHei",
     system-ui,
     sans-serif;
@@ -180,8 +188,8 @@ a:visited {
 .sidebar-panel {
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.5) 0%,
-    rgba(255, 255, 255, 0.28) 100%
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(248, 246, 255, 0.88) 100%
   );
   backdrop-filter: blur(40px) saturate(190%);
   -webkit-backdrop-filter: blur(40px) saturate(190%);
@@ -228,6 +236,61 @@ a:visited {
 
 .site-nav.is-open .icon-btn.sidebar-fab {
   display: none;
+}
+
+.site-chrome {
+  position: fixed;
+  top: max(0.85rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  z-index: 40;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.site-chrome-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.42rem 0.85rem;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.site-chrome-link:hover {
+  border-color: var(--glass-highlight);
+}
+
+.site-nav.is-open ~ .site-chrome {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.about-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.25rem;
+}
+
+.about-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
+}
+
+.about-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
 .site-nav-scrim {
@@ -499,7 +562,9 @@ a:visited {
   font-family:
     var(--font-display),
     var(--font-cjk),
+    "PingFang SC",
     "PingFang TC",
+    "Microsoft YaHei",
     "Microsoft JhengHei",
     sans-serif;
 }
@@ -1599,7 +1664,7 @@ a:visited {
 
 @media (min-width: 640px) {
   .cms-category-add {
-    grid-template-columns: 7rem 1fr 1fr auto;
+    grid-template-columns: 6.5rem 1fr 1fr 1fr auto;
     align-items: center;
   }
 }
@@ -1763,7 +1828,9 @@ a:visited {
   font-family:
     var(--font-cjk),
     var(--font-source-sans),
+    "PingFang SC",
     "PingFang TC",
+    "Microsoft YaHei",
     "Microsoft JhengHei",
     sans-serif;
   font-size: var(--typeset-size);
@@ -1786,7 +1853,9 @@ a:visited {
   font-family:
     var(--font-display),
     var(--font-cjk),
+    "PingFang SC",
     "PingFang TC",
+    "Microsoft YaHei",
     "Microsoft JhengHei",
     sans-serif;
   font-weight: 700;

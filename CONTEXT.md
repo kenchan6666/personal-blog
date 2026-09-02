@@ -1,12 +1,16 @@
 # Personal Portfolio
 
-求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 英文切换。需要双语呈现的内容字段（如品牌名、Hero 文案、Profile、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant` 与 `en` 两套输入；公开展示时按当前语言取对应原文，该语未填则回退到另一语已填写的原文。不机翻、不代写。
+求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 简中 / 英文切换。需要多语呈现的内容字段（如品牌名、Hero 文案、Profile、About 模块、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant`、`zh-Hans` 与 `en` 三套输入；公开展示时按当前语言取对应原文，该语未填则按 `zh-Hans ↔ zh-Hant ↔ en` 回退。中文之间回退只做繁简字形转换，不机翻、不代写。
 
 ## Language
 
 **Profile**:
-Owner 的身份面：简介、经历、技能、公开邮箱、头像，以及一排有序外链。头像支持 Owner 上传；访客联系方式以 Links + 公开邮箱为准（无站内私信）。
-_Avoid_: 咨詢, Consulting, About（作实体名时）
+Owner 的身份面：简介、经历、技能、公开邮箱、头像，以及一排有序外链。头像支持 Owner 上传；访客联系方式以 Links + 公开邮箱为准（无站内私信）。首页身份条与 About 页分工：Profile 是首页摘要，About 是个人详情。
+_Avoid_: 咨詢, Consulting
+
+**About**:
+公开个人详情页（`/about`），由 Owner 在后台维护的多个模块组成，类似 CV：自我描述、学历、成绩、经历，以及自定义模块。每个模块有标题与 Markdown 正文，支持 Draft / Published。访客从顶栏与侧栏进入。
+_Avoid_: 把 About 做成独立「关于我们」公司页；与 Profile 混成同一实体
 
 **Link**:
 挂在 Profile 上的外链条目（如 GitHub、电话、WhatsApp、Twitter/X、LinkedIn、简历 PDF），有展示顺序。号码或账号可写成 `tel:` / `wa.me` / 用户名，公开页按类型显示图标。

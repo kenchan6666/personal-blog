@@ -73,7 +73,7 @@ Copy `.env.example` to `.env` and set a Gmail **App Password** in `SMTP_PASSWORD
 
 ## Site profile + avatar
 
-- `GET /api/public/site?locale=zh-Hant|en`
+- `GET /api/public/site?locale=zh-Hant|zh-Hans|en`
 - `GET/PUT /api/owner/site` (Bearer)
 - `POST /api/owner/avatar` multipart field `file` (png/jpeg/webp, Bearer)
 - `GET /api/public/media/avatar/{filename}`
@@ -86,7 +86,7 @@ Avatars are stored under `AVATAR_DIR` (default `data/avatars`, gitignored).
 - `GET /api/public/projects/{slug}?locale=` — 404 for Draft / missing
 - `GET/POST /api/owner/projects` and `PUT /api/owner/projects/{id}` (Bearer)
 
-Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `published`.
+Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `published`. Locales: `zh-Hant`, `zh-Hans`, `en`.
 
 ## Articles
 
@@ -103,6 +103,15 @@ Optional `relatedProjectSlug`. A Draft related Project is omitted from the publi
 - `GET/POST /api/owner/journals`, `PUT/DELETE /api/owner/journals/{id}` (Bearer)
 
 Journals have no `relatedProject`. Sending `relatedProjectSlug` is rejected with 400.
+
+## About modules
+
+Owner-managed CV-like blocks on the public personal-detail page (`/about`).
+
+- `GET /api/public/about?locale=zh-Hant|zh-Hans|en` — Published only, ordered
+- `GET/POST /api/owner/about-modules` and `PUT/DELETE /api/owner/about-modules/{id}` (Bearer)
+
+Kinds: `summary`, `education`, `achievement`, `experience`, `custom`. Trilingual Markdown: `title`, `body`. Status is `draft` | `published`.
 
 ## GitHub OAuth + SourceRepo
 

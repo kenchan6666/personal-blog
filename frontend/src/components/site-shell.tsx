@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
+import { LocaleHtml } from "./locale-html";
 import { Sidebar } from "./sidebar";
+import { SiteChrome } from "./site-chrome";
 
 const DESKTOP_NAV = "(min-width: 1024px)";
 
@@ -43,6 +45,7 @@ export function SiteShell({ locale, dict, children }: Props) {
 
   return (
     <div className="relative z-10 min-h-screen">
+      <LocaleHtml locale={locale} />
       <Sidebar
         locale={locale}
         dict={dict}
@@ -51,6 +54,7 @@ export function SiteShell({ locale, dict, children }: Props) {
         onNavigate={() => setOpen(false)}
       />
 
+      <SiteChrome locale={locale} dict={dict} />
       <main className="site-main">{children}</main>
     </div>
   );

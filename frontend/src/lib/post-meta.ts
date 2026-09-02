@@ -34,9 +34,13 @@ export function parsePostDate(iso: string): Date {
   return new Date(iso);
 }
 
+function isChinese(locale: Locale): boolean {
+  return locale === "zh-Hant" || locale === "zh-Hans";
+}
+
 export function monthLabel(iso: string, locale: Locale): string {
   const month = parsePostDate(iso).getMonth();
-  return locale === "zh-Hant" ? ZH_MONTHS[month] : EN_MONTHS[month];
+  return isChinese(locale) ? ZH_MONTHS[month] : EN_MONTHS[month];
 }
 
 export function formatPostDate(iso: string, locale: Locale): string {
@@ -44,7 +48,7 @@ export function formatPostDate(iso: string, locale: Locale): string {
   const year = date.getFullYear();
   const month = date.getMonth() + 1;
   const day = date.getDate();
-  if (locale === "zh-Hant") {
+  if (isChinese(locale)) {
     return `${year} 年 ${month} 月 ${day} 日`;
   }
   return date.toLocaleDateString("en-GB", {

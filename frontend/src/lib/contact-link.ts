@@ -16,17 +16,18 @@ export type ContactKind =
 export type ContactPreset = {
   id: ContactKind;
   labelZh: string;
+  labelHans: string;
   labelEn: string;
   placeholder: string;
 };
 
 export const CONTACT_PRESETS: ContactPreset[] = [
-  { id: "github", labelZh: "GitHub", labelEn: "GitHub", placeholder: "https://github.com/you" },
-  { id: "phone", labelZh: "電話", labelEn: "Phone", placeholder: "+852 1234 5678" },
-  { id: "whatsapp", labelZh: "WhatsApp", labelEn: "WhatsApp", placeholder: "+852 1234 5678" },
-  { id: "x", labelZh: "推特", labelEn: "Twitter", placeholder: "https://x.com/you" },
-  { id: "telegram", labelZh: "Telegram", labelEn: "Telegram", placeholder: "@username" },
-  { id: "linkedin", labelZh: "LinkedIn", labelEn: "LinkedIn", placeholder: "https://linkedin.com/in/you" },
+  { id: "github", labelZh: "GitHub", labelHans: "GitHub", labelEn: "GitHub", placeholder: "https://github.com/you" },
+  { id: "phone", labelZh: "電話", labelHans: "电话", labelEn: "Phone", placeholder: "+852 1234 5678" },
+  { id: "whatsapp", labelZh: "WhatsApp", labelHans: "WhatsApp", labelEn: "WhatsApp", placeholder: "+852 1234 5678" },
+  { id: "x", labelZh: "推特", labelHans: "推特", labelEn: "Twitter", placeholder: "https://x.com/you" },
+  { id: "telegram", labelZh: "Telegram", labelHans: "Telegram", labelEn: "Telegram", placeholder: "@username" },
+  { id: "linkedin", labelZh: "LinkedIn", labelHans: "LinkedIn", labelEn: "LinkedIn", placeholder: "https://linkedin.com/in/you" },
 ];
 
 function hostOf(url: string): string {

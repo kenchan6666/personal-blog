@@ -6,29 +6,53 @@ from typing import Any
 
 from beanie import Document
 from pydantic import BaseModel, Field
+from zhconv import convert as zhconv_convert
 
 from app.avatar import avatar_public_url, hero_visual_public_url
 
-LOCALES = ("zh-Hant", "en")
+LOCALES = ("zh-Hant", "zh-Hans", "en")
 DEFAULT_ARTICLE_CATEGORY_SLUG = "taiko"
-DEFAULT_ARTICLE_CATEGORY_TITLE = {"zh-Hant": "太鼓", "en": "Taiko"}
+DEFAULT_ARTICLE_CATEGORY_TITLE = {
+    "zh-Hant": "太鼓",
+    "zh-Hans": "太鼓",
+    "en": "Taiko",
+}
+ABOUT_KINDS = ("summary", "education", "achievement", "experience", "custom")
+LOCALE_FALLBACK = {
+    "zh-Hans": ("zh-Hans", "zh-Hant", "en"),
+    "zh-Hant": ("zh-Hant", "zh-Hans", "en"),
+    "en": ("en", "zh-Hant", "zh-Hans"),
+}
+_SCRIPT_TARGET = {
+    "zh-Hans": "zh-cn",
+    "zh-Hant": "zh-hk",
+}
 
 
 def empty_localized() -> dict[str, str]:
-    return {"zh-Hant": "", "en": ""}
+    return {"zh-Hant": "", "zh-Hans": "", "en": ""}
+
+
+def convert_chinese_script(text: str, locale: str) -> str:
+    target = _SCRIPT_TARGET.get(locale)
+    if not target:
+        return text
+    return zhconv_convert(text, target)
 
 
 def pick_localized(field: dict[str, str] | None, locale: str) -> str:
     data = field or {}
-    current = data.get(locale) or ""
-    if current.strip():
-        return current
-    for other in LOCALES:
-        if other == locale:
+    order = LOCALE_FALLBACK.get(locale, LOCALES)
+    for key in order:
+        alt = data.get(key) or ""
+        if not str(alt).strip():
             continue
-        alt = data.get(other) or ""
-        if alt.strip():
-            return alt
+        if locale in _SCRIPT_TARGET and key in _SCRIPT_TARGET and key != locale:
+            return convert_chinese_script(str(alt), locale)
+        return str(alt)
+    for value in data.values():
+        if str(value).strip():
+            return str(value)
     return ""
 
 
@@ -326,6 +350,38 @@ class Journal(Document):
             "publishedAt": when.isoformat(),
             "wordCount": chars,
             "readingMinutes": reading_minutes(chars),
+        }
+
+
+class AboutModule(Document):
+    slug: str = ""
+    kind: str = "custom"
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+
+    class Settings:
+        name = "about_modules"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "slug": self.slug,
+            "kind": self.kind,
+            "title": self.title,
+            "body": self.body,
+            "status": self.status,
+            "order": self.order,
+        }
+
+    def resolve(self, locale: str) -> dict[str, Any]:
+        return {
+            "slug": self.slug,
+            "kind": self.kind,
+            "title": pick_localized(self.title, locale),
+            "body": pick_localized(self.body, locale),
+            "order": self.order,
         }
 
 

@@ -9,6 +9,7 @@ import {
   fetchMe,
   getSessionToken,
 } from "@/lib/api";
+import { AboutEditor } from "./about-editor";
 import { ArticleEditor } from "./article-editor";
 import { CommentModerator } from "./comment-moderator";
 import { GitHubConnect } from "./github-connect";
@@ -78,6 +79,9 @@ export function AdminDashboard({ locale, dict }: Props) {
         </div>
         <div className="lg:col-span-2">
           <SiteEditor dict={dict} />
+        </div>
+        <div className="lg:col-span-2">
+          <AboutEditor dict={dict} />
         </div>
         <ProjectEditor locale={locale} dict={dict} />
         <ArticleEditor dict={dict} />

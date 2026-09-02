@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
-import { locales } from "@/i18n/config";
+import { localeLabels, locales, stripLocalePrefix } from "@/i18n/config";
 
 type Props = {
   locale: Locale;
@@ -16,9 +16,11 @@ type Props = {
 
 const links = [
   { key: "home", href: "" },
+  { key: "about", href: "/about" },
   { key: "projects", href: "/projects" },
   { key: "articles", href: "/articles" },
   { key: "journals", href: "/journals" },
+  { key: "search", href: "/search" },
 ] as const;
 
 function MenuIcon() {
@@ -114,9 +116,9 @@ export function Sidebar({
             })}
           </nav>
 
-          <div className="hairline-t mt-6 flex gap-2 pt-4">
+          <div className="hairline-t mt-6 flex flex-wrap gap-2 pt-4">
           {locales.map((l) => {
-            const rest = pathname.replace(/^\/(zh-Hant|en)/, "") || "";
+            const rest = stripLocalePrefix(pathname);
             const href = `/${l}${rest}`;
             const active = l === locale;
             return (
@@ -127,7 +129,7 @@ export function Sidebar({
                 tabIndex={open ? 0 : -1}
                 className={`locale-chip ${active ? "locale-chip-active" : ""}`}
               >
-                {l === "zh-Hant" ? "繁中" : "EN"}
+                {localeLabels[l]}
               </Link>
             );
           })}

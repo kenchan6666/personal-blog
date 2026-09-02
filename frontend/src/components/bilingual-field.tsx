@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { localeLabels } from "@/i18n/config";
 import type { Localized } from "@/lib/api";
+import { emptyLocalized } from "@/lib/api";
 import { MarkdownBody } from "./markdown-body";
 
 type Props = {
@@ -53,14 +55,14 @@ export function BilingualField({
           </span>
         ) : null}
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(["zh-Hant", "en"] as const).map((localeKey) => (
+      <div className="grid gap-3 lg:grid-cols-3">
+        {(["zh-Hant", "zh-Hans", "en"] as const).map((localeKey) => (
           <div key={localeKey} className="block text-xs text-[var(--text-muted)]">
-            {localeKey}
+            {localeLabels[localeKey]}
             {showPreview && mode === "preview" ? (
               <div className="preview-pane mt-1">
-                {value[localeKey].trim() ? (
-                  <MarkdownBody source={value[localeKey]} />
+                {(value[localeKey] ?? "").trim() ? (
+                  <MarkdownBody source={value[localeKey] ?? ""} />
                 ) : (
                   <p className="text-sm text-[var(--text-muted)]">
                     {emptyPreview}
@@ -70,18 +72,26 @@ export function BilingualField({
             ) : multiline ? (
               <textarea
                 className="field"
-                value={value[localeKey]}
+                value={value[localeKey] ?? ""}
                 onChange={(e) =>
-                  onChange({ ...value, [localeKey]: e.target.value })
+                  onChange({
+                    ...emptyLocalized(),
+                    ...value,
+                    [localeKey]: e.target.value,
+                  })
                 }
                 rows={rows}
               />
             ) : (
               <input
                 className="field"
-                value={value[localeKey]}
+                value={value[localeKey] ?? ""}
                 onChange={(e) =>
-                  onChange({ ...value, [localeKey]: e.target.value })
+                  onChange({
+                    ...emptyLocalized(),
+                    ...value,
+                    [localeKey]: e.target.value,
+                  })
                 }
               />
             )}

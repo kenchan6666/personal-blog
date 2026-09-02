@@ -12,6 +12,7 @@ import {
   fetchOwnerArticles,
   fetchOwnerProjects,
   getSessionToken,
+  localizedText,
   saveOwnerArticle,
   type OwnerArticle,
   type OwnerArticleCategory,
@@ -31,11 +32,11 @@ function payloadOf(article: OwnerArticle): Omit<OwnerArticle, "id"> {
 }
 
 function titleOf(article: OwnerArticle, fallback: string) {
-  return article.title["zh-Hant"] || article.title.en || article.slug || fallback;
+  return localizedText(article.title, article.slug || fallback);
 }
 
 function categoryLabel(category: OwnerArticleCategory) {
-  return category.title["zh-Hant"] || category.title.en || category.slug;
+  return localizedText(category.title, category.slug);
 }
 
 export function ArticleEditor({ dict }: Props) {
@@ -51,6 +52,7 @@ export function ArticleEditor({ dict }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [newSlug, setNewSlug] = useState("");
   const [newTitleZh, setNewTitleZh] = useState("");
+  const [newTitleHans, setNewTitleHans] = useState("");
   const [newTitleEn, setNewTitleEn] = useState("");
   const [addingCategory, setAddingCategory] = useState(false);
 
@@ -138,11 +140,16 @@ export function ArticleEditor({ dict }: Props) {
     try {
       await createOwnerArticleCategory(token, {
         slug,
-        title: { "zh-Hant": newTitleZh, en: newTitleEn },
+        title: {
+          "zh-Hant": newTitleZh,
+          "zh-Hans": newTitleHans,
+          en: newTitleEn,
+        },
         order: categories.length,
       });
       setNewSlug("");
       setNewTitleZh("");
+      setNewTitleHans("");
       setNewTitleEn("");
       await reload(token);
       setMessage(a.saved);
@@ -227,6 +234,12 @@ export function ArticleEditor({ dict }: Props) {
             onChange={(e) => setNewTitleZh(e.target.value)}
             placeholder={a.categoryTitleZh}
             required
+          />
+          <input
+            className="field field-tight"
+            value={newTitleHans}
+            onChange={(e) => setNewTitleHans(e.target.value)}
+            placeholder={a.categoryTitleHans}
           />
           <input
             className="field field-tight"
@@ -376,7 +389,7 @@ export function ArticleEditor({ dict }: Props) {
               <option value="">{a.noRelatedProject}</option>
               {projects.map((project) => (
                 <option key={project.id} value={project.slug}>
-                  {project.title["zh-Hant"] || project.title.en || project.slug}
+                  {localizedText(project.title, project.slug)}
                 </option>
               ))}
             </select>

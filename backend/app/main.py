@@ -29,9 +29,12 @@ from app.config import Settings
 from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
 from app.mailer import ConsoleMailer, Mailer, SmtpMailer, SmtpThenConsoleMailer
 from app.models import (
+    ABOUT_KINDS,
     DEFAULT_ARTICLE_CATEGORY_SLUG,
     DEFAULT_ARTICLE_CATEGORY_TITLE,
+    LOCALES,
     STATUSES,
+    AboutModule,
     Article,
     ArticleCategory,
     Comment,
@@ -151,6 +154,15 @@ class JournalBody(BaseModel):
     order: int = 0
 
 
+class AboutModuleBody(BaseModel):
+    slug: str = Field(min_length=1, max_length=80)
+    kind: str = "custom"
+    title: dict[str, str] = Field(default_factory=empty_localized)
+    body: dict[str, str] = Field(default_factory=empty_localized)
+    status: str = "draft"
+    order: int = 0
+
+
 def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
 
@@ -211,6 +223,7 @@ def create_app(
                     ArticleCategory,
                     Article,
                     Journal,
+                    AboutModule,
                     Comment,
                 ],
             )
@@ -328,8 +341,7 @@ def create_app(
 
     @app.get("/api/public/site")
     async def public_site(locale: str = "zh-Hant") -> dict[str, Any]:
-        if locale not in ("zh-Hant", "en"):
-            locale = "zh-Hant"
+        locale = normalize_locale(locale)
         site = await get_or_create_site()
         return site.resolve(locale)
 
@@ -440,7 +452,7 @@ def create_app(
         return FileResponse(path, media_type=media_type)
 
     def normalize_locale(locale: str) -> str:
-        return locale if locale in ("zh-Hant", "en") else "zh-Hant"
+        return locale if locale in LOCALES else "zh-Hant"
 
     def apply_project_body(project: Project, body: ProjectBody) -> None:
         if body.status not in STATUSES:
@@ -1182,6 +1194,98 @@ def create_app(
                 detail="not_found",
             )
         await current_store().delete(journal)
+        return {"status": "deleted"}
+
+    def apply_about_module_body(module: AboutModule, body: AboutModuleBody) -> None:
+        if body.status not in STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_status",
+            )
+        kind = body.kind.strip().lower() or "custom"
+        if kind not in ABOUT_KINDS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_kind",
+            )
+        slug = body.slug.strip().lower()
+        if not slug:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_slug",
+            )
+        module.slug = slug
+        module.kind = kind
+        module.title = body.title
+        module.body = body.body
+        module.status = body.status
+        module.order = body.order
+
+    async def ensure_unique_about_slug(
+        slug: str, exclude_id: str | None = None
+    ) -> None:
+        existing = await current_store().find_one(AboutModule, slug=slug)
+        if existing is not None and str(existing.id) != exclude_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="slug_taken",
+            )
+
+    @app.get("/api/public/about")
+    async def public_about(locale: str = "zh-Hant") -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        modules = await current_store().find(AboutModule, status="published")
+        modules.sort(key=lambda item: (item.order, item.slug))
+        return [item.resolve(locale) for item in modules]
+
+    @app.get("/api/owner/about-modules")
+    async def owner_list_about_modules(
+        _: str = Depends(require_owner),
+    ) -> list[dict[str, Any]]:
+        modules = await current_store().find_all(AboutModule)
+        modules.sort(key=lambda item: (item.order, item.slug))
+        return [item.to_owner_dict() for item in modules]
+
+    @app.post("/api/owner/about-modules")
+    async def owner_create_about_module(
+        body: AboutModuleBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        module = new_document(AboutModule)
+        apply_about_module_body(module, body)
+        await ensure_unique_about_slug(module.slug)
+        await current_store().insert(module)
+        return module.to_owner_dict()
+
+    @app.put("/api/owner/about-modules/{module_id}")
+    async def owner_update_about_module(
+        module_id: PydanticObjectId,
+        body: AboutModuleBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        module = await current_store().get(AboutModule, module_id)
+        if module is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        apply_about_module_body(module, body)
+        await ensure_unique_about_slug(module.slug, exclude_id=str(module.id))
+        await current_store().save(module)
+        return module.to_owner_dict()
+
+    @app.delete("/api/owner/about-modules/{module_id}")
+    async def owner_delete_about_module(
+        module_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        module = await current_store().get(AboutModule, module_id)
+        if module is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        await current_store().delete(module)
         return {"status": "deleted"}
 
     def public_comment_payload(comment: Comment) -> dict[str, Any]:

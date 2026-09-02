@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import {
-  createOwnerJournal,
-  deleteOwnerJournal,
-  emptyOwnerJournal,
-  fetchOwnerJournals,
+  createOwnerAboutModule,
+  deleteOwnerAboutModule,
+  emptyOwnerAboutModule,
+  fetchOwnerAboutModules,
   getSessionToken,
   localizedText,
-  saveOwnerJournal,
-  type OwnerJournal,
+  saveOwnerAboutModule,
+  type AboutKind,
+  type OwnerAboutModule,
 } from "@/lib/api";
 import { BilingualField } from "./bilingual-field";
 import { CmsCard, StatusPill } from "./cms-card";
@@ -20,19 +21,34 @@ type Props = {
   dict: Dictionary;
 };
 
-function payloadOf(journal: OwnerJournal): Omit<OwnerJournal, "id"> {
-  const { id: _id, ...rest } = journal;
+const KINDS: AboutKind[] = [
+  "summary",
+  "education",
+  "achievement",
+  "experience",
+  "custom",
+];
+
+function payloadOf(module: OwnerAboutModule): Omit<OwnerAboutModule, "id"> {
+  const { id: _id, ...rest } = module;
   return rest;
 }
 
-function titleOf(journal: OwnerJournal, fallback: string) {
-  return localizedText(journal.title, journal.slug || fallback);
+function kindLabel(dict: Dictionary, kind: AboutKind) {
+  const map = {
+    summary: dict.about.kindSummary,
+    education: dict.about.kindEducation,
+    achievement: dict.about.kindAchievement,
+    experience: dict.about.kindExperience,
+    custom: dict.about.kindCustom,
+  };
+  return map[kind];
 }
 
-export function JournalEditor({ dict }: Props) {
+export function AboutEditor({ dict }: Props) {
   const a = dict.admin;
-  const [journals, setJournals] = useState<OwnerJournal[]>([]);
-  const [current, setCurrent] = useState<OwnerJournal>(emptyOwnerJournal());
+  const [modules, setModules] = useState<OwnerAboutModule[]>([]);
+  const [current, setCurrent] = useState<OwnerAboutModule>(emptyOwnerAboutModule());
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,8 +56,8 @@ export function JournalEditor({ dict }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   async function reload(token: string) {
-    const list = await fetchOwnerJournals(token);
-    setJournals(list);
+    const list = await fetchOwnerAboutModules(token);
+    setModules(list);
     return list;
   }
 
@@ -53,8 +69,8 @@ export function JournalEditor({ dict }: Props) {
       .finally(() => setLoading(false));
   }, [a.errorGeneric]);
 
-  function openEditor(journal: OwnerJournal) {
-    setCurrent(journal);
+  function openEditor(module: OwnerAboutModule) {
+    setCurrent(module);
     setMessage(null);
     setError(null);
     setOpen(true);
@@ -75,8 +91,8 @@ export function JournalEditor({ dict }: Props) {
     setError(null);
     try {
       const saved = current.id
-        ? await saveOwnerJournal(token, current.id, payloadOf(current))
-        : await createOwnerJournal(token, payloadOf(current));
+        ? await saveOwnerAboutModule(token, current.id, payloadOf(current))
+        : await createOwnerAboutModule(token, payloadOf(current));
       setCurrent(saved);
       await reload(token);
       setMessage(a.saved);
@@ -94,10 +110,10 @@ export function JournalEditor({ dict }: Props) {
     setMessage(null);
     setError(null);
     try {
-      await deleteOwnerJournal(token, current.id);
+      await deleteOwnerAboutModule(token, current.id);
       await reload(token);
       setOpen(false);
-      setCurrent(emptyOwnerJournal());
+      setCurrent(emptyOwnerAboutModule());
     } catch {
       setError(a.errorGeneric);
     } finally {
@@ -113,14 +129,14 @@ export function JournalEditor({ dict }: Props) {
 
   return (
     <CmsCard
-      title={a.journalEditor}
+      title={a.aboutEditor}
       action={
         <button
           type="button"
           className="btn-ghost text-sm"
-          onClick={() => openEditor(emptyOwnerJournal())}
+          onClick={() => openEditor(emptyOwnerAboutModule())}
         >
-          {a.newJournal}
+          {a.newAbout}
         </button>
       }
     >
@@ -128,24 +144,27 @@ export function JournalEditor({ dict }: Props) {
         <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
       ) : null}
       {loading ? (
-        <p className="text-sm text-[var(--text-muted)]">{a.loadingJournals}</p>
-      ) : journals.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">{a.emptyJournals}</p>
+        <p className="text-sm text-[var(--text-muted)]">{a.loadingAbout}</p>
+      ) : modules.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">{a.emptyAbout}</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {journals.map((journal) => (
-            <li key={journal.id}>
+          {modules.map((module) => (
+            <li key={module.id}>
               <button
                 type="button"
                 className="tile"
-                onClick={() => openEditor(journal)}
+                onClick={() => openEditor(module)}
               >
                 <span className="font-semibold">
-                  {titleOf(journal, a.untitledJournal)}
+                  {localizedText(module.title, a.untitledAbout)}
+                </span>
+                <span className="ml-3 text-xs text-[var(--text-muted)]">
+                  {kindLabel(dict, module.kind)}
                 </span>
                 <span className="ml-3">
                   <StatusPill
-                    published={journal.status === "published"}
+                    published={module.status === "published"}
                     publishedLabel={a.statusPublished}
                     draftLabel={a.statusDraft}
                   />
@@ -158,14 +177,18 @@ export function JournalEditor({ dict }: Props) {
 
       <CmsModal
         open={open}
-        title={current.id ? titleOf(current, a.untitledJournal) : a.newJournal}
+        title={
+          current.id
+            ? localizedText(current.title, a.untitledAbout)
+            : a.newAbout
+        }
         closeLabel={a.close}
         onClose={closeEditor}
         footer={
           <>
             <button
               type="submit"
-              form="journal-form"
+              form="about-form"
               className="btn-cta"
               disabled={saving}
             >
@@ -178,7 +201,7 @@ export function JournalEditor({ dict }: Props) {
                 disabled={saving}
                 onClick={() => void onDelete()}
               >
-                {a.deleteJournal}
+                {a.deleteAbout}
               </button>
             ) : null}
             <button type="button" className="btn-ghost" onClick={closeEditor}>
@@ -193,7 +216,7 @@ export function JournalEditor({ dict }: Props) {
           </>
         }
       >
-        <form id="journal-form" onSubmit={onSave}>
+        <form id="about-form" onSubmit={onSave}>
           <label className="mb-6 block text-sm font-semibold">
             {a.fieldSlug}
             <input
@@ -205,6 +228,25 @@ export function JournalEditor({ dict }: Props) {
           </label>
           <div className="mb-6 grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
+              {a.fieldAboutKind}
+              <select
+                className="field mt-2 font-normal"
+                value={current.kind}
+                onChange={(e) =>
+                  setCurrent({
+                    ...current,
+                    kind: e.target.value as AboutKind,
+                  })
+                }
+              >
+                {KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {kindLabel(dict, kind)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-sm font-semibold">
               {a.fieldStatus}
               <select
                 className="field mt-2 font-normal"
@@ -212,7 +254,7 @@ export function JournalEditor({ dict }: Props) {
                 onChange={(e) =>
                   setCurrent({
                     ...current,
-                    status: e.target.value as OwnerJournal["status"],
+                    status: e.target.value as OwnerAboutModule["status"],
                   })
                 }
               >
@@ -236,26 +278,17 @@ export function JournalEditor({ dict }: Props) {
             {a.localeFallbackHint}
           </p>
           <BilingualField
-            label={a.fieldJournalTitle}
+            label={a.fieldAboutTitle}
             value={current.title}
             onChange={(title) => setCurrent({ ...current, title })}
           />
           <BilingualField
-            label={a.fieldJournalSummary}
-            value={current.summary}
-            onChange={(summary) => setCurrent({ ...current, summary })}
-            multiline
-            previewable
-            rows={5}
-            {...previewProps}
-          />
-          <BilingualField
-            label={a.fieldJournalBody}
+            label={a.fieldAboutBody}
             value={current.body}
             onChange={(body) => setCurrent({ ...current, body })}
             multiline
             previewable
-            rows={12}
+            rows={10}
             {...previewProps}
           />
         </form>

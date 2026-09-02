@@ -87,7 +87,7 @@
 
 ## 8. i18n chrome
 
-壳层字符串走字典（`zh-Hant` / `en`）。Owner 输入的 Markdown / 标题原样渲染，不做机翻。
+壳层字符串走字典（`zh-Hant` / `zh-Hans` / `en`）。Owner 输入的 Markdown / 标题原样渲染，不做机翻。
 
 ## 9. 参考图用法
 

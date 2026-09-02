@@ -7,6 +7,7 @@ import {
   emptyOwnerSite,
   fetchOwnerSite,
   getSessionToken,
+  localizedText,
   mediaUrl,
   saveOwnerSite,
   uploadOwnerAvatar,
@@ -61,7 +62,11 @@ export function SiteEditor({ dict }: Props) {
         ...prev.links,
         {
           label: preset
-            ? { "zh-Hant": preset.labelZh, en: preset.labelEn }
+            ? {
+                "zh-Hant": preset.labelZh,
+                "zh-Hans": preset.labelHans,
+                en: preset.labelEn,
+              }
             : emptyLocalized(),
           url: "",
           order: prev.links.length,
@@ -156,7 +161,7 @@ export function SiteEditor({ dict }: Props) {
     }
   }
 
-  const brand = site.brand["zh-Hant"] || site.brand.en;
+  const brand = localizedText(site.brand);
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
@@ -414,6 +419,7 @@ export function SiteEditor({ dict }: Props) {
                         CONTACT_PRESETS.find(
                           (preset) =>
                             preset.labelZh === link.label["zh-Hant"] ||
+                            preset.labelHans === link.label["zh-Hans"] ||
                             preset.labelEn === link.label.en,
                         )?.placeholder ?? "https://、電話或 @帳號"
                       }

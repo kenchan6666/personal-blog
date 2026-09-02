@@ -9,6 +9,7 @@ export const SESSION_KEY = "portfolio_session_token";
 
 export type Localized = {
   "zh-Hant": string;
+  "zh-Hans": string;
   en: string;
 };
 
@@ -71,7 +72,12 @@ export type PublicSite = {
 };
 
 export function emptyLocalized(): Localized {
-  return { "zh-Hant": "", en: "" };
+  return { "zh-Hant": "", "zh-Hans": "", en: "" };
+}
+
+export function localizedText(value: Localized | undefined, fallback = ""): string {
+  if (!value) return fallback;
+  return value["zh-Hant"] || value["zh-Hans"] || value.en || fallback;
 }
 
 export function emptyOwnerSite(): OwnerSite {
@@ -865,4 +871,111 @@ export async function replyOwnerComment(
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerComment;
+}
+
+export type AboutKind =
+  | "summary"
+  | "education"
+  | "achievement"
+  | "experience"
+  | "custom";
+
+export type OwnerAboutModule = {
+  id: string;
+  slug: string;
+  kind: AboutKind;
+  title: Localized;
+  body: Localized;
+  status: "draft" | "published";
+  order: number;
+};
+
+export type PublicAboutModule = {
+  slug: string;
+  kind: AboutKind;
+  title: string;
+  body: string;
+  order: number;
+};
+
+export function emptyOwnerAboutModule(): OwnerAboutModule {
+  return {
+    id: "",
+    slug: "",
+    kind: "custom",
+    title: emptyLocalized(),
+    body: emptyLocalized(),
+    status: "draft",
+    order: 0,
+  };
+}
+
+export async function fetchPublicAbout(
+  locale: string,
+): Promise<PublicAboutModule[]> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/public/about?locale=${encodeURIComponent(locale)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    return (await res.json()) as PublicAboutModule[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchOwnerAboutModules(
+  token: string,
+): Promise<OwnerAboutModule[]> {
+  const res = await fetch(`${API_BASE}/api/owner/about-modules`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerAboutModule[];
+}
+
+export async function createOwnerAboutModule(
+  token: string,
+  body: Omit<OwnerAboutModule, "id">,
+): Promise<OwnerAboutModule> {
+  const res = await fetch(`${API_BASE}/api/owner/about-modules`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerAboutModule;
+}
+
+export async function saveOwnerAboutModule(
+  token: string,
+  id: string,
+  body: Omit<OwnerAboutModule, "id">,
+): Promise<OwnerAboutModule> {
+  const res = await fetch(`${API_BASE}/api/owner/about-modules/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerAboutModule;
+}
+
+export async function deleteOwnerAboutModule(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/about-modules/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
 }

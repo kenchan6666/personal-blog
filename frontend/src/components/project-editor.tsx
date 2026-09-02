@@ -11,6 +11,7 @@ import {
   fetchOwnerGitHubRepos,
   fetchOwnerProjects,
   getSessionToken,
+  localizedText,
   saveOwnerProject,
   type OwnerProject,
   type SourceRepo,
@@ -32,7 +33,7 @@ function payloadOf(
 }
 
 function titleOf(project: OwnerProject, fallback: string) {
-  return project.title["zh-Hant"] || project.title.en || project.slug || fallback;
+  return localizedText(project.title, project.slug || fallback);
 }
 
 function slugFromName(name: string, taken: string[]) {
@@ -62,8 +63,8 @@ function projectFromRepo(
     slug,
     order,
     status: "published",
-    title: { "zh-Hant": repo.name, en: repo.name },
-    summary: { "zh-Hant": summary, en: summary },
+    title: { "zh-Hant": repo.name, "zh-Hans": repo.name, en: repo.name },
+    summary: { "zh-Hant": summary, "zh-Hans": summary, en: summary },
   };
 }
 
