@@ -15,6 +15,7 @@ type Props = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   elevated?: boolean;
+  small?: boolean;
 };
 
 function focusablesIn(root: HTMLElement) {
@@ -36,6 +37,7 @@ export function CmsModal({
   children,
   footer,
   elevated,
+  small,
 }: Props) {
   const [present, setPresent] = useState(open);
   const [entered, setEntered] = useState(false);
@@ -121,7 +123,7 @@ export function CmsModal({
       />
       <div
         ref={panelRef}
-        className="cms-modal-panel"
+        className={`cms-modal-panel${small ? " is-small" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="cms-modal-title"

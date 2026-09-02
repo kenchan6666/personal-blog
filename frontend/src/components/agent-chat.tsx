@@ -18,6 +18,7 @@ import {
   type AgentMessage,
   type Localized,
 } from "@/lib/api";
+import { CmsModal } from "./cms-modal";
 import { MarkdownBody } from "./markdown-body";
 
 type Props = {
@@ -71,6 +72,8 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingKnowledge, setSavingKnowledge] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingConversation, setDeletingConversation] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -154,7 +157,8 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
 
   async function removeConversation(id: string) {
     const token = getSessionToken();
-    if (!token || sending || !window.confirm("删除这个对话及其历史消息？")) return;
+    if (!token || sending || deletingConversation) return;
+    setDeletingConversation(true);
     try {
       await deleteAgentConversation(token, id);
       let rows = await refreshConversations(token);
@@ -163,8 +167,11 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         rows = await refreshConversations(token);
       }
       if (id === activeId && rows[0]) await openConversation(token, rows[0].id);
+      setPendingDeleteId(null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法删除对话。");
+    } finally {
+      setDeletingConversation(false);
     }
   }
 
@@ -323,7 +330,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                   type="button"
                   className="agent-delete-mini"
                   aria-label="删除对话"
-                  onClick={() => removeConversation(conversation.id)}
+                  onClick={() => setPendingDeleteId(conversation.id)}
                 >
                   ×
                 </button>
@@ -588,6 +595,53 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           </div>
         </aside>
       ) : null}
+
+      <CmsModal
+        open={pendingDeleteId !== null}
+        title="删除对话？"
+        closeLabel="取消删除"
+        small
+        elevated
+        onClose={() => {
+          if (!deletingConversation) setPendingDeleteId(null);
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={deletingConversation}
+              onClick={() => setPendingDeleteId(null)}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              className="agent-danger-button"
+              disabled={deletingConversation}
+              onClick={() => {
+                if (pendingDeleteId) void removeConversation(pendingDeleteId);
+              }}
+            >
+              {deletingConversation ? "删除中…" : "确认删除"}
+            </button>
+          </>
+        }
+      >
+        <div className="agent-delete-confirm">
+          <p>
+            将永久删除对话
+            <strong>
+              “
+              {conversations.find((item) => item.id === pendingDeleteId)?.title ??
+                "未命名对话"}
+              ”
+            </strong>
+            及其历史消息。
+          </p>
+          <span>此操作无法撤销。</span>
+        </div>
+      </CmsModal>
     </section>
   );
 }

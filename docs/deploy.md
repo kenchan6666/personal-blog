@@ -59,7 +59,7 @@ Set these values in `deployment/.env` before using the Agent tab:
 
 - `UNI_API_KEY`: your UniAPI key.
 - `UNI_API_BASE=https://api.uniapi.io`.
-- `VIOLA_AGENT_MODEL=gemini-2.0-flash` (change this only when UniAPI uses a
+- `VIOLA_AGENT_MODEL=gemini-2.5-flash` (change this only when UniAPI uses a
   different exact model slug).
 - `AGENT_INTERNAL_TOKEN`: a random secret used by FastAPI when calling Viola.
 - `AGENT_SERVICE_TOKEN`: a different random secret used by the Portfolio MCP

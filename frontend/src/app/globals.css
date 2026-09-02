@@ -1324,6 +1324,10 @@ html.is-locale-hold .article-page {
     transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+.cms-modal-panel.is-small {
+  width: min(28rem, 100%);
+}
+
 .cms-modal-root.is-open .cms-modal-scrim {
   opacity: 1;
 }
@@ -2982,6 +2986,40 @@ html[data-theme="dark"] .ambient-orb {
   padding: 0.35rem;
   color: var(--text-muted);
   opacity: 0;
+}
+
+.agent-delete-confirm {
+  padding: 0.35rem 0.1rem 0.6rem;
+}
+
+.agent-delete-confirm p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.agent-delete-confirm strong {
+  color: var(--text-primary);
+}
+
+.agent-delete-confirm span {
+  display: block;
+  margin-top: 0.55rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.agent-danger-button {
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-control);
+  color: white;
+  background: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.agent-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .agent-conversation-item:hover .agent-delete-mini,
