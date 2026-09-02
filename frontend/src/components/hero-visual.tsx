@@ -1,4 +1,5 @@
 import { mediaUrl, type HeroVisual as HeroVisualConfig } from "@/lib/api";
+import { ContentImage } from "./content-image";
 
 type Props = {
   visual?: HeroVisualConfig | null;
@@ -11,10 +12,17 @@ export function HeroVisual({ visual }: Props) {
     const blur = Math.max(0, visual.blur || 0);
     return (
       <div className="hero-photo">
-        <img
+        <ContentImage
           src={src}
           alt=""
+          width={1600}
+          height={1200}
+          sizes="(max-width: 1024px) 92vw, 46vw"
+          priority
+          className="hero-photo-img"
           style={{
+            width: "auto",
+            height: "auto",
             transform: `translate(${(visual.posX - 50) * 0.4}%, ${(visual.posY - 50) * 0.4}%) scale(${scale})`,
             filter: blur ? `blur(${blur}px)` : undefined,
           }}

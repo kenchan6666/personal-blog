@@ -3,6 +3,8 @@ import { AdminLoginForm } from "@/components/admin-login-form";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLoginPage({
   params,
 }: {

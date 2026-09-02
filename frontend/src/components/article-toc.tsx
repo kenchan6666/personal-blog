@@ -10,6 +10,7 @@ type Props = {
 
 export function ArticleToc({ headings, label }: Props) {
   const [active, setActive] = useState(headings[0]?.id ?? "");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const nodes = headings
@@ -32,9 +33,8 @@ export function ArticleToc({ headings, label }: Props) {
     return () => observer.disconnect();
   }, [headings]);
 
-  return (
-    <nav className="article-toc" aria-label={label}>
-      <p className="article-toc-label">{label}</p>
+  function HeadingList({ onPick }: { onPick?: () => void }) {
+    return (
       <ol>
         {headings.map((heading) => (
           <li
@@ -44,12 +44,34 @@ export function ArticleToc({ headings, label }: Props) {
             <a
               href={`#${heading.id}`}
               className={active === heading.id ? "is-active" : undefined}
+              onClick={onPick}
             >
               {heading.text}
             </a>
           </li>
         ))}
       </ol>
-    </nav>
+    );
+  }
+
+  return (
+    <div className="article-toc-slot">
+      <nav className="article-toc-mobile" aria-label={label}>
+        <button
+          type="button"
+          className="article-toc-mobile-toggle"
+          aria-expanded={open}
+          onClick={() => setOpen((value) => !value)}
+        >
+          <span>{label}</span>
+          <span aria-hidden>{open ? "–" : "+"}</span>
+        </button>
+        {open ? <HeadingList onPick={() => setOpen(false)} /> : null}
+      </nav>
+      <nav className="article-toc" aria-label={label}>
+        <p className="article-toc-label">{label}</p>
+        <HeadingList />
+      </nav>
+    </div>
   );
 }

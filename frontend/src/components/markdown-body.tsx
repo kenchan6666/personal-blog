@@ -8,7 +8,8 @@ import {
   isSafeMarkdownImageUrl,
   liftReadmeHtmlImages,
 } from "@/lib/readme-html";
-import { MermaidOrPre } from "./mermaid-diagram";
+import { ContentImage } from "./content-image";
+import { HighlightedPre } from "./highlighted-pre";
 
 function headingText(children: ReactNode): string {
   return Array.isArray(children)
@@ -59,15 +60,12 @@ export function MarkdownBody({ source }: { source: string }) {
     img: ({ src, alt }) => {
       const url = typeof src === "string" ? src.trim() : "";
       if (!isSafeMarkdownImageUrl(url)) return null;
-      return (
-        <img
-          src={url}
-          alt={alt ?? ""}
-          className={isBadgeImage(url) ? "md-badge" : undefined}
-        />
-      );
+      if (isBadgeImage(url)) {
+        return <img src={url} alt={alt ?? ""} className="md-badge" />;
+      }
+      return <ContentImage src={url} alt={alt ?? ""} className="md-image" />;
     },
-    pre: MermaidOrPre,
+    pre: HighlightedPre,
   };
 
   return (

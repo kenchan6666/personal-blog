@@ -3,6 +3,8 @@ import { AdminDashboard } from "@/components/admin-dashboard";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminPage({
   params,
 }: {

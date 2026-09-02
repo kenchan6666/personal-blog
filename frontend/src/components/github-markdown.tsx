@@ -3,7 +3,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { isBadgeImage, liftReadmeHtmlImages } from "@/lib/readme-html";
-import { MermaidOrPre } from "./mermaid-diagram";
+import { ContentImage } from "./content-image";
+import { HighlightedPre } from "./highlighted-pre";
 
 type Props = {
   source: string;
@@ -41,15 +42,12 @@ export function GithubMarkdown({ source, repoFullName, refName }: Props) {
           img: ({ src, alt }) => {
             const url = typeof src === "string" ? src : "";
             if (!url) return null;
-            return (
-              <img
-                src={url}
-                alt={alt ?? ""}
-                className={isBadgeImage(url) ? "md-badge" : undefined}
-              />
-            );
+            if (isBadgeImage(url)) {
+              return <img src={url} alt={alt ?? ""} className="md-badge" />;
+            }
+            return <ContentImage src={url} alt={alt ?? ""} className="md-image" />;
           },
-          pre: MermaidOrPre,
+          pre: HighlightedPre,
         }}
       >
         {markdown}

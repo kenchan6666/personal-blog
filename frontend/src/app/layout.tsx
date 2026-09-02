@@ -5,6 +5,7 @@ import {
   Noto_Sans_TC,
   Space_Grotesk,
 } from "next/font/google";
+import { ThemeScript } from "@/components/theme-script";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -54,9 +55,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="zh-Hant"
+      suppressHydrationWarning
       className={`${spaceGrotesk.variable} ${notoSansTC.variable} ${notoSansSC.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full">
+        <ThemeScript />
         <div className="ambient" aria-hidden>
           <span className="ambient-orb ambient-orb-a" />
           <span className="ambient-orb ambient-orb-b" />

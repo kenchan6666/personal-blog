@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { mermaidSourceFromPre } from "@/lib/mermaid-block";
+import { useInView } from "@/lib/use-in-view";
+import { useResolvedTheme } from "@/lib/use-resolved-theme";
 
 type Props = {
   source: string;
@@ -11,16 +13,7 @@ let mermaidReady: Promise<typeof import("mermaid").default> | null = null;
 
 function loadMermaid() {
   if (!mermaidReady) {
-    mermaidReady = import("mermaid").then((mod) => {
-      const mermaid = mod.default;
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "neutral",
-        securityLevel: "strict",
-        fontFamily: "inherit",
-      });
-      return mermaid;
-    });
+    mermaidReady = import("mermaid").then((mod) => mod.default);
   }
   return mermaidReady;
 }
@@ -28,10 +21,13 @@ function loadMermaid() {
 export function MermaidDiagram({ source }: Props) {
   const reactId = useId().replace(/[^a-zA-Z0-9]/g, "");
   const nonce = useRef(0);
+  const { ref, inView } = useInView<HTMLDivElement>();
+  const theme = useResolvedTheme();
   const [svg, setSvg] = useState("");
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
+    if (!inView) return;
     let cancelled = false;
     const chart = source.trim();
     setFailed(false);
@@ -40,7 +36,15 @@ export function MermaidDiagram({ source }: Props) {
 
     const renderId = `mermaid-${reactId}-${++nonce.current}`;
     void loadMermaid()
-      .then((mermaid) => mermaid.render(renderId, chart))
+      .then((mermaid) => {
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: theme === "dark" ? "dark" : "neutral",
+          securityLevel: "strict",
+          fontFamily: "inherit",
+        });
+        return mermaid.render(renderId, chart);
+      })
       .then(({ svg: next }) => {
         if (!cancelled) setSvg(next);
       })
@@ -51,7 +55,7 @@ export function MermaidDiagram({ source }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [source, reactId]);
+  }, [inView, reactId, source, theme]);
 
   if (failed) {
     return (
@@ -61,12 +65,16 @@ export function MermaidDiagram({ source }: Props) {
     );
   }
 
-  if (!svg) {
-    return <div className="mermaid-wrap mermaid-pending" aria-hidden />;
-  }
-
   return (
-    <div className="mermaid-wrap" dangerouslySetInnerHTML={{ __html: svg }} />
+    <div
+      ref={ref}
+      className={`mermaid-wrap${svg ? "" : " mermaid-pending"}`}
+      aria-hidden={!svg}
+    >
+      {svg ? (
+        <div dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : null}
+    </div>
   );
 }
 

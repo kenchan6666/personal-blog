@@ -141,15 +141,23 @@ export class PublicApiError extends Error {
   }
 }
 
+const PUBLIC_REVALIDATE = 60;
+
 async function publicJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }
 
 async function publicJsonOrNull<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
   if (res.status === 404) return null;
+  if (!res.ok) throw new PublicApiError(res.status);
+  return (await res.json()) as T;
+}
+
+async function publicJsonLive<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }
@@ -822,7 +830,7 @@ export async function fetchPublicComments(
   kind: "articles" | "journals",
   slug: string,
 ): Promise<PublicComment[]> {
-  return publicJson<PublicComment[]>(
+  return publicJsonLive<PublicComment[]>(
     `${API_BASE}/api/public/${kind}/${encodeURIComponent(slug)}/comments`,
   );
 }

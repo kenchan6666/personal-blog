@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
+import { ThemeToggle } from "./theme-toggle";
 
 type Props = {
   locale: Locale;
@@ -12,16 +13,21 @@ type Props = {
 
 export function SiteChrome({ locale, dict }: Props) {
   const pathname = usePathname();
-  if (pathname.includes("/admin")) return null;
+  const admin = pathname.includes("/admin");
 
   return (
     <div className="site-chrome">
-      <Link href={`/${locale}/search`} className="site-chrome-link">
-        {dict.nav.search}
-      </Link>
-      <Link href={`/${locale}/about`} className="site-chrome-link">
-        {dict.nav.about}
-      </Link>
+      {admin ? null : (
+        <>
+          <Link href={`/${locale}/search`} className="site-chrome-link">
+            {dict.nav.search}
+          </Link>
+          <Link href={`/${locale}/about`} className="site-chrome-link">
+            {dict.nav.about}
+          </Link>
+        </>
+      )}
+      <ThemeToggle dict={dict} />
     </div>
   );
 }

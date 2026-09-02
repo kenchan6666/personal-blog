@@ -1,4 +1,5 @@
 import { mediaUrl } from "@/lib/api";
+import { ContentImage } from "./content-image";
 
 type ProfileLink = {
   label: string;
@@ -63,12 +64,14 @@ export function ProfileSection({ content }: Props) {
         </h2>
         {avatarSrc ? (
           <div className="mb-10">
-            <img
+            <ContentImage
               src={avatarSrc}
               alt=""
               width={128}
               height={128}
+              sizes="128px"
               className="avatar-frame h-32 w-32 object-cover"
+              style={{ width: "8rem", height: "8rem" }}
             />
           </div>
         ) : null}

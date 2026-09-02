@@ -28,6 +28,10 @@ const zhHant = {
   localeName: "繁中",
   openMenu: "打開選單",
   closeMenu: "關閉選單",
+  theme: {
+    toDark: "切換為深色",
+    toLight: "切換為淺色",
+  },
   loadingPage: "載入中…",
   errorPage: "載入失敗，請再試一次。",
   retry: "重試",
@@ -296,6 +300,10 @@ const en = {
   localeName: "EN",
   openMenu: "Open menu",
   closeMenu: "Close menu",
+  theme: {
+    toDark: "Switch to dark",
+    toLight: "Switch to light",
+  },
   loadingPage: "Loading…",
   errorPage: "Something went wrong. Please try again.",
   retry: "Retry",
@@ -541,6 +549,10 @@ const zhHans = {
   localeName: "简中",
   openMenu: "打开菜单",
   closeMenu: "关闭菜单",
+  theme: {
+    toDark: "切换为深色",
+    toLight: "切换为浅色",
+  },
   loadingPage: "加载中…",
   errorPage: "加载失败，请再试一次。",
   retry: "重试",
