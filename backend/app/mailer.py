@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+import httpx
+
 
 class Mailer(Protocol):
     async def send_otp(self, *, to: str, code: str) -> None: ...
@@ -60,8 +62,50 @@ class SmtpMailer:
         await asyncio.to_thread(_send)
 
 
+class ResendMailer:
+    """HTTPS mail. Works from GCP because it uses 443, not SMTP 587."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        from_addr: str,
+        client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self.api_key = api_key
+        self.from_addr = from_addr
+        self.client = client
+
+    async def send_otp(self, *, to: str, code: str) -> None:
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "from": self.from_addr,
+            "to": [to],
+            "subject": "Your portfolio admin login code",
+            "text": f"Your one-time code is: {code}\n\nIt expires shortly.",
+        }
+        if self.client is not None:
+            response = await self.client.post(
+                "https://api.resend.com/emails",
+                headers=headers,
+                json=payload,
+            )
+        else:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post(
+                    "https://api.resend.com/emails",
+                    headers=headers,
+                    json=payload,
+                )
+        if response.status_code >= 400:
+            raise RuntimeError(f"resend_{response.status_code}: {response.text}")
+
+
 class SmtpThenConsoleMailer:
-    """Try SMTP, then print OTP. GCP Compute Engine blocks outbound 25/465/587."""
+    """Try the primary mailer, then print OTP so Owner can still sign in."""
 
     def __init__(self, smtp: Mailer, console: Mailer | None = None) -> None:
         self.smtp = smtp
@@ -72,10 +116,8 @@ class SmtpThenConsoleMailer:
             await self.smtp.send_otp(to=to, code=code)
         except Exception as exc:
             print(
-                "[mail] SMTP failed "
+                "[mail] send failed "
                 f"({type(exc).__name__}: {exc}). "
-                "GCP Compute Engine blocks outbound TCP 25/465/587, "
-                "so Gmail SMTP from a VM usually times out. "
                 "OTP is printed below so Owner can still sign in.",
                 flush=True,
             )

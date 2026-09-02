@@ -28,9 +28,11 @@ class Settings(BaseSettings):
     smtp_user: str = "ynchanhk@gmail.com"
     smtp_password: str = ""
     smtp_from: str = "ynchanhk@gmail.com"
-    # smtp | console — default console. GCP VMs block outbound 25/465/587,
-    # so smtp.gmail.com:587 times out; SmtpThenConsoleMailer prints OTP then.
+    # console | smtp | resend
+    # resend = HTTPS to api.resend.com (works on GCP). smtp = Gmail, often
+    # fails from Compute Engine IPs; OTP still prints to logs on failure.
     mail_backend: str = "console"
+    resend_api_key: str = ""
 
     cors_origins: str = (
         "http://localhost:3000,http://localhost:3001,http://localhost:3002,"

@@ -37,7 +37,7 @@ _Avoid_: tag（作实体名时）, topic, label, 栏目
 _Avoid_: message, review, 未审核即公开
 
 **Owner**:
-唯一可进入后台、修改全部公开内容的人。以邮箱验证码登录（SMTP 发信）；非密码登录。
+唯一可进入后台、修改全部公开内容的人。以邮箱验证码登录（生产用 Resend HTTPS 发信；SMTP 仅作本机备选）；非密码登录。
 _Avoid_: Admin（指人时）, user（泛称）
 
 **SourceRepo**:

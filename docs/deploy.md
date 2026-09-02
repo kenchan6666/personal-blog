@@ -39,7 +39,8 @@ Stop: `.\deployment\stop.ps1 --prod` (or `bash deployment/stop.sh --prod`).
 | --- | --- | --- | --- |
 | `OWNER_EMAIL` | Your allowlisted mailbox | yes | yes |
 | `MAIL_BACKEND=console` | — OTP appears in API logs | yes (dev/demo) | — |
-| `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | Gmail **App Password** | optional; **GCP blocks outbound 25/465/587**, so `smtp.gmail.com` from this VM will time out. `MAIL_BACKEND=smtp` still **prints the OTP in API logs** if send fails. | — |
+| `MAIL_BACKEND=resend` + `RESEND_API_KEY` + `SMTP_FROM` | [Resend](https://resend.com) API key; verify `kenchan0522.blog` and send from e.g. `ken@kenchan0522.blog` | yes, if you want the OTP in the inbox | — |
+| `SMTP_USER` / `SMTP_PASSWORD` | Gmail **App Password** | optional; consumer Gmail SMTP from this VM usually fails. OTP still prints to API logs. | — |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub → Settings → Developer settings → OAuth Apps | no | yes |
 | `GITHUB_OAUTH_CALLBACK_URL` | `{PUBLIC_ORIGIN}/api/auth/github/callback` | no | yes |
 | `GITHUB_OAUTH_SUCCESS_URL` | `{PUBLIC_ORIGIN}/zh-Hant/admin` | no | yes |
@@ -52,8 +53,8 @@ Never commit `deployment/.env`. Rotate any secret that has been pasted into chat
 ## Owner login on the deployed site
 
 1. Open `/zh-Hant/admin/login`.
-2. If `MAIL_BACKEND=console` (recommended on GCP), run `docker compose -f docker-compose.prod.yml logs api` and copy the `[otp] ... code=`.
-3. If `MAIL_BACKEND=smtp`, Gmail still usually cannot send from Compute Engine (outbound 587 blocked). On timeout the API prints the same `[otp]` line — copy it from logs. A real inbox send needs an HTTP mail API (Resend / SendGrid), not SMTP from this VM.
+2. If `MAIL_BACKEND=resend` and the domain is verified, the code arrives in `OWNER_EMAIL`.
+3. If `MAIL_BACKEND=console`, or Resend/SMTP fails, run `docker compose -f docker-compose.prod.yml logs api` and copy the `[otp] ... code=`.
 4. After login, CMS and GitHub connect use `/api` on the same host.
 
 ## TLS

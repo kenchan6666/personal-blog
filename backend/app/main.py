@@ -28,7 +28,13 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
-from app.mailer import ConsoleMailer, Mailer, SmtpMailer, SmtpThenConsoleMailer
+from app.mailer import (
+    ConsoleMailer,
+    Mailer,
+    ResendMailer,
+    SmtpMailer,
+    SmtpThenConsoleMailer,
+)
 from app.models import (
     ABOUT_KINDS,
     LOCALES,
@@ -194,10 +200,26 @@ def create_app(
     translator: MachineTranslator | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
+    backend = settings.mail_backend.lower()
     if mailer is not None:
         resolved_mailer: Mailer = mailer
-    elif settings.mail_backend.lower() == "console":
+    elif backend == "console":
         resolved_mailer = ConsoleMailer()
+    elif backend == "resend":
+        if not settings.resend_api_key.strip():
+            print(
+                "[mail] MAIL_BACKEND=resend but RESEND_API_KEY is empty; using console",
+                flush=True,
+            )
+            resolved_mailer = ConsoleMailer()
+        else:
+            resolved_mailer = SmtpThenConsoleMailer(
+                ResendMailer(
+                    api_key=settings.resend_api_key,
+                    from_addr=settings.smtp_from,
+                ),
+                ConsoleMailer(),
+            )
     else:
         resolved_mailer = SmtpThenConsoleMailer(
             SmtpMailer(
@@ -256,10 +278,10 @@ def create_app(
             f"[mail] backend={settings.mail_backend} mailer={type(resolved_mailer).__name__}",
             flush=True,
         )
-        if settings.mail_backend.lower() != "console":
+        if backend == "smtp":
             print(
-                "[mail] SMTP from GCP Compute Engine often times out "
-                "(outbound 25/465/587 blocked); OTP will print to logs on failure.",
+                "[mail] Gmail SMTP from Compute Engine often fails; "
+                "OTP prints to logs on timeout. Use MAIL_BACKEND=resend to send.",
                 flush=True,
             )
         print(
