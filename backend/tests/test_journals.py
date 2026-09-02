@@ -134,11 +134,13 @@ async def test_published_journal_appears_in_public_list_and_detail(
     assert [item["slug"] for item in zh_list.json()] == ["monday-notes"]
     assert zh_list.json()[0]["title"] == "週一隨筆"
     assert "relatedProject" not in zh_list.json()[0]
+    assert zh_list.json()[0]["wordCount"] > 0
+    assert zh_list.json()[0]["publishedAt"]
 
     en_detail = await client.get(
         "/api/public/journals/monday-notes", params={"locale": "en"}
     )
     assert en_detail.status_code == 200
-    assert en_detail.json()["title"] == ""
+    assert en_detail.json()["title"] == "週一隨筆"
     assert en_detail.json()["body"] == "## Today\nA little life"
     assert "relatedProject" not in en_detail.json()

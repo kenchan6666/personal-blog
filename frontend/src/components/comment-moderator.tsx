@@ -9,6 +9,7 @@ import {
   replyOwnerComment,
   type OwnerComment,
 } from "@/lib/api";
+import { CmsCard } from "./cms-card";
 
 type Props = {
   dict: Dictionary;
@@ -55,20 +56,32 @@ export function CommentModerator({ dict }: Props) {
     }
   }
 
+  const pending = comments.filter((item) => item.status === "pending").length;
+  const sorted = [...comments].sort((left, right) => {
+    if (left.status === right.status) return 0;
+    return left.status === "pending" ? -1 : 1;
+  });
+
   return (
-    <section className="mt-14">
-      <h2 className="display-font mb-6 text-xl font-bold">{a.commentModerator}</h2>
+    <CmsCard
+      title={a.commentModerator}
+      action={
+        pending > 0 ? (
+          <span className="status-pill">{pending} {a.pending}</span>
+        ) : null
+      }
+    >
       {error ? (
-        <p className="mb-3 text-sm text-[var(--accent-cta)]">{error}</p>
+        <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
       ) : null}
       {comments.length === 0 ? (
         <p className="text-sm text-[var(--text-muted)]">{a.noComments}</p>
       ) : (
         <ul className="space-y-4">
-          {comments.map((comment) => (
+          {sorted.map((comment) => (
             <li
               key={comment.id}
-              className="rounded-[var(--radius-card)] border border-white/15 p-4"
+              className="rounded-[var(--radius-card)] border border-[var(--hairline)] p-4"
             >
               <p className="text-sm text-[var(--text-muted)]">
                 {comment.targetType}/{comment.targetSlug} · {comment.status}
@@ -103,7 +116,7 @@ export function CommentModerator({ dict }: Props) {
               </div>
               <div className="mt-3 flex gap-2">
                 <input
-                  className="flex-1 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                  className="field field-tight flex-1"
                   value={replies[comment.id] ?? ""}
                   onChange={(e) =>
                     setReplies((prev) => ({
@@ -125,6 +138,6 @@ export function CommentModerator({ dict }: Props) {
           ))}
         </ul>
       )}
-    </section>
+    </CmsCard>
   );
 }

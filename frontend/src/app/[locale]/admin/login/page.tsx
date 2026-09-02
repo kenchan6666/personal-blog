@@ -14,7 +14,7 @@ export default async function AdminLoginPage({
   const dict = getDictionary(locale);
 
   return (
-    <section className="flex min-h-screen items-center justify-center px-6 py-20">
+    <section className="flex min-h-screen items-center justify-center px-5 py-20">
       <AdminLoginForm locale={locale} dict={dict} />
     </section>
   );

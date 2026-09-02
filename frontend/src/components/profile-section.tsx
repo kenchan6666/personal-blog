@@ -48,19 +48,14 @@ function Block({
 export function ProfileSection({ content }: Props) {
   const avatarSrc = mediaUrl(content.avatarUrl);
   const hasBody =
-    avatarSrc ||
-    content.bio ||
-    content.skills ||
-    content.experience ||
-    content.publicEmail ||
-    content.links.length > 0;
+    avatarSrc || content.bio || content.skills || content.experience;
 
   if (!hasBody) return null;
 
   return (
     <section
       id="profile"
-      className="border-t border-white/10 px-6 py-16 sm:px-10 lg:px-14"
+      className="hairline-t px-5 py-14 sm:px-10 sm:py-16 lg:px-14"
     >
       <div className="mx-auto max-w-3xl">
         <h2 className="display-font mb-10 text-3xl font-bold tracking-tight">
@@ -80,37 +75,6 @@ export function ProfileSection({ content }: Props) {
         <Block label={content.bioLabel}>{content.bio}</Block>
         <Block label={content.skillsLabel}>{content.skills}</Block>
         <Block label={content.experienceLabel}>{content.experience}</Block>
-        <Block label={content.emailLabel}>
-          {content.publicEmail ? (
-            <a
-              href={`mailto:${content.publicEmail}`}
-              className="text-[var(--accent-link)] hover:underline"
-            >
-              {content.publicEmail}
-            </a>
-          ) : null}
-        </Block>
-        {content.links.length > 0 ? (
-          <div>
-            <h3 className="mb-3 text-xs font-semibold tracking-[0.18em] text-[var(--accent-link)] uppercase">
-              {content.linksLabel}
-            </h3>
-            <ul className="flex flex-col gap-2">
-              {content.links.map((link) => (
-                <li key={`${link.order}-${link.url}`}>
-                  <a
-                    href={link.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[var(--text-primary)] underline decoration-white/20 underline-offset-4 transition-colors hover:text-[var(--accent-link)] hover:decoration-[var(--accent-link)]"
-                  >
-                    {link.label || link.url}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
       </div>
     </section>
   );

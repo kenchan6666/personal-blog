@@ -16,7 +16,9 @@ def test_prod_compose_defines_frontend_api_mongo_redis_nginx():
 
 
 def test_nginx_proxies_site_and_api():
-    conf = (ROOT / "deploy" / "nginx.conf").read_text(encoding="utf-8")
+    conf = (ROOT / "deployment" / "nginx.conf").read_text(encoding="utf-8")
+    assert "location = /" in conf
+    assert "return 302 /zh-Hant" in conf
     assert "proxy_pass http://api:8000/api/" in conf
     assert "proxy_pass http://web:3000" in conf
     assert "Authorization" in conf

@@ -153,3 +153,37 @@ async def test_draft_project_source_is_not_browsable(client, mailer, settings):
 
     source = await client.get("/api/public/projects/wip/source")
     assert source.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_missing_readme_still_returns_source_overview(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    await _connect_github(client, token)
+    await _published_project_with_repo(
+        client,
+        token,
+        full_name="kenchan6666/empty-box",
+        slug="empty-box",
+    )
+
+    source = await client.get("/api/public/projects/empty-box/source")
+    assert source.status_code == 200
+    body = source.json()
+    assert body["readme"] == {"path": "", "content": ""}
+    assert [item["name"] for item in body["tree"]] == ["src"]
+
+
+@pytest.mark.asyncio
+async def test_public_source_allows_127_browser_origin(client):
+    response = await client.options(
+        "/api/public/projects",
+        headers={
+            "Origin": "http://127.0.0.1:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.status_code == 200
+    assert (
+        response.headers.get("access-control-allow-origin")
+        == "http://127.0.0.1:3000"
+    )

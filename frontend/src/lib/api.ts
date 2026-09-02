@@ -3,7 +3,7 @@ const PUBLIC_API =
 const API_BASE =
   typeof window === "undefined"
     ? (process.env.API_INTERNAL_URL ?? PUBLIC_API)
-    : PUBLIC_API;
+    : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "");
 
 export const SESSION_KEY = "portfolio_session_token";
 
@@ -29,6 +29,11 @@ export type OwnerSite = {
   experience: Localized;
   publicEmail: string;
   avatarUrl: string;
+  heroVisualUrl: string;
+  heroVisualPosX: number;
+  heroVisualPosY: number;
+  heroVisualScale: number;
+  heroVisualBlur: number;
   links: OwnerLink[];
 };
 
@@ -38,6 +43,14 @@ export type PublicLink = {
   order: number;
 };
 
+export type HeroVisual = {
+  url: string;
+  posX: number;
+  posY: number;
+  scale: number;
+  blur: number;
+};
+
 export type PublicSite = {
   brand: string;
   hero: {
@@ -45,6 +58,7 @@ export type PublicSite = {
     support: string;
     ctaProjects: string;
     ctaArticles: string;
+    visual?: HeroVisual | null;
   };
   profile: {
     bio: string;
@@ -72,6 +86,11 @@ export function emptyOwnerSite(): OwnerSite {
     experience: emptyLocalized(),
     publicEmail: "",
     avatarUrl: "",
+    heroVisualUrl: "",
+    heroVisualPosX: 50,
+    heroVisualPosY: 50,
+    heroVisualScale: 100,
+    heroVisualBlur: 0,
     links: [],
   };
 }
@@ -142,7 +161,7 @@ export async function fetchPublicSite(locale: string): Promise<PublicSite | null
   try {
     const res = await fetch(
       `${API_BASE}/api/public/site?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return null;
     return (await res.json()) as PublicSite;
@@ -191,6 +210,30 @@ export async function uploadOwnerAvatar(
   return (await res.json()) as { avatarUrl: string };
 }
 
+export async function uploadOwnerHeroVisual(
+  token: string,
+  file: File,
+): Promise<OwnerSite> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/owner/hero-visual`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerSite;
+}
+
+export async function clearOwnerHeroVisual(token: string): Promise<OwnerSite> {
+  const res = await fetch(`${API_BASE}/api/owner/hero-visual`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerSite;
+}
+
 export type SourceRepo = {
   fullName: string;
   owner: string;
@@ -198,6 +241,7 @@ export type SourceRepo = {
   private: boolean;
   htmlUrl: string;
   defaultBranch: string;
+  description?: string;
 };
 
 export type OwnerProject = {
@@ -239,7 +283,7 @@ export async function fetchPublicProjects(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/projects?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return [];
     return (await res.json()) as PublicProject[];
@@ -255,7 +299,7 @@ export async function fetchPublicProject(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return null;
     return (await res.json()) as PublicProject;
@@ -434,6 +478,9 @@ export type PublicArticle = {
   body: string;
   order: number;
   relatedProject: RelatedProject | null;
+  publishedAt: string;
+  wordCount: number;
+  readingMinutes: number;
 };
 
 export function emptyOwnerArticle(): OwnerArticle {
@@ -455,7 +502,7 @@ export async function fetchPublicArticles(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/articles?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return [];
     return (await res.json()) as PublicArticle[];
@@ -471,7 +518,7 @@ export async function fetchPublicArticle(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/articles/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return null;
     return (await res.json()) as PublicArticle;
@@ -551,6 +598,9 @@ export type PublicJournal = {
   summary: string;
   body: string;
   order: number;
+  publishedAt: string;
+  wordCount: number;
+  readingMinutes: number;
 };
 
 export function emptyOwnerJournal(): OwnerJournal {
@@ -571,7 +621,7 @@ export async function fetchPublicJournals(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/journals?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return [];
     return (await res.json()) as PublicJournal[];
@@ -587,7 +637,7 @@ export async function fetchPublicJournal(
   try {
     const res = await fetch(
       `${API_BASE}/api/public/journals/${encodeURIComponent(slug)}?locale=${encodeURIComponent(locale)}`,
-      { next: { revalidate: 30 } },
+      { cache: "no-store" },
     );
     if (!res.ok) return null;
     return (await res.json()) as PublicJournal;

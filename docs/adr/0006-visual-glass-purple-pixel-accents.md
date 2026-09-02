@@ -1,5 +1,7 @@
 # Visual direction: Digicrypt-like purple hero, glass cards, pixel as signature
 
-Public UI leads with a **deep purple gradient + geometric depth + bold sans hero** mood (see `docs/design/references/hero-mood-digicrypt-purple.png`): left copy / right visual, rounded coral–pink CTAs, high contrast white type. **Frosted-glass + rounded cards** carry content sections and the sidebar. **Pixel art/effects are accents only** (avatar frame, small mascot, optional SFX, micro transitions) — not full-site pixel chrome. Admin shares the same language with denser layout.
+**Status:** superseded by ADR-0009.
 
-Full tokens, layout rules, and do/don't: `docs/design/VISUAL.md`.
+Public UI originally led with a deep purple gradient, white type, and frosted-glass cards, using `docs/design/references/hero-mood-digicrypt-purple.png` as the mood board. Pixel art remained accents only. Replaced because the Owner asked for a light, flat, Gaussian-blur liquid-glass direction that the previous dark shell could not express without fighting its own tokens.
+
+Full tokens, layout rules, and do/don't lived in `docs/design/VISUAL.md` at the time of this decision; that file now describes ADR-0009.

@@ -15,6 +15,11 @@ class GitHubBrowseError(Exception):
     pass
 
 
+def is_readme_filename(name: str) -> bool:
+    lower = name.lower()
+    return lower == "readme" or lower.startswith("readme.")
+
+
 class GitHubClient(Protocol):
     def authorization_url(self, *, state: str) -> str: ...
 
@@ -89,6 +94,7 @@ class RecordingGitHub:
                 "private": False,
                 "htmlUrl": "https://github.com/kenchan6666/personal-blog",
                 "defaultBranch": "master",
+                "description": "Job-seeking portfolio",
             },
             {
                 "fullName": "kenchan6666/secret-lab",
@@ -97,6 +103,16 @@ class RecordingGitHub:
                 "private": True,
                 "htmlUrl": "https://github.com/kenchan6666/secret-lab",
                 "defaultBranch": "main",
+                "description": "",
+            },
+            {
+                "fullName": "kenchan6666/empty-box",
+                "owner": "kenchan6666",
+                "name": "empty-box",
+                "private": False,
+                "htmlUrl": "https://github.com/kenchan6666/empty-box",
+                "defaultBranch": "main",
+                "description": "",
             },
         ]
 
@@ -107,10 +123,15 @@ class RecordingGitHub:
                 "src/app.py": "print('hi')\n",
             },
             "feature": {
-                "README.md": "# Feature\nnext\n",
+                "Readme.md": "# Feature\nnext\n",
                 "src/app.py": "print('feat')\n",
             },
-        }
+        },
+        "kenchan6666/empty-box": {
+            "main": {
+                "src/app.py": "print('empty')\n",
+            },
+        },
     }
 
     async def repo_is_private(
@@ -141,9 +162,11 @@ class RecordingGitHub:
         self, *, access_token: str, owner: str, name: str, ref: str
     ) -> dict[str, str]:
         files = self._files(owner, name, ref)
-        for filename in ("README.md", "README", "readme.md"):
-            if filename in files:
-                return {"path": filename, "content": files[filename]}
+        for path, content in files.items():
+            if "/" in path:
+                continue
+            if is_readme_filename(path):
+                return {"path": path, "content": content}
         raise GitHubBrowseError("not_found")
 
     async def list_tree(
@@ -254,6 +277,7 @@ class HttpGitHub:
                             "private": bool(item["private"]),
                             "htmlUrl": item["html_url"],
                             "defaultBranch": item.get("default_branch") or "main",
+                            "description": item.get("description") or "",
                         }
                     )
                 url = response.links.get("next", {}).get("url")
@@ -300,14 +324,33 @@ class HttpGitHub:
                 headers=self._headers(access_token),
                 params={"ref": ref},
             )
-        if response.status_code >= 400:
-            raise GitHubBrowseError("not_found")
-        payload = response.json()
-        raw = base64.b64decode(payload.get("content") or "")
-        return {
-            "path": str(payload.get("path") or "README.md"),
-            "content": raw.decode("utf-8", errors="replace"),
-        }
+        if response.status_code < 400:
+            payload = response.json()
+            raw = base64.b64decode(payload.get("content") or "")
+            return {
+                "path": str(payload.get("path") or "README.md"),
+                "content": raw.decode("utf-8", errors="replace"),
+            }
+        listing = await self._contents(access_token, owner, name, ref, "")
+        if isinstance(listing, list):
+            match = next(
+                (
+                    item
+                    for item in listing
+                    if is_readme_filename(str(item.get("name") or ""))
+                    and item.get("type") == "file"
+                ),
+                None,
+            )
+            if match is not None:
+                return await self.get_blob(
+                    access_token=access_token,
+                    owner=owner,
+                    name=name,
+                    ref=ref,
+                    path=str(match.get("path") or match.get("name")),
+                )
+        raise GitHubBrowseError("not_found")
 
     async def list_tree(
         self,

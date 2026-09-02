@@ -11,7 +11,6 @@ from app.config import Settings
 from app.github import RecordingGitHub
 from app.mailer import RecordingMailer
 from app.main import create_app
-from app.models import Article, Comment, Journal, Project, SiteProfile
 
 
 @pytest.fixture
@@ -32,10 +31,14 @@ def settings(tmp_path) -> Settings:
         smtp_password="test",
         smtp_from="ynchanhk@gmail.com",
         avatar_dir=str(tmp_path / "avatars"),
+        local_data_dir=str(tmp_path / "local"),
         github_client_id="test-client",
         github_client_secret="test-secret",
         github_oauth_callback_url="http://test/api/auth/github/callback",
         github_oauth_success_url="http://localhost:3000/zh-Hant/admin",
+        cors_origins=(
+            "http://localhost:3000,http://127.0.0.1:3000"
+        ),
     )
 
 
@@ -54,11 +57,7 @@ async def app(settings: Settings, mailer: RecordingMailer, github: RecordingGitH
     application = create_app(settings, mailer=mailer, github=github)
     async with LifespanManager(application):
         await application.state.redis.flushdb()
-        await SiteProfile.delete_all()
-        await Project.delete_all()
-        await Article.delete_all()
-        await Journal.delete_all()
-        await Comment.delete_all()
+        await application.state.store.delete_all()
         yield application
 
 

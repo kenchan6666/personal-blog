@@ -4,7 +4,7 @@ I need a job-seeking personal site that looks premium, shows who I am and what I
 
 ## Solution
 
-Build a Personal Portfolio: Next.js public + Owner admin UI, FastAPI/Beanie/Mongo system of record, Redis for OTP/session and GitHub API cache. Visitors see Published Profile, Projects, Journals, Articles, and moderated Comments. The Owner signs in with email OTP, manages all entities in the CMS, links SourceRepos via GitHub OAuth, and publishes when ready. Visual system follows Digicrypt-like purple glass (see `docs/design/VISUAL.md`).
+Build a Personal Portfolio: Next.js public + Owner admin UI, FastAPI/Beanie/Mongo system of record, Redis for OTP/session and GitHub API cache. Visitors see Published Profile, Projects, Journals, Articles, and moderated Comments. The Owner signs in with email OTP, manages all entities in the CMS, links SourceRepos via GitHub OAuth, and publishes when ready. Visual system follows light flat liquid glass (see `docs/design/VISUAL.md`, ADR-0009).
 
 ## Testing Seams
 
@@ -42,7 +42,7 @@ Build a Personal Portfolio: Next.js public + Owner admin UI, FastAPI/Beanie/Mong
 27. As a visitor, I do not want an in-site private messaging form, so that contact stays via Links and public email.
 28. As a visitor, I want Draft content to be invisible (404), so that unfinished work never leaks.
 29. As a visitor, I want image uploads limited to Profile avatar (other images via Markdown URLs), so that the media surface stays small.
-30. As a visitor, I want purple glass visuals with coral CTAs and restrained pixel accents, so that the site feels distinctive but professional.
+30. As a visitor, I want light liquid-glass visuals with coral CTAs and restrained pixel accents, so that the site feels distinctive but professional and easy to read.
 31. As a visitor, I want motion that aids hierarchy (hero entrance, glass hover, short route fade) and respects reduced-motion, so that polish does not harm accessibility.
 32. As the Owner, I want email OTP login to my allowlisted mailbox only, so that only I can administer the site.
 33. As the Owner, I want OTP codes delivered via SMTP from my configured mailbox, so that I can sign in without passwords.
@@ -74,7 +74,7 @@ Build a Personal Portfolio: Next.js public + Owner admin UI, FastAPI/Beanie/Mong
 - **GitHub:** OAuth App; public source browser via API (no full mirror) per ADR-0001; private tree/blob never proxied to visitors.
 - **Comments:** Journal + Article only; name+email; moderation required; Owner replies allowed — ADR-0007.
 - **Media:** Avatar upload only in v1; other images via Markdown URLs.
-- **Visual:** Tokens and Hero rules in `docs/design/VISUAL.md` / ADR-0006; pixel accents only.
+- **Visual:** Tokens and Hero rules in `docs/design/VISUAL.md` / ADR-0009 (supersedes ADR-0006); pixel accents only.
 - **Routes (public v1):** `/`, `/projects`, `/projects/[slug]`, `/articles`, `/articles/[slug]`, `/journals`, `/journals/[slug]`, locale switch, `/admin/*`. No standalone about page; no site DM form.
 - **API shape (conceptual):** versioned JSON under `/api/...` for public reads and Owner mutations; GitHub OAuth callback on backend; source browser endpoints scoped to Published public SourceRepos.
 
@@ -100,4 +100,4 @@ Build a Personal Portfolio: Next.js public + Owner admin UI, FastAPI/Beanie/Mong
 
 - Immediate follow-on after this spec: scaffold Next.js shell and land homepage Hero per `VISUAL.md` (static chrome; API wiring later).
 - Issue tracker: GitHub Issues; triage label `ready-for-agent`.
-- Design references: `docs/design/references/hero-mood-digicrypt-purple.png`.
+- Design references: Hero two-column + capsule CTA only from `docs/design/references/hero-mood-digicrypt-purple.png` (color temperature no longer applies; see ADR-0009).

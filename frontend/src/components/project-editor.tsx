@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Dictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 import {
   attachOwnerSourceRepo,
   createOwnerProject,
@@ -10,63 +12,17 @@ import {
   fetchOwnerProjects,
   getSessionToken,
   saveOwnerProject,
-  startGitHubOAuth,
-  type Localized,
   type OwnerProject,
   type SourceRepo,
 } from "@/lib/api";
+import { BilingualField } from "./bilingual-field";
+import { CmsCard, StatusPill } from "./cms-card";
+import { CmsModal } from "./cms-modal";
 
 type Props = {
+  locale: Locale;
   dict: Dictionary;
 };
-
-function BilingualField({
-  label,
-  value,
-  onChange,
-  multiline = false,
-}: {
-  label: string;
-  value: Localized;
-  onChange: (next: Localized) => void;
-  multiline?: boolean;
-}) {
-  return (
-    <fieldset className="mb-6">
-      <legend className="mb-2 text-sm font-semibold text-[var(--text-primary)]">
-        {label}
-      </legend>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {(["zh-Hant", "en"] as const).map((localeKey) => (
-          <label
-            key={localeKey}
-            className="block text-xs text-[var(--text-muted)]"
-          >
-            {localeKey}
-            {multiline ? (
-              <textarea
-                className="mt-1 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-                value={value[localeKey]}
-                onChange={(e) =>
-                  onChange({ ...value, [localeKey]: e.target.value })
-                }
-                rows={8}
-              />
-            ) : (
-              <input
-                className="mt-1 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-                value={value[localeKey]}
-                onChange={(e) =>
-                  onChange({ ...value, [localeKey]: e.target.value })
-                }
-              />
-            )}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
 
 function payloadOf(
   project: OwnerProject,
@@ -75,10 +31,50 @@ function payloadOf(
   return rest;
 }
 
-export function ProjectEditor({ dict }: Props) {
+function titleOf(project: OwnerProject, fallback: string) {
+  return project.title["zh-Hant"] || project.title.en || project.slug || fallback;
+}
+
+function slugFromName(name: string, taken: string[]) {
+  const base =
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "project";
+  let slug = base;
+  let n = 2;
+  while (taken.includes(slug)) {
+    slug = `${base}-${n}`;
+    n += 1;
+  }
+  return slug;
+}
+
+function projectFromRepo(
+  repo: SourceRepo,
+  taken: string[],
+  order: number,
+): OwnerProject {
+  const slug = slugFromName(repo.name, taken);
+  const summary = repo.description ?? "";
+  return {
+    ...emptyOwnerProject(),
+    slug,
+    order,
+    status: "published",
+    title: { "zh-Hant": repo.name, en: repo.name },
+    summary: { "zh-Hant": summary, en: summary },
+  };
+}
+
+export function ProjectEditor({ locale, dict }: Props) {
   const a = dict.admin;
   const [projects, setProjects] = useState<OwnerProject[]>([]);
   const [current, setCurrent] = useState<OwnerProject>(emptyOwnerProject());
+  const [pickedRepo, setPickedRepo] = useState<SourceRepo | null>(null);
+  const [step, setStep] = useState<"pick" | "form">("form");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -99,47 +95,55 @@ export function ProjectEditor({ dict }: Props) {
     const token = getSessionToken();
     if (!token) return;
     reload(token)
-      .then((list) => {
-        if (list[0]) setCurrent(list[0]);
-      })
       .catch(() => setError(a.errorGeneric))
       .finally(() => setLoading(false));
   }, [a.errorGeneric]);
 
-  function newProject() {
+  const filteredRepos = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return repos;
+    return repos.filter(
+      (repo) =>
+        repo.fullName.toLowerCase().includes(q) ||
+        (repo.description ?? "").toLowerCase().includes(q),
+    );
+  }, [query, repos]);
+
+  function openNew() {
     setCurrent(emptyOwnerProject());
+    setPickedRepo(null);
+    setQuery("");
     setMessage(null);
     setError(null);
+    setStep(githubReady ? "pick" : "form");
+    setOpen(true);
   }
 
-  async function onConnectGitHub() {
-    const token = getSessionToken();
-    if (!token) return;
-    setError(null);
-    try {
-      const { authorizationUrl } = await startGitHubOAuth(token);
-      window.location.href = authorizationUrl;
-    } catch {
-      setError(a.errorGeneric);
-    }
-  }
-
-  async function onAttachRepo(fullName: string) {
-    const token = getSessionToken();
-    if (!token || !current.id || !fullName) return;
-    setSaving(true);
+  function openEditor(project: OwnerProject) {
+    setCurrent(project);
+    setPickedRepo(project.sourceRepo);
     setMessage(null);
     setError(null);
-    try {
-      const saved = await attachOwnerSourceRepo(token, current.id, fullName);
-      setCurrent(saved);
-      await reload(token);
-      setMessage(a.saved);
-    } catch {
-      setError(a.errorGeneric);
-    } finally {
-      setSaving(false);
-    }
+    setStep("form");
+    setOpen(true);
+  }
+
+  function closeEditor() {
+    setOpen(false);
+    setMessage(null);
+    setError(null);
+    setStep("form");
+  }
+
+  function chooseRepo(repo: SourceRepo) {
+    const taken = projects.map((item) => item.slug);
+    const nextOrder =
+      projects.reduce((max, item) => Math.max(max, item.order), 0) + 1;
+    setPickedRepo(repo);
+    setCurrent(projectFromRepo(repo, taken, nextOrder));
+    setStep("form");
+    setMessage(null);
+    setError(null);
   }
 
   async function onSave(e: React.FormEvent) {
@@ -150,10 +154,15 @@ export function ProjectEditor({ dict }: Props) {
     setMessage(null);
     setError(null);
     try {
-      const saved = current.id
+      let saved = current.id
         ? await saveOwnerProject(token, current.id, payloadOf(current))
         : await createOwnerProject(token, payloadOf(current));
+      const fullName = pickedRepo?.fullName;
+      if (fullName && saved.sourceRepo?.fullName !== fullName) {
+        saved = await attachOwnerSourceRepo(token, saved.id, fullName);
+      }
       setCurrent(saved);
+      setPickedRepo(saved.sourceRepo);
       await reload(token);
       setMessage(a.saved);
     } catch {
@@ -163,145 +172,253 @@ export function ProjectEditor({ dict }: Props) {
     }
   }
 
-  if (loading) {
-    return <p className="text-[var(--text-muted)]">{a.loadingProjects}</p>;
-  }
+  const previewProps = {
+    editLabel: a.editTab,
+    previewLabel: a.preview,
+    emptyPreview: a.emptyPreview,
+  };
+
+  const modalTitle =
+    step === "pick"
+      ? a.pickRepo
+      : current.id
+        ? titleOf(current, a.untitledProject)
+        : a.newProject;
 
   return (
-    <section className="mt-14">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="display-font text-xl font-bold">{a.projectEditor}</h2>
-        <button type="button" className="btn-ghost text-sm" onClick={newProject}>
+    <CmsCard
+      title={a.projectEditor}
+      action={
+        <button type="button" className="btn-ghost text-sm" onClick={openNew}>
           {a.newProject}
         </button>
-      </div>
+      }
+    >
+      {error && !open ? (
+        <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
+      ) : null}
+      {loading ? (
+        <p className="text-sm text-[var(--text-muted)]">{a.loadingProjects}</p>
+      ) : projects.length === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">
+          {githubReady ? a.emptyProjectsFromGithub : a.emptyProjects}
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {projects.map((project) => (
+            <li key={project.id} className="flex items-stretch gap-2">
+              <button
+                type="button"
+                className="tile flex-1"
+                onClick={() => openEditor(project)}
+              >
+                <span className="font-semibold">
+                  {titleOf(project, a.untitledProject)}
+                </span>
+                <span className="ml-3">
+                  <StatusPill
+                    published={project.status === "published"}
+                    publishedLabel={a.statusPublished}
+                    draftLabel={a.statusDraft}
+                  />
+                </span>
+                {project.sourceRepo ? (
+                  <span className="ml-3 font-mono text-xs text-[var(--text-muted)]">
+                    {project.sourceRepo.fullName}
+                  </span>
+                ) : null}
+              </button>
+              {project.status === "published" ? (
+                <Link
+                  href={`/${locale}/projects/${project.slug}`}
+                  className="btn-ghost self-center text-sm whitespace-nowrap"
+                >
+                  {a.viewPublic}
+                </Link>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <ul className="mb-8 flex flex-col gap-2">
-        {projects.map((project) => (
-          <li key={project.id}>
-            <button
-              type="button"
-              className={`w-full rounded-[var(--radius-card)] border px-4 py-3 text-left text-sm ${
-                current.id === project.id
-                  ? "border-white/30 bg-white/10"
-                  : "border-white/10 bg-white/5 hover:bg-white/10"
-              }`}
-              onClick={() => {
-                setCurrent(project);
-                setMessage(null);
-                setError(null);
-              }}
-            >
-              <span className="font-semibold">
-                {project.title["zh-Hant"] ||
-                  project.title.en ||
-                  project.slug ||
-                  a.untitledProject}
-              </span>
-              <span className="ml-3 text-xs text-[var(--text-muted)]">
-                {project.status === "published" ? a.statusPublished : a.statusDraft}
-              </span>
+      <CmsModal
+        open={open}
+        title={modalTitle}
+        closeLabel={a.close}
+        onClose={closeEditor}
+        footer={
+          step === "pick" ? (
+            <button type="button" className="btn-ghost" onClick={closeEditor}>
+              {a.close}
             </button>
-          </li>
-        ))}
-      </ul>
-
-      <form onSubmit={onSave} className="max-w-3xl">
-        <label className="mb-6 block text-sm font-semibold">
-          {a.fieldSlug}
-          <input
-            className="mt-2 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm font-normal text-white"
-            value={current.slug}
-            onChange={(e) => setCurrent({ ...current, slug: e.target.value })}
-            required
-          />
-        </label>
-        <label className="mb-6 block text-sm font-semibold">
-          {a.fieldStatus}
-          <select
-            className="mt-2 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm font-normal text-white"
-            value={current.status}
-            onChange={(e) =>
-              setCurrent({
-                ...current,
-                status: e.target.value as OwnerProject["status"],
-              })
-            }
-          >
-            <option value="draft">{a.statusDraft}</option>
-            <option value="published">{a.statusPublished}</option>
-          </select>
-        </label>
-        <label className="mb-6 block text-sm font-semibold">
-          {a.fieldOrder}
-          <input
-            type="number"
-            className="mt-2 w-28 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm font-normal text-white"
-            value={current.order}
-            onChange={(e) =>
-              setCurrent({ ...current, order: Number(e.target.value) || 0 })
-            }
-          />
-        </label>
-        <BilingualField
-          label={a.fieldProjectTitle}
-          value={current.title}
-          onChange={(title) => setCurrent({ ...current, title })}
-        />
-        <BilingualField
-          label={a.fieldProjectSummary}
-          value={current.summary}
-          onChange={(summary) => setCurrent({ ...current, summary })}
-          multiline
-        />
-        <BilingualField
-          label={a.fieldProjectBody}
-          value={current.body}
-          onChange={(body) => setCurrent({ ...current, body })}
-          multiline
-        />
-
-        <div className="mb-6">
-          <p className="mb-2 text-sm font-semibold">{a.fieldSourceRepo}</p>
-          {githubReady ? (
-            <select
-              className="w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
-              value={current.sourceRepo?.fullName ?? ""}
-              disabled={!current.id || saving}
-              onChange={(e) => {
-                if (e.target.value) void onAttachRepo(e.target.value);
-              }}
-            >
-              <option value="">{a.noSourceRepo}</option>
-              {repos.map((repo) => (
-                <option key={repo.fullName} value={repo.fullName}>
-                  {repo.fullName}
-                  {repo.private ? " (private)" : ""}
-                </option>
-              ))}
-            </select>
           ) : (
-            <button
-              type="button"
-              className="btn-ghost text-sm"
-              onClick={onConnectGitHub}
-            >
-              {a.connectGitHub}
-            </button>
-          )}
-        </div>
-
-        {message ? (
-          <p className="mb-3 text-sm text-[var(--accent-link)]">{message}</p>
-        ) : null}
-        {error ? (
-          <p className="mb-3 text-sm text-[var(--accent-cta)]">{error}</p>
-        ) : null}
-
-        <button type="submit" className="btn-cta" disabled={saving}>
-          {saving ? a.saving : a.save}
-        </button>
-      </form>
-    </section>
+            <>
+              {githubReady && !current.id ? (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setStep("pick")}
+                >
+                  {a.pickRepo}
+                </button>
+              ) : null}
+              <button
+                type="submit"
+                form="project-form"
+                className="btn-cta"
+                disabled={saving}
+              >
+                {saving ? a.saving : a.save}
+              </button>
+              <button type="button" className="btn-ghost" onClick={closeEditor}>
+                {a.close}
+              </button>
+              {message ? (
+                <p className="text-sm text-[var(--accent-link)]">{message}</p>
+              ) : null}
+              {current.id && current.status === "published" ? (
+                <Link
+                  href={`/${locale}/projects/${current.slug}`}
+                  className="btn-ghost text-sm"
+                >
+                  {a.viewPublic}
+                </Link>
+              ) : null}
+              {error ? (
+                <p className="text-sm text-[var(--danger)]">{error}</p>
+              ) : null}
+            </>
+          )
+        }
+      >
+        {step === "pick" ? (
+          <div>
+            {!githubReady ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                {a.githubDisconnectedHint}
+              </p>
+            ) : (
+              <>
+                <input
+                  className="field field-tight mb-4"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={a.searchRepos}
+                />
+                {filteredRepos.length === 0 ? (
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {a.noMatchingRepos}
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {filteredRepos.map((repo) => (
+                      <li key={repo.fullName}>
+                        <button
+                          type="button"
+                          className="tile"
+                          onClick={() => chooseRepo(repo)}
+                        >
+                          <span className="font-mono text-sm font-semibold">
+                            {repo.fullName}
+                          </span>
+                          {repo.private ? (
+                            <span className="ml-2 text-xs text-[var(--text-muted)]">
+                              private
+                            </span>
+                          ) : null}
+                          {repo.description ? (
+                            <p className="mt-1 text-sm text-[var(--text-muted)]">
+                              {repo.description}
+                            </p>
+                          ) : null}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        ) : (
+          <form id="project-form" onSubmit={onSave}>
+            {pickedRepo ? (
+              <p className="mb-6 rounded-[var(--radius-card)] border border-[var(--hairline)] bg-[#f7f5fb] px-3 py-2 text-sm">
+                {a.addingRepo}:{" "}
+                <span className="font-mono">{pickedRepo.fullName}</span>
+              </p>
+            ) : null}
+            <label className="mb-6 block text-sm font-semibold">
+              {a.fieldSlug}
+              <input
+                className="field mt-2 font-normal"
+                value={current.slug}
+                onChange={(e) =>
+                  setCurrent({ ...current, slug: e.target.value })
+                }
+                required
+              />
+            </label>
+            <div className="mb-6 grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm font-semibold">
+                {a.fieldStatus}
+                <select
+                  className="field mt-2 font-normal"
+                  value={current.status}
+                  onChange={(e) =>
+                    setCurrent({
+                      ...current,
+                      status: e.target.value as OwnerProject["status"],
+                    })
+                  }
+                >
+                  <option value="draft">{a.statusDraft}</option>
+                  <option value="published">{a.statusPublished}</option>
+                </select>
+              </label>
+              <label className="block text-sm font-semibold">
+                {a.fieldOrder}
+                <input
+                  type="number"
+                  className="field mt-2 font-normal"
+                  value={current.order}
+                  onChange={(e) =>
+                    setCurrent({
+                      ...current,
+                      order: Number(e.target.value) || 0,
+                    })
+                  }
+                />
+              </label>
+            </div>
+            <p className="mb-4 text-xs text-[var(--text-muted)]">
+              {a.localeFallbackHint}
+            </p>
+            <BilingualField
+              label={a.fieldProjectTitle}
+              value={current.title}
+              onChange={(title) => setCurrent({ ...current, title })}
+            />
+            <BilingualField
+              label={a.fieldProjectSummary}
+              value={current.summary}
+              onChange={(summary) => setCurrent({ ...current, summary })}
+              multiline
+              previewable
+              rows={5}
+              {...previewProps}
+            />
+            <BilingualField
+              label={a.fieldProjectBody}
+              value={current.body}
+              onChange={(body) => setCurrent({ ...current, body })}
+              multiline
+              previewable
+              rows={8}
+              {...previewProps}
+            />
+          </form>
+        )}
+      </CmsModal>
+    </CmsCard>
   );
 }

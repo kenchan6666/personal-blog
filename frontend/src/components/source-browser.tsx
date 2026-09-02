@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
+import type { SourceRepo } from "@/lib/api";
 import {
   fetchPublicSource,
   fetchPublicSourceBlob,
@@ -9,44 +10,84 @@ import {
   type PublicSourceOverview,
   type SourceTreeEntry,
 } from "@/lib/api";
-import { MarkdownBody } from "./markdown-body";
+import { GithubMarkdown } from "./github-markdown";
 
 type Props = {
   slug: string;
   dict: Dictionary;
+  sourceRepo: SourceRepo;
+  initial?: PublicSourceOverview | null;
 };
 
-export function SourceBrowser({ slug, dict }: Props) {
+function parentPath(path: string) {
+  const parts = path.split("/").filter(Boolean);
+  parts.pop();
+  return parts.join("/");
+}
+
+function FileIcon({ dir }: { dir: boolean }) {
+  return dir ? (
+    <svg viewBox="0 0 16 16" className="gh-icon" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M1.75 2.5A.75.75 0 0 1 2.5 1.75h4.19c.2 0 .39.08.53.22L8.72 3.5h4.78a.75.75 0 0 1 .75.75v8.5a.75.75 0 0 1-.75.75H2.5a.75.75 0 0 1-.75-.75Z"
+      />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 16 16" className="gh-icon" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M2 1.75C2 .784 2.784 0 3.75 0h6.586c.199 0 .39.079.53.22l2.914 2.914c.141.14.22.331.22.53v10.586A1.75 1.75 0 0 1 12.25 16h-8.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 0 0 .25-.25V6H9.75A1.75 1.75 0 0 1 8 4.25V1.5Zm6.906 1.442L10.5 1.646V4.25c0 .138.112.25.25.25h2.604Z"
+      />
+    </svg>
+  );
+}
+
+export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   const labels = dict.projects;
-  const [overview, setOverview] = useState<PublicSourceOverview | null>(null);
-  const [ref, setRef] = useState("");
-  const [tree, setTree] = useState<SourceTreeEntry[]>([]);
+  const [overview, setOverview] = useState<PublicSourceOverview | null>(
+    initial ?? null,
+  );
+  const [ref, setRef] = useState(initial?.ref ?? "");
+  const [tree, setTree] = useState<SourceTreeEntry[]>(initial?.tree ?? []);
   const [dir, setDir] = useState("");
   const [blob, setBlob] = useState<{ path: string; content: string } | null>(
     null,
   );
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     void fetchPublicSource(slug, ref || undefined).then((data) => {
+      if (cancelled) return;
       if (!data) {
-        setOverview(null);
+        setLoadError(true);
         return;
       }
+      setLoadError(false);
       setOverview(data);
       setTree(data.tree);
       setDir("");
       setBlob(null);
       if (!ref) setRef(data.ref);
     });
+    return () => {
+      cancelled = true;
+    };
   }, [slug, ref]);
+
+  async function openDir(path: string) {
+    if (!overview) return;
+    const next = await fetchPublicSourceTree(slug, overview.ref, path);
+    setDir(path);
+    setTree(next);
+    setBlob(null);
+  }
 
   async function openEntry(entry: SourceTreeEntry) {
     if (!overview) return;
     if (entry.type === "dir") {
-      const next = await fetchPublicSourceTree(slug, overview.ref, entry.path);
-      setDir(entry.path);
-      setTree(next);
-      setBlob(null);
+      await openDir(entry.path);
       return;
     }
     const file = await fetchPublicSourceBlob(slug, overview.ref, entry.path);
@@ -54,24 +95,66 @@ export function SourceBrowser({ slug, dict }: Props) {
   }
 
   async function goRoot() {
-    if (!overview) return;
-    const data = await fetchPublicSource(slug, overview.ref);
-    if (!data) return;
-    setDir("");
-    setTree(data.tree);
-    setBlob(null);
+    await openDir("");
   }
 
-  if (!overview) return null;
+  if (!overview) {
+    return (
+      <section className="gh-repo">
+        <p className="text-sm text-[var(--text-muted)]">
+          {loadError ? labels.sourceUnavailable : labels.sourceLoading}
+        </p>
+      </section>
+    );
+  }
+
+  const crumbs = dir.split("/").filter(Boolean);
+  const isMarkdown =
+    blob && /\.(md|markdown|mdx)$/i.test(blob.path.split("/").pop() || "");
+  const lines = blob?.content.split("\n") ?? [];
 
   return (
-    <section className="glass mt-12 rounded-[var(--radius-panel)] p-5">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="display-font text-lg font-bold">{labels.sourceBrowser}</h2>
-        <label className="text-xs text-[var(--text-muted)]">
+    <section className="gh-repo">
+      <div className="gh-repo-header">
+        <div>
+          <p className="gh-repo-name">
+            <a
+              href={sourceRepo.htmlUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {sourceRepo.owner}
+            </a>
+            <span> / </span>
+            <a
+              href={sourceRepo.htmlUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {sourceRepo.name}
+            </a>
+          </p>
+          {sourceRepo.private ? (
+            <span className="status-pill">{labels.privateRepo}</span>
+          ) : (
+            <span className="status-pill">{labels.publicRepo}</span>
+          )}
+        </div>
+        <a
+          className="btn-ghost text-sm"
+          href={sourceRepo.htmlUrl}
+          rel="noreferrer"
+          target="_blank"
+        >
+          GitHub
+        </a>
+      </div>
+
+      <div className="gh-toolbar">
+        <label className="gh-branch">
           {labels.branch}
           <select
-            className="ml-2 rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-2 py-1 font-mono text-sm text-white"
+            className="field field-tight field-inline font-mono text-sm"
             value={overview.ref}
             onChange={(e) => setRef(e.target.value)}
           >
@@ -82,40 +165,114 @@ export function SourceBrowser({ slug, dict }: Props) {
             ))}
           </select>
         </label>
+        <nav className="gh-crumbs" aria-label="breadcrumb">
+          <button type="button" onClick={() => void goRoot()}>
+            {sourceRepo.name}
+          </button>
+          {crumbs.map((part, index) => {
+            const path = crumbs.slice(0, index + 1).join("/");
+            return (
+              <span key={path}>
+                <span className="gh-sep">/</span>
+                <button type="button" onClick={() => void openDir(path)}>
+                  {part}
+                </button>
+              </span>
+            );
+          })}
+        </nav>
       </div>
 
-      <div className="mb-3 text-xs text-[var(--text-muted)]">
-        <button type="button" className="hover:text-white" onClick={goRoot}>
-          /
-        </button>
-        {dir ? <span className="font-mono"> {dir}</span> : null}
-      </div>
-
-      <ul className="mb-6 divide-y divide-white/10 font-mono text-sm">
-        {tree.map((entry) => (
-          <li key={entry.path}>
+      {!blob ? (
+        <div className="gh-files">
+          <table>
+            <thead>
+              <tr>
+                <th>{labels.fileName}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dir ? (
+                <tr>
+                  <td>
+                    <button
+                      type="button"
+                      className="gh-file"
+                      onClick={() => void openDir(parentPath(dir))}
+                    >
+                      <span className="gh-muted">..</span>
+                    </button>
+                  </td>
+                </tr>
+              ) : null}
+              {tree.map((entry) => (
+                <tr key={entry.path}>
+                  <td>
+                    <button
+                      type="button"
+                      className="gh-file"
+                      onClick={() => void openEntry(entry)}
+                    >
+                      <FileIcon dir={entry.type === "dir"} />
+                      <span>{entry.name}</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="gh-box">
+          <div className="gh-box-bar">
+            <span className="font-mono text-sm">{blob.path}</span>
             <button
               type="button"
-              className="w-full px-1 py-2 text-left hover:text-[var(--accent-link)]"
-              onClick={() => void openEntry(entry)}
+              className="text-sm text-[var(--accent-link)]"
+              onClick={() => setBlob(null)}
             >
-              {entry.type === "dir" ? `${labels.dir} ` : `${labels.file} `}
-              {entry.name}
+              {labels.backToFiles}
             </button>
-          </li>
-        ))}
-      </ul>
+          </div>
+          {isMarkdown ? (
+            <div className="gh-box-body">
+              <GithubMarkdown
+                source={blob.content}
+                repoFullName={sourceRepo.fullName}
+                refName={overview.ref}
+              />
+            </div>
+          ) : (
+            <div className="gh-code">
+              {lines.map((line, index) => (
+                <div key={index} className="gh-line">
+                  <span className="gh-ln">{index + 1}</span>
+                  <span className="gh-lc">{line || " "}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {blob ? (
-        <pre className="overflow-x-auto rounded-[var(--radius-card)] bg-black/30 p-4 font-mono text-sm leading-relaxed">
-          {blob.content}
-        </pre>
-      ) : overview.readme.content ? (
-        <div>
-          <p className="mb-2 font-mono text-xs text-[var(--text-muted)]">
-            {overview.readme.path}
-          </p>
-          <MarkdownBody source={overview.readme.content} />
+      {!blob && !dir ? (
+        <div className="gh-box">
+          <div className="gh-box-bar">
+            <span className="font-mono text-sm">
+              {overview.readme.path || labels.readme}
+            </span>
+          </div>
+          <div className="gh-box-body">
+            {overview.readme.content ? (
+              <GithubMarkdown
+                source={overview.readme.content}
+                repoFullName={sourceRepo.fullName}
+                refName={overview.ref}
+              />
+            ) : (
+              <p className="text-[var(--text-muted)]">{labels.noReadme}</p>
+            )}
+          </div>
         </div>
       ) : null}
     </section>

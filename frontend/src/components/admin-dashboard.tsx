@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { ArticleEditor } from "./article-editor";
 import { CommentModerator } from "./comment-moderator";
+import { GitHubConnect } from "./github-connect";
 import { JournalEditor } from "./journal-editor";
 import { ProjectEditor } from "./project-editor";
 import { SiteEditor } from "./site-editor";
@@ -54,10 +55,10 @@ export function AdminDashboard({ locale, dict }: Props) {
   if (!email) return null;
 
   return (
-    <div className="sidebar-panel max-w-4xl rounded-[var(--radius-panel)] p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="w-full max-w-6xl">
+      <div className="glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
         <div>
-          <h1 className="display-font mb-2 text-2xl font-bold">
+          <h1 className="display-font mb-1 text-2xl font-bold">
             {dict.admin.dashboard}
           </h1>
           <p className="text-sm text-[var(--text-muted)]">
@@ -69,11 +70,20 @@ export function AdminDashboard({ locale, dict }: Props) {
         </button>
       </div>
 
-      <SiteEditor dict={dict} />
-      <ProjectEditor dict={dict} />
-      <ArticleEditor dict={dict} />
-      <JournalEditor dict={dict} />
-      <CommentModerator dict={dict} />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="lg:col-span-2">
+          <Suspense>
+            <GitHubConnect locale={locale} dict={dict} />
+          </Suspense>
+        </div>
+        <div className="lg:col-span-2">
+          <SiteEditor dict={dict} />
+        </div>
+        <ProjectEditor locale={locale} dict={dict} />
+        <ArticleEditor dict={dict} />
+        <JournalEditor dict={dict} />
+        <CommentModerator dict={dict} />
+      </div>
     </div>
   );
 }

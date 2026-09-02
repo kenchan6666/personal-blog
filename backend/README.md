@@ -1,13 +1,25 @@
 # Portfolio API
 
-FastAPI + Beanie/MongoDB + Redis. Primary test seam: **HTTP API** (`/api/...`).
+FastAPI + Beanie/MongoDB (or local JSON) + Redis. Primary test seam: **HTTP API** (`/api/...`).
 
 ## Prerequisites
 
 - Python 3.12+ (3.14 used in development)
-- Docker (for Mongo + Redis)
+- Docker (for Redis; Mongo only if `MONGO_URI` is set)
 
-## Start dependencies
+## Start (one command)
+
+From the repo root, Redis + API + Next.js (Mongo too if `MONGO_URI` is set):
+
+```powershell
+.\deployment\start.ps1
+```
+
+```bash
+bash deployment/start.sh
+```
+
+## Start dependencies only
 
 From the repo root:
 
@@ -17,7 +29,8 @@ docker compose up -d
 
 Defaults:
 
-- MongoDB: `mongodb://127.0.0.1:27019` (host **27019** → container 27017; avoids clashes with other local Mongo on 27017)
+- If `MONGO_URI` is empty or omitted, the API writes collections as JSON under `LOCAL_DATA_DIR` (default `data/local`). Health then reports `"mongo": "local"`.
+- MongoDB (optional): `mongodb://127.0.0.1:27019` (host **27019** → container 27017; avoids clashes with other local Mongo on 27017)
 - Redis: `redis://127.0.0.1:6380` (host port **6380** → container 6379)
 
 ## Install & run
@@ -36,10 +49,16 @@ uvicorn app.main:app --reload --port 8000
 
 Health check: [http://127.0.0.1:8000/api/health](http://127.0.0.1:8000/api/health)
 
-Expected when deps are up:
+Expected when Redis is up and Mongo is configured:
 
 ```json
 {"status":"ok","mongo":"up","redis":"up"}
+```
+
+Expected when `MONGO_URI` is empty (local JSON store):
+
+```json
+{"status":"ok","mongo":"local","redis":"up"}
 ```
 
 ## Owner OTP auth
@@ -133,6 +152,7 @@ pytest -v
 
 - `app/main.py` — app factory, lifespan, health + auth + site routes
 - `app/config.py` — settings from env
-- `app/models.py` — Beanie documents (SiteProfile, Project, Article, Journal, Comment)
+- `app/models.py` — documents (SiteProfile, Project, Article, Journal, Comment)
+- `app/store.py` — Mongo or local JSON persistence
 - `app/github.py` — GitHub OAuth + repo list (injected in tests)
 - `tests/` — HTTP-seam integration tests

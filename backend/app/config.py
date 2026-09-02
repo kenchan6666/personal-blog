@@ -8,9 +8,14 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    mongo_uri: str = "mongodb://127.0.0.1:27019"
+    mongo_uri: str = ""
     mongo_db: str = "portfolio"
     redis_url: str = "redis://127.0.0.1:6380/0"
+    local_data_dir: str = "data/local"
+
+    @property
+    def uses_mongo(self) -> bool:
+        return bool(self.mongo_uri.strip())
 
     owner_email: str = "ynchanhk@gmail.com"
     otp_ttl_seconds: int = 300
@@ -26,7 +31,10 @@ class Settings(BaseSettings):
     # smtp | console — default console for local; Gmail SMTP often times out
     mail_backend: str = "console"
 
-    cors_origins: str = "http://localhost:3000,http://localhost:3001,http://localhost:3002"
+    cors_origins: str = (
+        "http://localhost:3000,http://localhost:3001,http://localhost:3002,"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002"
+    )
 
     avatar_dir: str = "data/avatars"
     avatar_max_bytes: int = 2 * 1024 * 1024

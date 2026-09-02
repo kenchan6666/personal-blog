@@ -1,6 +1,7 @@
 # Single-VM stack: nginx :80 → Next.js + FastAPI, plus Mongo and Redis.
-# Usage: copy deploy/env.example to deploy/.env, then:
-#   docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d --build
+# Preferred: bash deployment/start.sh --prod
+# Or: copy deployment/env.example to deployment/.env, then:
+#   docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d --build
 
 services:
   mongo:
@@ -17,7 +18,7 @@ services:
     build: ./backend
     restart: unless-stopped
     env_file:
-      - ./deploy/.env
+      - ./deployment/.env
     environment:
       MONGO_URI: mongodb://mongo:27017
       MONGO_DB: portfolio
@@ -46,7 +47,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deployment/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - web
       - api

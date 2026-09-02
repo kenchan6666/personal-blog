@@ -4,6 +4,7 @@ import json
 import secrets
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -22,6 +23,7 @@ from app.avatar import (
     media_type_for_filename,
     resolve_avatar_path,
     save_avatar_file,
+    save_hero_visual_file,
 )
 from app.config import Settings
 from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
@@ -35,8 +37,10 @@ from app.models import (
     Project,
     SiteProfile,
     SourceRepo,
+    dated,
     empty_localized,
 )
+from app.store import bind_store, build_store, current_store, new_document
 
 
 async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
@@ -80,6 +84,10 @@ class SiteUpdateBody(BaseModel):
     experience: dict[str, str] = Field(default_factory=empty_localized)
     publicEmail: str = ""
     links: list[LinkInput] = Field(default_factory=list)
+    heroVisualPosX: float = 50
+    heroVisualPosY: float = 50
+    heroVisualScale: float = 100
+    heroVisualBlur: float = 0
 
 
 class ProjectBody(BaseModel):
@@ -125,11 +133,16 @@ class JournalBody(BaseModel):
     order: int = 0
 
 
+def clamp(value: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, value))
+
+
 async def get_or_create_site() -> SiteProfile:
-    site = await SiteProfile.find_one()
+    store = current_store()
+    site = await store.find_one(SiteProfile)
     if site is None:
-        site = SiteProfile()
-        await site.insert()
+        site = new_document(SiteProfile)
+        await store.insert(site)
     return site
 
 
@@ -163,15 +176,20 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        mongo = AsyncIOMotorClient(settings.mongo_uri)
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        await init_beanie(
-            database=mongo[settings.mongo_db],
-            document_models=[SiteProfile, Project, Article, Journal, Comment],
-        )
         await redis.ping()
+        mongo = None
+        store = build_store(settings.mongo_uri, settings.local_data_dir)
+        if settings.uses_mongo:
+            mongo = AsyncIOMotorClient(settings.mongo_uri)
+            await init_beanie(
+                database=mongo[settings.mongo_db],
+                document_models=[SiteProfile, Project, Article, Journal, Comment],
+            )
+        bind_store(store)
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
         app.state.mongo = mongo
+        app.state.store = store
         app.state.redis = redis
         app.state.settings = settings
         app.state.mailer = resolved_mailer
@@ -186,11 +204,17 @@ def create_app(
             f"[mail] backend={settings.mail_backend} mailer={type(resolved_mailer).__name__}",
             flush=True,
         )
+        print(
+            f"[store] kind={store.kind} mongo={'on' if settings.uses_mongo else 'off'}",
+            flush=True,
+        )
         try:
             yield
         finally:
             await redis.aclose()
-            mongo.close()
+            if mongo is not None:
+                mongo.close()
+            bind_store(None)
 
     app = FastAPI(title="Portfolio API", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
@@ -219,13 +243,18 @@ def create_app(
 
     @app.get("/api/health")
     async def health(response: Response) -> dict[str, str]:
-        mongo: AsyncIOMotorClient = app.state.mongo
         redis: Redis = app.state.redis
-        mongo_up = await check_mongo(mongo)
         redis_up = await check_redis(redis)
+        if settings.uses_mongo:
+            mongo_up = await check_mongo(app.state.mongo)
+            storage = "up" if mongo_up else "down"
+            healthy = mongo_up and redis_up
+        else:
+            storage = "local"
+            healthy = redis_up
         payload = {
-            "status": "ok" if mongo_up and redis_up else "degraded",
-            "mongo": "up" if mongo_up else "down",
+            "status": "ok" if healthy else "degraded",
+            "mongo": storage,
             "redis": "up" if redis_up else "down",
         }
         if payload["status"] != "ok":
@@ -295,7 +324,11 @@ def create_app(
             LinkItem(label=item.label, url=item.url, order=item.order)
             for item in body.links
         ]
-        await site.save()
+        site.hero_visual_pos_x = clamp(body.heroVisualPosX, 0, 100)
+        site.hero_visual_pos_y = clamp(body.heroVisualPosY, 0, 100)
+        site.hero_visual_scale = clamp(body.heroVisualScale, 80, 180)
+        site.hero_visual_blur = clamp(body.heroVisualBlur, 0, 48)
+        await current_store().save(site)
         return site.to_owner_dict()
 
     @app.post("/api/owner/avatar")
@@ -313,11 +346,54 @@ def create_app(
             previous_filename=site.avatar_filename or None,
         )
         site.avatar_filename = filename
-        await site.save()
+        await current_store().save(site)
         return {"avatarUrl": site.avatar_url()}
 
     @app.get("/api/public/media/avatar/{filename}")
     async def public_avatar(filename: str) -> FileResponse:
+        directory: Path = app.state.avatar_dir
+        path = resolve_avatar_path(directory, filename)
+        if path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        media_type = media_type_for_filename(path.name)
+        return FileResponse(path, media_type=media_type)
+
+    @app.post("/api/owner/hero-visual")
+    async def owner_upload_hero_visual(
+        file: UploadFile = File(...),
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        site = await get_or_create_site()
+        settings: Settings = app.state.settings
+        directory: Path = app.state.avatar_dir
+        filename = await save_hero_visual_file(
+            file,
+            directory=directory,
+            max_bytes=max(settings.avatar_max_bytes, 4 * 1024 * 1024),
+            previous_filename=site.hero_visual_filename or None,
+        )
+        site.hero_visual_filename = filename
+        await current_store().save(site)
+        return site.to_owner_dict()
+
+    @app.delete("/api/owner/hero-visual")
+    async def owner_clear_hero_visual(
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        site = await get_or_create_site()
+        directory: Path = app.state.avatar_dir
+        if site.hero_visual_filename:
+            old = directory / Path(site.hero_visual_filename).name
+            old.unlink(missing_ok=True)
+        site.hero_visual_filename = ""
+        await current_store().save(site)
+        return site.to_owner_dict()
+
+    @app.get("/api/public/media/hero/{filename}")
+    async def public_hero_visual(filename: str) -> FileResponse:
         directory: Path = app.state.avatar_dir
         path = resolve_avatar_path(directory, filename)
         if path is None:
@@ -351,7 +427,7 @@ def create_app(
         project.order = body.order
 
     async def ensure_unique_slug(slug: str, exclude_id: str | None = None) -> None:
-        existing = await Project.find_one(Project.slug == slug)
+        existing = await current_store().find_one(Project, slug=slug)
         if existing is not None and str(existing.id) != exclude_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -361,7 +437,7 @@ def create_app(
     @app.get("/api/public/projects")
     async def public_projects(locale: str = "zh-Hant") -> list[dict[str, Any]]:
         locale = normalize_locale(locale)
-        projects = await Project.find(Project.status == "published").to_list()
+        projects = await current_store().find(Project, status="published")
         projects.sort(key=lambda item: (item.order, item.slug))
         return [item.resolve(locale) for item in projects]
 
@@ -370,9 +446,8 @@ def create_app(
         slug: str, locale: str = "zh-Hant"
     ) -> dict[str, Any]:
         locale = normalize_locale(locale)
-        project = await Project.find_one(
-            Project.slug == slug,
-            Project.status == "published",
+        project = await current_store().find_one(
+            Project, slug=slug, status="published"
         )
         if project is None:
             raise HTTPException(
@@ -384,9 +459,8 @@ def create_app(
     GITHUB_CACHE_TTL = 120
 
     async def published_browsable_source(slug: str) -> tuple[SourceRepo, str]:
-        project = await Project.find_one(
-            Project.slug == slug,
-            Project.status == "published",
+        project = await current_store().find_one(
+            Project, slug=slug, status="published"
         )
         repo = project.source_repo if project is not None else None
         if repo is None or not repo.full_name or repo.private:
@@ -560,7 +634,7 @@ def create_app(
     async def owner_list_projects(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        projects = await Project.find_all().to_list()
+        projects = await current_store().find_all(Project)
         projects.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in projects]
 
@@ -569,10 +643,10 @@ def create_app(
         body: ProjectBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        project = Project()
+        project = new_document(Project)
         apply_project_body(project, body)
         await ensure_unique_slug(project.slug)
-        await project.insert()
+        await current_store().insert(project)
         return project.to_owner_dict()
 
     @app.put("/api/owner/projects/{project_id}")
@@ -581,7 +655,7 @@ def create_app(
         body: ProjectBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        project = await Project.get(project_id)
+        project = await current_store().get(Project, project_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -589,7 +663,7 @@ def create_app(
             )
         apply_project_body(project, body)
         await ensure_unique_slug(project.slug, exclude_id=str(project.id))
-        await project.save()
+        await current_store().save(project)
         return project.to_owner_dict()
 
     def github_redirect(*, connected: bool) -> RedirectResponse:
@@ -607,6 +681,11 @@ def create_app(
     async def owner_github_oauth_start(
         _: str = Depends(require_owner),
     ) -> dict[str, str]:
+        if not settings.github_client_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="github_not_configured",
+            )
         redis: Redis = app.state.redis
         github_client: GitHubClient = app.state.github
         state = secrets.token_urlsafe(24)
@@ -661,7 +740,7 @@ def create_app(
         body: SourceRepoBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        project = await Project.get(project_id)
+        project = await current_store().get(Project, project_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -685,7 +764,7 @@ def create_app(
                 detail="unknown_repo",
             )
         project.source_repo = SourceRepo.from_github(match)
-        await project.save()
+        await current_store().save(project)
         return project.to_owner_dict()
 
     def apply_article_body(article: Article, body: ArticleBody) -> None:
@@ -707,11 +786,13 @@ def create_app(
         article.status = body.status
         article.order = body.order
         article.related_project_slug = body.relatedProjectSlug.strip().lower()
+        if body.status == "published" and article.published_at is None:
+            article.published_at = datetime.now(timezone.utc)
 
     async def ensure_unique_article_slug(
         slug: str, exclude_id: str | None = None
     ) -> None:
-        existing = await Article.find_one(Article.slug == slug)
+        existing = await current_store().find_one(Article, slug=slug)
         if existing is not None and str(existing.id) != exclude_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -722,9 +803,8 @@ def create_app(
         payload = article.resolve(locale)
         related_slug = article.related_project_slug
         if related_slug:
-            project = await Project.find_one(
-                Project.slug == related_slug,
-                Project.status == "published",
+            project = await current_store().find_one(
+                Project, slug=related_slug, status="published"
             )
             if project is not None:
                 payload["relatedProject"] = {
@@ -736,8 +816,8 @@ def create_app(
     @app.get("/api/public/articles")
     async def public_articles(locale: str = "zh-Hant") -> list[dict[str, Any]]:
         locale = normalize_locale(locale)
-        articles = await Article.find(Article.status == "published").to_list()
-        articles.sort(key=lambda item: (item.order, item.slug))
+        articles = await current_store().find(Article, status="published")
+        articles.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
         return [await public_article_payload(item, locale) for item in articles]
 
     @app.get("/api/public/articles/{slug}")
@@ -745,9 +825,8 @@ def create_app(
         slug: str, locale: str = "zh-Hant"
     ) -> dict[str, Any]:
         locale = normalize_locale(locale)
-        article = await Article.find_one(
-            Article.slug == slug,
-            Article.status == "published",
+        article = await current_store().find_one(
+            Article, slug=slug, status="published"
         )
         if article is None:
             raise HTTPException(
@@ -760,7 +839,7 @@ def create_app(
     async def owner_list_articles(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        articles = await Article.find_all().to_list()
+        articles = await current_store().find_all(Article)
         articles.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in articles]
 
@@ -769,10 +848,10 @@ def create_app(
         body: ArticleBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        article = Article()
+        article = new_document(Article)
         apply_article_body(article, body)
         await ensure_unique_article_slug(article.slug)
-        await article.insert()
+        await current_store().insert(article)
         return article.to_owner_dict()
 
     @app.put("/api/owner/articles/{article_id}")
@@ -781,7 +860,7 @@ def create_app(
         body: ArticleBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        article = await Article.get(article_id)
+        article = await current_store().get(Article, article_id)
         if article is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -789,7 +868,7 @@ def create_app(
             )
         apply_article_body(article, body)
         await ensure_unique_article_slug(article.slug, exclude_id=str(article.id))
-        await article.save()
+        await current_store().save(article)
         return article.to_owner_dict()
 
     @app.delete("/api/owner/articles/{article_id}")
@@ -797,13 +876,13 @@ def create_app(
         article_id: PydanticObjectId,
         _: str = Depends(require_owner),
     ) -> dict[str, str]:
-        article = await Article.get(article_id)
+        article = await current_store().get(Article, article_id)
         if article is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        await article.delete()
+        await current_store().delete(article)
         return {"status": "deleted"}
 
     def reject_journal_project_link(body: JournalBody) -> None:
@@ -833,11 +912,13 @@ def create_app(
         journal.body = body.body
         journal.status = body.status
         journal.order = body.order
+        if body.status == "published" and journal.published_at is None:
+            journal.published_at = datetime.now(timezone.utc)
 
     async def ensure_unique_journal_slug(
         slug: str, exclude_id: str | None = None
     ) -> None:
-        existing = await Journal.find_one(Journal.slug == slug)
+        existing = await current_store().find_one(Journal, slug=slug)
         if existing is not None and str(existing.id) != exclude_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -847,8 +928,8 @@ def create_app(
     @app.get("/api/public/journals")
     async def public_journals(locale: str = "zh-Hant") -> list[dict[str, Any]]:
         locale = normalize_locale(locale)
-        journals = await Journal.find(Journal.status == "published").to_list()
-        journals.sort(key=lambda item: (item.order, item.slug))
+        journals = await current_store().find(Journal, status="published")
+        journals.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
         return [item.resolve(locale) for item in journals]
 
     @app.get("/api/public/journals/{slug}")
@@ -856,9 +937,8 @@ def create_app(
         slug: str, locale: str = "zh-Hant"
     ) -> dict[str, Any]:
         locale = normalize_locale(locale)
-        journal = await Journal.find_one(
-            Journal.slug == slug,
-            Journal.status == "published",
+        journal = await current_store().find_one(
+            Journal, slug=slug, status="published"
         )
         if journal is None:
             raise HTTPException(
@@ -871,7 +951,7 @@ def create_app(
     async def owner_list_journals(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        journals = await Journal.find_all().to_list()
+        journals = await current_store().find_all(Journal)
         journals.sort(key=lambda item: (item.order, item.slug))
         return [item.to_owner_dict() for item in journals]
 
@@ -880,10 +960,10 @@ def create_app(
         body: JournalBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        journal = Journal()
+        journal = new_document(Journal)
         apply_journal_body(journal, body)
         await ensure_unique_journal_slug(journal.slug)
-        await journal.insert()
+        await current_store().insert(journal)
         return journal.to_owner_dict()
 
     @app.put("/api/owner/journals/{journal_id}")
@@ -892,7 +972,7 @@ def create_app(
         body: JournalBody,
         _: str = Depends(require_owner),
     ) -> dict[str, Any]:
-        journal = await Journal.get(journal_id)
+        journal = await current_store().get(Journal, journal_id)
         if journal is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -900,7 +980,7 @@ def create_app(
             )
         apply_journal_body(journal, body)
         await ensure_unique_journal_slug(journal.slug, exclude_id=str(journal.id))
-        await journal.save()
+        await current_store().save(journal)
         return journal.to_owner_dict()
 
     @app.delete("/api/owner/journals/{journal_id}")
@@ -908,13 +988,13 @@ def create_app(
         journal_id: PydanticObjectId,
         _: str = Depends(require_owner),
     ) -> dict[str, str]:
-        journal = await Journal.get(journal_id)
+        journal = await current_store().get(Journal, journal_id)
         if journal is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        await journal.delete()
+        await current_store().delete(journal)
         return {"status": "deleted"}
 
     def public_comment_payload(comment: Comment) -> dict[str, Any]:
@@ -922,14 +1002,12 @@ def create_app(
 
     async def published_comment_target(target_type: str, slug: str):
         if target_type == "article":
-            return await Article.find_one(
-                Article.slug == slug,
-                Article.status == "published",
+            return await current_store().find_one(
+                Article, slug=slug, status="published"
             )
         if target_type == "journal":
-            return await Journal.find_one(
-                Journal.slug == slug,
-                Journal.status == "published",
+            return await current_store().find_one(
+                Journal, slug=slug, status="published"
             )
         return None
 
@@ -955,7 +1033,8 @@ def create_app(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="invalid_email",
             )
-        comment = Comment(
+        comment = new_document(
+            Comment,
             target_type=target_type,
             target_slug=slug,
             display_name=name,
@@ -963,7 +1042,7 @@ def create_app(
             body=body.body.strip(),
             status="pending",
         )
-        await comment.insert()
+        await current_store().insert(comment)
         return public_comment_payload(comment)
 
     async def list_public_comments(target_type: str, slug: str) -> list[dict[str, Any]]:
@@ -973,11 +1052,12 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        comments = await Comment.find(
-            Comment.target_type == target_type,
-            Comment.target_slug == slug,
-            Comment.status == "approved",
-        ).to_list()
+        comments = await current_store().find(
+            Comment,
+            target_type=target_type,
+            target_slug=slug,
+            status="approved",
+        )
         return [item.to_public_dict() for item in comments]
 
     @app.post("/api/public/articles/{slug}/comments")
@@ -1001,7 +1081,7 @@ def create_app(
         return await list_public_comments("journal", slug)
 
     async def load_owner_comment(comment_id: PydanticObjectId) -> Comment:
-        comment = await Comment.get(comment_id)
+        comment = await current_store().get(Comment, comment_id)
         if comment is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1013,7 +1093,7 @@ def create_app(
     async def owner_list_comments(
         _: str = Depends(require_owner),
     ) -> list[dict[str, Any]]:
-        comments = await Comment.find_all().to_list()
+        comments = await current_store().find_all(Comment)
         comments.sort(key=lambda item: str(item.id))
         return [item.to_owner_dict() for item in comments]
 
@@ -1024,7 +1104,7 @@ def create_app(
     ) -> dict[str, Any]:
         comment = await load_owner_comment(comment_id)
         comment.status = "approved"
-        await comment.save()
+        await current_store().save(comment)
         return comment.to_owner_dict()
 
     @app.post("/api/owner/comments/{comment_id}/reject")
@@ -1034,7 +1114,7 @@ def create_app(
     ) -> dict[str, Any]:
         comment = await load_owner_comment(comment_id)
         comment.status = "rejected"
-        await comment.save()
+        await current_store().save(comment)
         return comment.to_owner_dict()
 
     @app.post("/api/owner/comments/{comment_id}/reply")
@@ -1045,7 +1125,7 @@ def create_app(
     ) -> dict[str, Any]:
         comment = await load_owner_comment(comment_id)
         comment.owner_reply = body.body.strip()
-        await comment.save()
+        await current_store().save(comment)
         return comment.to_owner_dict()
 
     return app

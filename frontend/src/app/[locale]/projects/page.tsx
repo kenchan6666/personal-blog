@@ -1,8 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArchiveIndex } from "@/components/archive-index";
+import { PageFrame } from "@/components/page-frame";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicProjects } from "@/lib/api";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectsPage({
   params,
@@ -16,33 +19,36 @@ export default async function ProjectsPage({
   const projects = await fetchPublicProjects(locale);
 
   return (
-    <section className="px-6 py-24 sm:px-10 lg:px-14">
-      <h1 className="display-font text-3xl font-bold">{dict.nav.projects}</h1>
-      {projects.length === 0 ? (
-        <p className="mt-6 max-w-xl text-[var(--text-muted)]">
-          {dict.projects.empty}
-        </p>
-      ) : (
-        <ul className="mt-10 grid max-w-3xl gap-4">
-          {projects.map((project) => (
-            <li key={project.slug}>
-              <Link
-                href={`/${locale}/projects/${project.slug}`}
-                className="glass glass-hover block rounded-[var(--radius-card)] p-6"
-              >
-                <h2 className="display-font text-xl font-bold">
-                  {project.title}
-                </h2>
-                {project.summary ? (
-                  <p className="mt-2 text-sm leading-relaxed text-[var(--text-muted)]">
-                    {project.summary}
-                  </p>
-                ) : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <PageFrame title={dict.nav.projects}>
+      <ArchiveIndex
+        searchPlaceholder={`${dict.archive.search} ${dict.nav.projects}`}
+        labels={{
+          search: dict.archive.search,
+          all: dict.archive.all,
+          results: dict.archive.results,
+          empty: dict.projects.empty,
+          noMatch: dict.archive.noMatch,
+        }}
+        filters={[
+          { id: "source", label: dict.archive.withSource },
+          { id: "public", label: dict.archive.publicRepo },
+          { id: "private", label: dict.archive.privateRepo },
+        ]}
+        items={projects.map((project) => {
+          const tags: string[] = [];
+          if (project.sourceRepo) {
+            tags.push("source");
+            tags.push(project.sourceRepo.private ? "private" : "public");
+          }
+          return {
+            href: `/${locale}/projects/${project.slug}`,
+            title: project.title,
+            summary: project.summary,
+            meta: project.sourceRepo?.fullName,
+            tags,
+          };
+        })}
+      />
+    </PageFrame>
   );
 }

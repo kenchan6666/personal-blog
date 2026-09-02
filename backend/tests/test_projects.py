@@ -139,7 +139,7 @@ async def test_published_project_appears_in_public_list_and_detail(
         "/api/public/projects/glass-api", params={"locale": "en"}
     )
     assert en_detail.status_code == 200
-    assert en_detail.json()["title"] == ""
+    assert en_detail.json()["title"] == "玻璃 API"
     assert en_detail.json()["body"] == "## Motive\nCraft first"
 
     zh_detail = await client.get(

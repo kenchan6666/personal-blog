@@ -81,7 +81,7 @@ async def test_owner_can_save_bilingual_site_fields(client, mailer, settings):
 
 
 @pytest.mark.asyncio
-async def test_public_site_uses_locale_without_inventing_translation(
+async def test_public_site_falls_back_to_filled_locale(
     client, mailer, settings
 ):
     token = await _owner_token(client, mailer, settings)
@@ -127,6 +127,9 @@ async def test_public_site_uses_locale_without_inventing_translation(
     en = await client.get("/api/public/site", params={"locale": "en"})
     assert en.status_code == 200
     en_body = en.json()
-    assert en_body["brand"] == ""
-    assert en_body["hero"]["headline"] == ""
+    assert en_body["brand"] == "陳逸楠"
+    assert en_body["hero"]["headline"] == "標題"
+    assert en_body["hero"]["support"] == "副文"
+    assert en_body["profile"]["bio"] == "簡介"
     assert en_body["profile"]["links"][0]["label"] == "GitHub"
+    assert en_body["hero"]["visual"] is None

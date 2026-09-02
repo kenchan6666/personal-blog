@@ -144,12 +144,15 @@ async def test_published_article_shows_related_project(
     assert zh_list.status_code == 200
     assert [item["slug"] for item in zh_list.json()] == ["craft-notes"]
     assert zh_list.json()[0]["title"] == "工藝筆記"
+    assert zh_list.json()[0]["wordCount"] > 0
+    assert zh_list.json()[0]["readingMinutes"] >= 1
+    assert zh_list.json()[0]["publishedAt"]
 
     en_detail = await client.get(
         "/api/public/articles/craft-notes", params={"locale": "en"}
     )
     assert en_detail.status_code == 200
-    assert en_detail.json()["title"] == ""
+    assert en_detail.json()["title"] == "工藝筆記"
     assert en_detail.json()["body"] == "## Body\nCraft first"
     assert en_detail.json()["relatedProject"]["slug"] == "glass-api"
     assert en_detail.json()["relatedProject"]["title"] == "Glass API"

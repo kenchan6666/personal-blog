@@ -1,5 +1,10 @@
-import type { Metadata } from "next";
-import { Geist_Mono, Source_Sans_3, Space_Grotesk } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import {
+  Geist_Mono,
+  Noto_Sans_TC,
+  Source_Sans_3,
+  Space_Grotesk,
+} from "next/font/google";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -14,6 +19,13 @@ const sourceSans = Source_Sans_3({
   weight: ["400", "500", "600", "700"],
 });
 
+const notoSansTC = Noto_Sans_TC({
+  variable: "--font-noto-sans-tc",
+  weight: ["400", "500", "700"],
+  display: "swap",
+  preload: false,
+});
+
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -24,13 +36,26 @@ export const metadata: Metadata = {
   description: "Job-seeking personal portfolio — projects, articles, journals.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="zh-Hant"
-      className={`${spaceGrotesk.variable} ${sourceSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${sourceSans.variable} ${notoSansTC.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <div className="ambient" aria-hidden>
+          <span className="ambient-orb ambient-orb-a" />
+          <span className="ambient-orb ambient-orb-b" />
+          <span className="ambient-orb ambient-orb-c" />
+        </div>
+        {children}
+      </body>
     </html>
   );
 }

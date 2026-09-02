@@ -47,27 +47,20 @@ export function CommentThread({ kind, slug, dict }: Props) {
   }
 
   return (
-    <section className="mt-14 max-w-3xl">
-      <h2 className="display-font mb-6 text-2xl font-bold">{labels.title}</h2>
+    <section className="comment-thread">
+      <h2 className="comment-thread-title display-font">{labels.title}</h2>
       {comments.length === 0 ? (
         <p className="mb-8 text-sm text-[var(--text-muted)]">{labels.empty}</p>
       ) : (
-        <ul className="mb-8 space-y-5">
+        <ul className="comment-list">
           {comments.map((comment) => (
-            <li
-              key={comment.id}
-              className="glass rounded-[var(--radius-card)] p-4"
-            >
-              <p className="text-sm font-semibold">{comment.displayName}</p>
-              <p className="mt-2 whitespace-pre-wrap text-[var(--text-primary)]">
-                {comment.body}
-              </p>
+            <li key={comment.id} className="comment-card glass">
+              <p className="comment-name">{comment.displayName}</p>
+              <p className="comment-body">{comment.body}</p>
               {comment.ownerReply ? (
-                <p className="mt-3 border-t border-white/10 pt-3 text-sm text-[var(--text-muted)]">
-                  <span className="font-semibold text-[var(--accent-link)]">
-                    {labels.ownerReply}
-                  </span>
-                  : {comment.ownerReply}
+                <p className="comment-owner">
+                  <span className="comment-owner-label">{labels.ownerReply}</span>
+                  {` ${comment.ownerReply}`}
                 </p>
               ) : null}
             </li>
@@ -75,43 +68,42 @@ export function CommentThread({ kind, slug, dict }: Props) {
         </ul>
       )}
 
-      <form onSubmit={onSubmit} className="glass rounded-[var(--radius-card)] p-5">
-        <p className="mb-4 text-sm text-[var(--text-muted)]">{labels.hint}</p>
-        <label className="mb-3 block text-sm">
-          {labels.name}
-          <input
-            className="mt-1 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-white"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            required
-          />
-        </label>
-        <label className="mb-3 block text-sm">
-          {labels.email}
-          <input
-            type="email"
-            className="mt-1 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-white"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </label>
-        <label className="mb-4 block text-sm">
+      <form onSubmit={onSubmit} className="comment-form glass">
+        <div className="comment-row">
+          <label className="comment-field">
+            {labels.name}
+            <input
+              className="field"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              autoComplete="nickname"
+              required
+            />
+          </label>
+          <label className="comment-field">
+            {labels.email}
+            <input
+              type="email"
+              className="field"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
+          </label>
+        </div>
+        <label className="comment-field mb-4">
           {labels.body}
           <textarea
-            className="mt-1 w-full rounded-[var(--radius-card)] border border-white/15 bg-white/5 px-3 py-2 text-white"
+            className="field"
             rows={4}
             value={body}
             onChange={(e) => setBody(e.target.value)}
             required
           />
         </label>
-        {message ? (
-          <p className="mb-3 text-sm text-[var(--accent-link)]">{message}</p>
-        ) : null}
-        {error ? (
-          <p className="mb-3 text-sm text-[var(--accent-cta)]">{error}</p>
-        ) : null}
+        {message ? <p className="comment-status is-ok">{message}</p> : null}
+        {error ? <p className="comment-status is-err">{error}</p> : null}
         <button type="submit" className="btn-cta" disabled={sending}>
           {sending ? labels.sending : labels.submit}
         </button>

@@ -1,10 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MarkdownBody } from "@/components/markdown-body";
+import { PageFrame, PagePanel } from "@/components/page-frame";
 import { SourceBrowser } from "@/components/source-browser";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { fetchPublicProject } from "@/lib/api";
+import { fetchPublicProject, fetchPublicSource } from "@/lib/api";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProjectDetailPage({
   params,
@@ -15,44 +17,50 @@ export default async function ProjectDetailPage({
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
   const dict = getDictionary(locale);
+  const copy = dict.projects;
   const project = await fetchPublicProject(locale, slug);
   if (!project) notFound();
+  const source =
+    project.sourceRepo && !project.sourceRepo.private
+      ? await fetchPublicSource(project.slug)
+      : null;
 
   return (
-    <article className="px-6 py-24 sm:px-10 lg:px-14">
-      <Link
-        href={`/${locale}/projects`}
-        className="text-sm text-[var(--accent-link)] hover:underline"
-      >
-        ← {dict.nav.projects}
-      </Link>
-      <h1 className="display-font mt-6 max-w-3xl text-4xl font-bold tracking-tight">
-        {project.title}
-      </h1>
-      {project.summary ? (
-        <p className="mt-4 max-w-[70ch] text-lg text-[var(--text-muted)]">
-          {project.summary}
-        </p>
+    <PageFrame
+      title={project.title}
+      lead={project.summary}
+      back={{ href: `/${locale}/projects`, label: dict.nav.projects }}
+    >
+      {project.body ? (
+        <PagePanel label={copy.about}>
+          <MarkdownBody source={project.body} />
+        </PagePanel>
       ) : null}
-      {project.sourceRepo ? (
-        <p className="mt-4 text-sm text-[var(--text-muted)]">
-          {dict.admin.sourceRepo}:{" "}
-          <a
-            href={project.sourceRepo.htmlUrl}
-            className="text-[var(--accent-link)] hover:underline"
-            rel="noreferrer"
-            target="_blank"
-          >
-            {project.sourceRepo.fullName}
-          </a>
-        </p>
+      {project.sourceRepo?.private ? (
+        <PagePanel label={copy.source}>
+          <p className="text-[var(--text-muted)]">{copy.privateHint}</p>
+          <p className="mt-3">
+            <a
+              href={project.sourceRepo.htmlUrl}
+              className="text-[var(--accent-link)] hover:underline"
+              rel="noreferrer"
+              target="_blank"
+            >
+              {project.sourceRepo.fullName}
+            </a>
+          </p>
+        </PagePanel>
       ) : null}
-      <div className="mt-10">
-        <MarkdownBody source={project.body} />
-      </div>
       {project.sourceRepo && !project.sourceRepo.private ? (
-        <SourceBrowser slug={project.slug} dict={dict} />
+        <PagePanel label={copy.source}>
+          <SourceBrowser
+            slug={project.slug}
+            dict={dict}
+            sourceRepo={project.sourceRepo}
+            initial={source}
+          />
+        </PagePanel>
       ) : null}
-    </article>
+    </PageFrame>
   );
 }

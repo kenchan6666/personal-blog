@@ -1,6 +1,6 @@
 # Personal Portfolio
 
-求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 英文切换。需要双语呈现的内容字段（如品牌名、Hero 文案、Profile、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant` 与 `en` 两套输入；公开展示时按当前语言取对应原文，缺译则不机翻、不代写。
+求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 英文切换。需要双语呈现的内容字段（如品牌名、Hero 文案、Profile、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant` 与 `en` 两套输入；公开展示时按当前语言取对应原文，该语未填则回退到另一语已填写的原文。不机翻、不代写。
 
 ## Language
 
@@ -9,7 +9,7 @@ Owner 的身份面：简介、经历、技能、公开邮箱、头像，以及�
 _Avoid_: 咨詢, Consulting, About（作实体名时）
 
 **Link**:
-挂在 Profile 上的外链条目（如 GitHub、LinkedIn、简历 PDF），有展示顺序。
+挂在 Profile 上的外链条目（如 GitHub、电话、WhatsApp、Twitter/X、LinkedIn、简历 PDF），有展示顺序。号码或账号可写成 `tel:` / `wa.me` / 用户名，公开页按类型显示图标。
 _Avoid_: Social, bookmark, 链接墙（本站不做独立链接墙页）
 
 **Project**:

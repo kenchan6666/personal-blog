@@ -70,7 +70,7 @@ export function AdminLoginForm({ locale, dict }: Props) {
   }
 
   return (
-    <div className="sidebar-panel mx-auto w-full max-w-md rounded-[var(--radius-panel)] p-8">
+    <div className="glass mx-auto w-full max-w-md rounded-[var(--radius-panel)] p-8">
       <h1 className="display-font mb-6 text-2xl font-bold">{dict.admin.title}</h1>
 
       <form className="space-y-4" onSubmit={sent ? onVerify : onSend}>
@@ -81,7 +81,7 @@ export function AdminLoginForm({ locale, dict }: Props) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 outline-none focus:border-[var(--accent-link)]"
+            className="field field-tight py-2.5"
           />
         </label>
 
@@ -95,7 +95,7 @@ export function AdminLoginForm({ locale, dict }: Props) {
               required
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="w-full rounded-xl border border-white/15 bg-white/5 px-3 py-2.5 tracking-[0.3em] outline-none focus:border-[var(--accent-link)]"
+              className="field field-tight py-2.5 tracking-[0.3em]"
             />
           </label>
         )}
@@ -104,7 +104,7 @@ export function AdminLoginForm({ locale, dict }: Props) {
           <p className="text-sm text-[var(--text-muted)]">{dict.admin.sentHint}</p>
         )}
 
-        {error && <p className="text-sm text-[#ff8a9a]">{error}</p>}
+        {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
         <button type="submit" className="btn-cta w-full" disabled={busy !== "idle"}>
           {busy === "send"

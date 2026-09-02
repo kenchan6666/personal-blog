@@ -21,6 +21,17 @@ const links = [
   { key: "journals", href: "/journals" },
 ] as const;
 
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M4 6.4h16v1.7H4zm0 4.75h16v1.7H4zm0 4.75h16v1.7H4z"
+      />
+    </svg>
+  );
+}
+
 export function Sidebar({
   locale,
   dict,
@@ -31,28 +42,31 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <>
-      {/* Scrim: covers page behind whenever panel is open */}
+    <div className={`site-nav${open ? " is-open" : ""}`}>
+      <button
+        type="button"
+        className="icon-btn sidebar-fab"
+        aria-label={dict.openMenu}
+        aria-expanded={open}
+        aria-controls="site-sidebar"
+        onClick={onToggle}
+      >
+        <MenuIcon />
+      </button>
+
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${
-          open ? "opacity-100" : "pointer-events-none opacity-0"
-        }`}
+        className="scrim site-nav-scrim"
         onClick={onToggle}
         aria-hidden={!open}
       />
 
-      <aside
-        className={`sidebar-panel fixed top-3 bottom-3 left-3 z-50 overflow-hidden rounded-[var(--radius-panel)] transition-[width] duration-300 ease-out ${
-          open
-            ? "w-[min(100%-1.5rem,var(--sidebar-width))]"
-            : "w-[var(--sidebar-rail)]"
-        }`}
-      >
+      <aside id="site-sidebar" className="sidebar-panel">
         <button
           type="button"
-          className="sidebar-toggle absolute top-4 right-4 z-20 flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-lg text-[var(--text-muted)] transition-[color,background] duration-300 hover:bg-white/10 hover:text-white"
+          className="icon-btn sidebar-toggle"
           aria-label={open ? dict.closeMenu : dict.openMenu}
           aria-expanded={open}
+          aria-controls="site-sidebar"
           onClick={onToggle}
         >
           <span
@@ -92,11 +106,7 @@ export function Sidebar({
                   href={href}
                   onClick={onNavigate}
                   tabIndex={open ? 0 : -1}
-                  className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                    active
-                      ? "bg-white/12 text-[var(--accent-link)]"
-                      : "text-[var(--text-muted)] hover:bg-white/8 hover:text-white"
-                  }`}
+                  className={`nav-link ${active ? "nav-link-active" : ""}`}
                 >
                   {dict.nav[item.key]}
                 </Link>
@@ -104,7 +114,7 @@ export function Sidebar({
             })}
           </nav>
 
-          <div className="mt-6 flex gap-2 border-t border-white/10 pt-4">
+          <div className="hairline-t mt-6 flex gap-2 pt-4">
           {locales.map((l) => {
             const rest = pathname.replace(/^\/(zh-Hant|en)/, "") || "";
             const href = `/${l}${rest}`;
@@ -115,11 +125,7 @@ export function Sidebar({
                 href={href}
                 onClick={onNavigate}
                 tabIndex={open ? 0 : -1}
-                className={`flex-1 rounded-[var(--radius-control)] px-3 py-2 text-center text-xs font-semibold tracking-wide ${
-                  active
-                    ? "bg-white/15 text-white"
-                    : "text-[var(--text-muted)] hover:bg-white/8"
-                }`}
+                className={`locale-chip ${active ? "locale-chip-active" : ""}`}
               >
                 {l === "zh-Hant" ? "繁中" : "EN"}
               </Link>
@@ -131,12 +137,12 @@ export function Sidebar({
           href={`/${locale}/admin`}
           onClick={onNavigate}
           tabIndex={open ? 0 : -1}
-          className="mt-3 rounded-xl px-3 py-2 text-center text-xs font-semibold text-[var(--text-muted)] hover:bg-white/8 hover:text-white"
+          className="nav-link mt-3 text-center text-xs font-semibold"
         >
           {dict.nav.admin}
         </Link>
         </div>
       </aside>
-    </>
+    </div>
   );
 }

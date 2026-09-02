@@ -6,18 +6,32 @@ Local Mongo/Redis on host ports (`docker compose up -d`) is unchanged. This file
 
 ## Bring up
 
-```bash
-cp deploy/env.example deploy/.env
-# edit deploy/.env — see checklist below
+Windows PowerShell:
 
-docker compose -f docker-compose.prod.yml --env-file deploy/.env up -d --build
+```powershell
+.\deployment\start.ps1 --prod
+```
+
+macOS / Linux / Git Bash:
+
+```bash
+bash deployment/start.sh --prod
+```
+
+The script copies `deployment/env.example` to `deployment/.env` on first run. Edit that file (see checklist below) and run the same command again if you change secrets.
+
+Equivalent compose:
+
+```bash
+cp deployment/env.example deployment/.env
+docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d --build
 ```
 
 Then open `http://<host>/zh-Hant`. Health: `http://<host>/api/health`.
 
 Logs: `docker compose -f docker-compose.prod.yml logs -f api web nginx`.
 
-Stop: `docker compose -f docker-compose.prod.yml down`.
+Stop: `.\deployment\stop.ps1 --prod` (or `bash deployment/stop.sh --prod`).
 
 ## Secrets checklist
 
@@ -33,7 +47,7 @@ Stop: `docker compose -f docker-compose.prod.yml down`.
 
 After you know `PUBLIC_ORIGIN`, set GitHub callback/success to that origin (not leftover `localhost`).
 
-Never commit `deploy/.env`. Rotate any secret that has been pasted into chat.
+Never commit `deployment/.env`. Rotate any secret that has been pasted into chat.
 
 ## Owner login on the deployed site
 
@@ -44,11 +58,12 @@ Never commit `deploy/.env`. Rotate any secret that has been pasted into chat.
 
 ## TLS (later)
 
-Point DNS at the VM, put certificates on the host, and extend `deploy/nginx.conf` with `listen 443 ssl`. Until then, HTTP on port 80 is enough for a private demo.
+Point DNS at the VM, put certificates on the host, and extend `deployment/nginx.conf` with `listen 443 ssl`. Until then, HTTP on port 80 is enough for a private demo.
 
 ## Layout
 
+- `bash deployment/start.sh --prod` — one-command bring-up
 - `docker-compose.prod.yml` — mongo, redis, api, web, nginx
-- `deploy/nginx.conf` — reverse proxy
-- `deploy/env.example` — template for `deploy/.env`
+- `deployment/nginx.conf` — reverse proxy
+- `deployment/env.example` — template for `deployment/.env`
 - `backend/Dockerfile`, `frontend/Dockerfile`

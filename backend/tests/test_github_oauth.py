@@ -53,6 +53,21 @@ async def _connect_github(client, token: str, *, code: str = "ok") -> None:
 
 
 @pytest.mark.asyncio
+async def test_oauth_start_without_client_id_fails_closed(
+    client, app, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    app.state.settings.github_client_id = ""
+    response = await client.get(
+        "/api/owner/github/oauth/start",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "github_not_configured"
+    assert "authorizationUrl" not in response.json()
+
+
+@pytest.mark.asyncio
 async def test_unauthenticated_cannot_start_github_oauth(client):
     response = await client.get("/api/owner/github/oauth/start")
     assert response.status_code == 401
@@ -86,8 +101,10 @@ async def test_owner_oauth_lists_repos_without_leaking_token(
     assert names == [
         "kenchan6666/personal-blog",
         "kenchan6666/secret-lab",
+        "kenchan6666/empty-box",
     ]
     assert repos.json()[1]["private"] is True
+    assert repos.json()[0]["description"] == "Job-seeking portfolio"
     assert "accessToken" not in repos.json()[0]
 
 

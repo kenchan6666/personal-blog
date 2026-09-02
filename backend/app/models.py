@@ -1,15 +1,51 @@
 from __future__ import annotations
 
+import re
+from datetime import datetime, timezone
 from typing import Any
 
 from beanie import Document
 from pydantic import BaseModel, Field
 
-from app.avatar import avatar_public_url
+from app.avatar import avatar_public_url, hero_visual_public_url
+
+LOCALES = ("zh-Hant", "en")
 
 
 def empty_localized() -> dict[str, str]:
     return {"zh-Hant": "", "en": ""}
+
+
+def pick_localized(field: dict[str, str] | None, locale: str) -> str:
+    data = field or {}
+    current = data.get(locale) or ""
+    if current.strip():
+        return current
+    for other in LOCALES:
+        if other == locale:
+            continue
+        alt = data.get(other) or ""
+        if alt.strip():
+            return alt
+    return ""
+
+
+def count_chars(text: str) -> int:
+    return len(re.sub(r"\s+", "", text or ""))
+
+
+def reading_minutes(chars: int) -> int:
+    if chars <= 0:
+        return 0
+    return max(1, round(chars / 400))
+
+
+def dated(published_at: datetime | None, doc_id: Any) -> datetime:
+    if published_at is not None:
+        return published_at
+    if doc_id is not None and hasattr(doc_id, "generation_time"):
+        return doc_id.generation_time
+    return datetime.now(timezone.utc)
 
 
 class LinkItem(BaseModel):
@@ -30,6 +66,11 @@ class SiteProfile(Document):
     public_email: str = ""
     links: list[LinkItem] = Field(default_factory=list)
     avatar_filename: str = ""
+    hero_visual_filename: str = ""
+    hero_visual_pos_x: float = 50
+    hero_visual_pos_y: float = 50
+    hero_visual_scale: float = 100
+    hero_visual_blur: float = 0
 
     class Settings:
         name = "site_profile"
@@ -39,28 +80,43 @@ class SiteProfile(Document):
             return ""
         return avatar_public_url(self.avatar_filename)
 
-    def resolve(self, locale: str) -> dict[str, Any]:
-        def pick(field: dict[str, str]) -> str:
-            return (field or {}).get(locale, "") or ""
+    def hero_visual_url(self) -> str:
+        if not self.hero_visual_filename:
+            return ""
+        return hero_visual_public_url(self.hero_visual_filename)
 
+    def hero_visual_public(self) -> dict[str, Any] | None:
+        url = self.hero_visual_url()
+        if not url:
+            return None
+        return {
+            "url": url,
+            "posX": self.hero_visual_pos_x,
+            "posY": self.hero_visual_pos_y,
+            "scale": self.hero_visual_scale,
+            "blur": self.hero_visual_blur,
+        }
+
+    def resolve(self, locale: str) -> dict[str, Any]:
         links = sorted(self.links, key=lambda item: item.order)
         return {
-            "brand": pick(self.brand),
+            "brand": pick_localized(self.brand, locale),
             "hero": {
-                "headline": pick(self.hero_headline),
-                "support": pick(self.hero_support),
-                "ctaProjects": pick(self.hero_cta_projects),
-                "ctaArticles": pick(self.hero_cta_articles),
+                "headline": pick_localized(self.hero_headline, locale),
+                "support": pick_localized(self.hero_support, locale),
+                "ctaProjects": pick_localized(self.hero_cta_projects, locale),
+                "ctaArticles": pick_localized(self.hero_cta_articles, locale),
+                "visual": self.hero_visual_public(),
             },
             "profile": {
-                "bio": pick(self.bio),
-                "skills": pick(self.skills),
-                "experience": pick(self.experience),
+                "bio": pick_localized(self.bio, locale),
+                "skills": pick_localized(self.skills, locale),
+                "experience": pick_localized(self.experience, locale),
                 "publicEmail": self.public_email,
                 "avatarUrl": self.avatar_url(),
                 "links": [
                     {
-                        "label": pick(link.label),
+                        "label": pick_localized(link.label, locale),
                         "url": link.url,
                         "order": link.order,
                     }
@@ -81,6 +137,11 @@ class SiteProfile(Document):
             "experience": self.experience,
             "publicEmail": self.public_email,
             "avatarUrl": self.avatar_url(),
+            "heroVisualUrl": self.hero_visual_url(),
+            "heroVisualPosX": self.hero_visual_pos_x,
+            "heroVisualPosY": self.hero_visual_pos_y,
+            "heroVisualScale": self.hero_visual_scale,
+            "heroVisualBlur": self.hero_visual_blur,
             "links": [link.model_dump() for link in self.links],
         }
 
@@ -145,14 +206,11 @@ class Project(Document):
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
-        def pick(field: dict[str, str]) -> str:
-            return (field or {}).get(locale, "") or ""
-
         return {
             "slug": self.slug,
-            "title": pick(self.title),
-            "summary": pick(self.summary),
-            "body": pick(self.body),
+            "title": pick_localized(self.title, locale),
+            "summary": pick_localized(self.summary, locale),
+            "body": pick_localized(self.body, locale),
             "order": self.order,
             "sourceRepo": self.source_repo.to_public() if self.source_repo else None,
         }
@@ -166,6 +224,7 @@ class Article(Document):
     status: str = "draft"
     order: int = 0
     related_project_slug: str = ""
+    published_at: datetime | None = None
 
     class Settings:
         name = "articles"
@@ -183,16 +242,19 @@ class Article(Document):
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
-        def pick(field: dict[str, str]) -> str:
-            return (field or {}).get(locale, "") or ""
-
+        body_text = pick_localized(self.body, locale)
+        chars = count_chars(body_text)
+        when = dated(self.published_at, self.id)
         return {
             "slug": self.slug,
-            "title": pick(self.title),
-            "summary": pick(self.summary),
-            "body": pick(self.body),
+            "title": pick_localized(self.title, locale),
+            "summary": pick_localized(self.summary, locale),
+            "body": body_text,
             "order": self.order,
             "relatedProject": None,
+            "publishedAt": when.isoformat(),
+            "wordCount": chars,
+            "readingMinutes": reading_minutes(chars),
         }
 
 
@@ -203,6 +265,7 @@ class Journal(Document):
     body: dict[str, str] = Field(default_factory=empty_localized)
     status: str = "draft"
     order: int = 0
+    published_at: datetime | None = None
 
     class Settings:
         name = "journals"
@@ -219,15 +282,18 @@ class Journal(Document):
         }
 
     def resolve(self, locale: str) -> dict[str, Any]:
-        def pick(field: dict[str, str]) -> str:
-            return (field or {}).get(locale, "") or ""
-
+        body_text = pick_localized(self.body, locale)
+        chars = count_chars(body_text)
+        when = dated(self.published_at, self.id)
         return {
             "slug": self.slug,
-            "title": pick(self.title),
-            "summary": pick(self.summary),
-            "body": pick(self.body),
+            "title": pick_localized(self.title, locale),
+            "summary": pick_localized(self.summary, locale),
+            "body": body_text,
             "order": self.order,
+            "publishedAt": when.isoformat(),
+            "wordCount": chars,
+            "readingMinutes": reading_minutes(chars),
         }
 
 
