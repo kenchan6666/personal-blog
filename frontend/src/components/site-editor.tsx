@@ -165,7 +165,11 @@ export function SiteEditor({ dict }: Props) {
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
+    translateLabel: a.translate,
+    translatingLabel: a.translating,
     emptyPreview: a.emptyPreview,
+    onTranslateError: (code: string) =>
+      setError(code === "empty_source" ? a.errorTranslateEmpty : a.errorTranslate),
   };
 
   return (
@@ -249,7 +253,7 @@ export function SiteEditor({ dict }: Props) {
       >
         <form id="site-form" onSubmit={onSave}>
           <p className="mb-6 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint}
+            {a.localeFallbackHint} {a.translateHint}
           </p>
           <div className="mb-8">
             <p className="mb-3 text-sm font-semibold">{a.fieldAvatar}</p>
@@ -304,11 +308,13 @@ export function SiteEditor({ dict }: Props) {
             label={a.fieldBrand}
             value={site.brand}
             onChange={(brand) => setSite({ ...site, brand })}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldHeroHeadline}
             value={site.heroHeadline}
             onChange={(heroHeadline) => setSite({ ...site, heroHeadline })}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldHeroSupport}
@@ -325,6 +331,7 @@ export function SiteEditor({ dict }: Props) {
             onChange={(heroCtaProjects) =>
               setSite({ ...site, heroCtaProjects })
             }
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldCtaArticles}
@@ -332,6 +339,7 @@ export function SiteEditor({ dict }: Props) {
             onChange={(heroCtaArticles) =>
               setSite({ ...site, heroCtaArticles })
             }
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldArticlesLead}
@@ -339,6 +347,7 @@ export function SiteEditor({ dict }: Props) {
             onChange={(articlesLead) => setSite({ ...site, articlesLead })}
             multiline
             rows={3}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldAboutLead}
@@ -346,6 +355,7 @@ export function SiteEditor({ dict }: Props) {
             onChange={(aboutLead) => setSite({ ...site, aboutLead })}
             multiline
             rows={3}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldAboutEmpty}
@@ -353,6 +363,7 @@ export function SiteEditor({ dict }: Props) {
             onChange={(aboutEmpty) => setSite({ ...site, aboutEmpty })}
             multiline
             rows={2}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldBio}
@@ -430,6 +441,7 @@ export function SiteEditor({ dict }: Props) {
                     label={a.linkLabel}
                     value={link.label}
                     onChange={(label) => updateLink(index, { label })}
+                    {...previewProps}
                   />
                   <label className="mb-3 block text-xs text-[var(--text-muted)]">
                     {a.linkUrl}

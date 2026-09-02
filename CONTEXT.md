@@ -1,6 +1,6 @@
 # Personal Portfolio
 
-求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 简中 / 英文切换。需要多语呈现的内容字段（如品牌名、Hero 文案、Profile、About 模块、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant`、`zh-Hans` 与 `en` 三套输入；公开展示时按当前语言取对应原文，该语未填则按 `zh-Hans ↔ zh-Hant ↔ en` 回退。中文之间回退只做繁简字形转换，不机翻、不代写。
+求职向个人作品集站点：先展示「我是谁、做过什么」，再以写作证明深度。公开内容由唯一 Owner 经后台 CMS 维护。壳层 UI 提供繁中 / 简中 / 英文切换。需要多语呈现的内容字段（如品牌名、Hero 文案、Profile、About 模块、Project / Journal / Article 标题与正文）在 CMS 中分别提供 `zh-Hant`、`zh-Hans` 与 `en` 三套输入；Owner 可先写一语，再点「翻译」填入空白语（中文为字形转换，英文为机翻，已填不覆盖，须核对方可保存）。公开展示时按当前语言取对应原文，该语未填则按 `zh-Hans ↔ zh-Hant ↔ en` 回退。中文之间回退只做繁简字形转换，不机翻、不代写。
 
 ## Language
 

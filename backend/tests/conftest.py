@@ -11,6 +11,7 @@ from app.config import Settings
 from app.github import RecordingGitHub
 from app.mailer import RecordingMailer
 from app.main import create_app
+from app.translate import ScriptedTranslator
 
 
 @pytest.fixture
@@ -52,9 +53,21 @@ def github() -> RecordingGitHub:
     return RecordingGitHub()
 
 
+@pytest.fixture
+def translator() -> ScriptedTranslator:
+    return ScriptedTranslator()
+
+
 @pytest_asyncio.fixture
-async def app(settings: Settings, mailer: RecordingMailer, github: RecordingGitHub):
-    application = create_app(settings, mailer=mailer, github=github)
+async def app(
+    settings: Settings,
+    mailer: RecordingMailer,
+    github: RecordingGitHub,
+    translator: ScriptedTranslator,
+):
+    application = create_app(
+        settings, mailer=mailer, github=github, translator=translator
+    )
     async with LifespanManager(application):
         await application.state.redis.flushdb()
         await application.state.store.delete_all()

@@ -111,7 +111,11 @@ export function JournalEditor({ dict }: Props) {
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
+    translateLabel: a.translate,
+    translatingLabel: a.translating,
     emptyPreview: a.emptyPreview,
+    onTranslateError: (code: string) =>
+      setError(code === "empty_source" ? a.errorTranslateEmpty : a.errorTranslate),
   };
   const imageProps = {
     allowImages: true,
@@ -242,12 +246,13 @@ export function JournalEditor({ dict }: Props) {
             </label>
           </div>
           <p className="mb-4 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint}
+            {a.localeFallbackHint} {a.translateHint}
           </p>
           <BilingualField
             label={a.fieldJournalTitle}
             value={current.title}
             onChange={(title) => setCurrent({ ...current, title })}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldJournalSummary}

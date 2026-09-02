@@ -300,6 +300,27 @@ export async function uploadOwnerMedia(
   return (await res.json()) as { url: string };
 }
 
+export type TranslateResult = Localized & {
+  source: string;
+  warnings: string[];
+};
+
+export async function translateOwnerLocalized(
+  token: string,
+  value: Localized,
+): Promise<TranslateResult> {
+  const res = await fetch(`${API_BASE}/api/owner/translate`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(value),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as TranslateResult;
+}
+
 export type SourceRepo = {
   fullName: string;
   owner: string;

@@ -112,6 +112,7 @@ Owner-managed CV-like blocks on the public personal-detail page (`/about`).
 - `GET/POST /api/owner/about-modules` and `PUT/DELETE /api/owner/about-modules/{id}` (Bearer)
 - `POST /api/owner/media` multipart field `file` (png/jpeg/webp, Bearer) — returns `{ url }` for Markdown images
 - `GET /api/public/media/content/{filename}`
+- `POST /api/owner/translate` (Bearer) — fills empty `zh-Hant` / `zh-Hans` / `en` from one original. Chinese uses script conversion; English uses machine translation. Filled locales are kept. Public pages still show stored text only.
 
 Kinds: `summary`, `education`, `achievement`, `experience`, `custom`. Each kind has a distinct public template (narrative / timeline / cards). Trilingual Markdown: `title`, `body`. Status is `draft` | `published`.
 

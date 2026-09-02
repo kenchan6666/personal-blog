@@ -206,7 +206,11 @@ export function ArticleEditor({ dict }: Props) {
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
+    translateLabel: a.translate,
+    translatingLabel: a.translating,
     emptyPreview: a.emptyPreview,
+    onTranslateError: (code: string) =>
+      setError(code === "empty_source" ? a.errorTranslateEmpty : a.errorTranslate),
   };
   const imageProps = {
     allowImages: true,
@@ -418,12 +422,13 @@ export function ArticleEditor({ dict }: Props) {
             </select>
           </label>
           <p className="mb-4 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint}
+            {a.localeFallbackHint} {a.translateHint}
           </p>
           <BilingualField
             label={a.fieldArticleTitle}
             value={current.title}
             onChange={(title) => setCurrent({ ...current, title })}
+            {...previewProps}
           />
           <BilingualField
             label={a.fieldArticleSummary}
@@ -488,6 +493,7 @@ export function ArticleEditor({ dict }: Props) {
           label={a.fieldCategory}
           value={categoryDraft.title}
           onChange={(title) => setCategoryDraft({ ...categoryDraft, title })}
+          {...previewProps}
         />
       </form>
     </CmsModal>

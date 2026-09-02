@@ -47,6 +47,11 @@ from app.models import (
     pick_localized,
 )
 from app.store import bind_store, build_store, current_store, new_document
+from app.translate import (
+    GoogleGtxTranslator,
+    MachineTranslator,
+    fill_localized,
+)
 
 
 async def check_mongo(mongo: AsyncMongoClient) -> bool:
@@ -186,6 +191,7 @@ def create_app(
     settings: Settings | None = None,
     mailer: Mailer | None = None,
     github: GitHubClient | None = None,
+    translator: MachineTranslator | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     if mailer is not None:
@@ -208,6 +214,7 @@ def create_app(
         client_secret=settings.github_client_secret,
         callback_url=settings.github_oauth_callback_url,
     )
+    resolved_translator: MachineTranslator = translator or GoogleGtxTranslator()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -238,6 +245,7 @@ def create_app(
         app.state.settings = settings
         app.state.mailer = resolved_mailer
         app.state.github = resolved_github
+        app.state.translator = resolved_translator
         app.state.avatar_dir = avatar_dir
         app.state.auth = AuthService(
             redis=redis,
@@ -269,6 +277,7 @@ def create_app(
     app = FastAPI(title="Portfolio API", version="0.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.mailer = resolved_mailer
+    app.state.translator = resolved_translator
 
     origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
     app.add_middleware(
@@ -340,6 +349,23 @@ def create_app(
     @app.get("/api/auth/me")
     async def me(email: str = Depends(require_owner)) -> dict[str, str]:
         return {"email": email, "role": "owner"}
+
+    @app.post("/api/owner/translate")
+    async def owner_translate(
+        body: dict[str, str],
+        _: str = Depends(require_owner),
+    ) -> dict[str, object]:
+        try:
+            filled, source, warnings = await fill_localized(
+                body,
+                translator=app.state.translator,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from None
+        return {**filled, "source": source, "warnings": warnings}
 
     @app.get("/api/public/site")
     async def public_site(locale: str = "zh-Hant") -> dict[str, Any]:

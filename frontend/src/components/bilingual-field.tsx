@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { localeLabels } from "@/i18n/config";
 import type { Localized } from "@/lib/api";
-import { emptyLocalized, getSessionToken, mediaUrl, uploadOwnerMedia } from "@/lib/api";
+import {
+  emptyLocalized,
+  getSessionToken,
+  mediaUrl,
+  translateOwnerLocalized,
+  uploadOwnerMedia,
+} from "@/lib/api";
 import { appendMarkdownToAll } from "@/lib/about-templates";
 import {
   joinMarkdownBlocks,
@@ -21,11 +27,14 @@ type Props = {
   rows?: number;
   editLabel?: string;
   previewLabel?: string;
+  translateLabel?: string;
+  translatingLabel?: string;
   emptyPreview?: string;
   allowImages?: boolean;
   uploadImageLabel?: string;
   uploadingImageLabel?: string;
   onImageError?: () => void;
+  onTranslateError?: (code: string) => void;
 };
 
 export function BilingualField({
@@ -37,14 +46,18 @@ export function BilingualField({
   rows = 8,
   editLabel = "Edit",
   previewLabel = "Preview",
+  translateLabel = "Translate",
+  translatingLabel = "Translating…",
   emptyPreview = "",
   allowImages = false,
   uploadImageLabel = "Upload image",
   uploadingImageLabel = "Uploading…",
   onImageError,
+  onTranslateError,
 }: Props) {
   const [mode, setMode] = useState<"edit" | "preview">("edit");
   const [uploading, setUploading] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const showPreview = previewable && multiline;
   const visualImages = allowImages && multiline;
 
@@ -66,6 +79,29 @@ export function BilingualField({
     }
   }
 
+  async function onTranslate() {
+    const token = getSessionToken();
+    if (!token || translating) return;
+    setTranslating(true);
+    try {
+      const result = await translateOwnerLocalized(token, value);
+      onChange({
+        "zh-Hant": result["zh-Hant"] ?? "",
+        "zh-Hans": result["zh-Hans"] ?? "",
+        en: result.en ?? "",
+      });
+      setMode("edit");
+      if (result.warnings?.length) {
+        onTranslateError?.(result.warnings[0] ?? "translate_failed");
+      }
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "translate_failed";
+      onTranslateError?.(code);
+    } finally {
+      setTranslating(false);
+    }
+  }
+
   return (
     <div className="mb-6">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -79,19 +115,19 @@ export function BilingualField({
                 accept="image/png,image/jpeg,image/webp"
                 className="sr-only"
                 onChange={onUpload}
-                disabled={uploading}
+                disabled={uploading || translating}
               />
             </label>
           ) : null}
-          {showPreview ? (
-            <span className="segment">
-              <button
-                type="button"
-                className={mode === "edit" ? "segment-active" : ""}
-                onClick={() => setMode("edit")}
-              >
-                {editLabel}
-              </button>
+          <span className="segment">
+            <button
+              type="button"
+              className={mode === "edit" ? "segment-active" : ""}
+              onClick={() => setMode("edit")}
+            >
+              {editLabel}
+            </button>
+            {showPreview ? (
               <button
                 type="button"
                 className={mode === "preview" ? "segment-active" : ""}
@@ -99,8 +135,15 @@ export function BilingualField({
               >
                 {previewLabel}
               </button>
-            </span>
-          ) : null}
+            ) : null}
+            <button
+              type="button"
+              onClick={() => void onTranslate()}
+              disabled={translating}
+            >
+              {translating ? translatingLabel : translateLabel}
+            </button>
+          </span>
         </span>
       </div>
       <div className="grid gap-3 lg:grid-cols-3">
