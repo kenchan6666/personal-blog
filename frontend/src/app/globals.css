@@ -1875,7 +1875,7 @@ html.is-route-pending .site-main {
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
-  background: #f6f4fa;
+  background: var(--field-bg);
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -1902,7 +1902,30 @@ html.is-route-pending .site-main {
 }
 
 .gh-file:hover {
-  background: #f7f5fb;
+  background: var(--panel-fill);
+}
+
+.gh-kind-col {
+  width: 8.5rem;
+  padding: 0.5rem 0.9rem;
+  text-align: right;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.gh-box-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.gh-lang {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
 }
 
 .gh-icon {
@@ -1931,7 +1954,7 @@ html.is-route-pending .site-main {
   gap: 0.75rem;
   padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--hairline);
-  background: #f6f4fa;
+  background: var(--field-bg);
 }
 
 .gh-box-body {
