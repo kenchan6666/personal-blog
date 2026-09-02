@@ -12,6 +12,7 @@ export function AboutStory({ modules, kindLabel }: Props) {
       {modules.map((module) => (
         <section
           key={module.slug}
+          id={module.slug}
           className={`about-module about-module-${module.kind}`}
         >
           {module.kind === "summary" ? null : (

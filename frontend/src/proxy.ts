@@ -14,7 +14,9 @@ export function proxy(request: NextRequest) {
 
   const segment = pathname.split("/")[1];
   if (isLocale(segment)) {
-    return NextResponse.next();
+    const headers = new Headers(request.headers);
+    headers.set("x-locale", segment);
+    return NextResponse.next({ request: { headers } });
   }
 
   const url = request.nextUrl.clone();

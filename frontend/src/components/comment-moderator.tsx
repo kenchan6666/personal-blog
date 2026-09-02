@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 import {
   fetchOwnerComments,
   getSessionToken,
@@ -12,10 +13,18 @@ import {
 import { CmsCard } from "./cms-card";
 
 type Props = {
+  locale: Locale;
   dict: Dictionary;
 };
 
-export function CommentModerator({ dict }: Props) {
+function commentHref(locale: Locale, comment: OwnerComment): string {
+  if (comment.targetType === "journal") {
+    return `/${locale}/journals/${comment.targetSlug}`;
+  }
+  return `/${locale}/articles/${comment.targetSlug}`;
+}
+
+export function CommentModerator({ locale, dict }: Props) {
   const a = dict.admin;
   const [comments, setComments] = useState<OwnerComment[]>([]);
   const [replies, setReplies] = useState<Record<string, string>>({});
@@ -84,7 +93,18 @@ export function CommentModerator({ dict }: Props) {
               className="rounded-[var(--radius-card)] border border-[var(--hairline)] p-4"
             >
               <p className="text-sm text-[var(--text-muted)]">
-                {comment.targetType}/{comment.targetSlug} · {comment.status}
+                <a
+                  href={commentHref(locale, comment)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline-offset-2 hover:underline"
+                >
+                  {a.viewPublic}
+                </a>
+                {" · "}
+                {comment.targetType}/{comment.targetSlug}
+                {" · "}
+                {comment.status}
               </p>
               <p className="mt-1 font-semibold">
                 {comment.displayName}{" "}

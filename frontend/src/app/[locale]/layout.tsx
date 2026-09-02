@@ -4,7 +4,7 @@ import { SiteShell } from "@/components/site-shell";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, locales, type Locale } from "@/i18n/config";
 import { fetchPublicSite } from "@/lib/api";
-import { pageMetadata } from "@/lib/seo";
+import { pageMetadata, siteShareImage } from "@/lib/seo";
 import { brandForShell } from "@/lib/site-content";
 
 export function generateStaticParams() {
@@ -26,6 +26,7 @@ export async function generateMetadata({
     title: brandForShell(dict, site),
     description: site?.hero.support || dict.hero.support,
     path: "",
+    image: siteShareImage(site),
   });
 }
 

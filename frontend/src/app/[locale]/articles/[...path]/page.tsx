@@ -34,6 +34,7 @@ export async function generateMetadata({
     title: article.title,
     description: article.summary,
     path: pathWithoutLocale(locale, articleHref(locale, article)),
+    markdown: article.body,
   });
 }
 

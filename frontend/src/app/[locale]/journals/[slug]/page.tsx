@@ -25,6 +25,7 @@ export async function generateMetadata({
     title: journal.title,
     description: journal.summary,
     path: `/journals/${journal.slug}`,
+    markdown: journal.body,
   });
 }
 

@@ -41,7 +41,7 @@ export function GitHubConnect({ locale, dict }: Props) {
     const flag = params.get("github");
     if (flag === "connected") setFlash("ok");
     if (flag === "error") setFlash("err");
-    if (flag) router.replace(`/${locale}/admin`);
+    if (flag) router.replace(`/${locale}/admin?tab=github`);
   }, [params, locale, router]);
 
   async function onConnect() {

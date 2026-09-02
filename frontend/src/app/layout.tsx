@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import {
   Geist_Mono,
   Noto_Sans_SC,
@@ -6,6 +7,7 @@ import {
   Space_Grotesk,
 } from "next/font/google";
 import { ThemeScript } from "@/components/theme-script";
+import { defaultLocale, isLocale } from "@/i18n/config";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -51,12 +53,18 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const raw = (await headers()).get("x-locale") ?? defaultLocale;
+  const locale = isLocale(raw) ? raw : defaultLocale;
   return (
     <html
-      lang="zh-Hant"
+      lang={locale}
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${notoSansTC.variable} ${notoSansSC.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${notoSansTC.variable} ${notoSansSC.variable} ${geistMono.variable} locale-${locale} h-full antialiased`}
     >
       <body className="min-h-full">
         <ThemeScript />

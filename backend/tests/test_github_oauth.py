@@ -94,6 +94,8 @@ async def test_owner_oauth_lists_repos_without_leaking_token(
     location = callback.headers["location"]
     assert "access_token" not in location
     assert "gho_" not in location
+    assert "tab=github" in location
+    assert "github=connected" in location
 
     repos = await client.get("/api/owner/github/repos", headers=headers)
     assert repos.status_code == 200

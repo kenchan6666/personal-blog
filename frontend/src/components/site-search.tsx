@@ -94,7 +94,7 @@ export function SiteSearch({
     for (const module of about) {
       if (haystack(module.title, module.body).includes(q)) {
         hits.push({
-          href: `/${locale}/about`,
+          href: `/${locale}/about#${module.slug}`,
           title: module.title,
           kind: dict.nav.about,
           summary: excerptAround(module.body, q),

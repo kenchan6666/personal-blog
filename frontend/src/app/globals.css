@@ -241,6 +241,10 @@ html {
   overflow-x: clip;
 }
 
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 body {
   margin: 0;
   color: var(--text-primary);
@@ -478,6 +482,10 @@ a:visited {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--text-muted);
+}
+
+.about-module {
+  scroll-margin-top: 5.5rem;
 }
 
 .about-heading {
@@ -1240,7 +1248,7 @@ html.is-route-pending .site-main {
   position: fixed;
   inset: 0;
   border: 0;
-  background: rgba(243, 240, 250, 0.52);
+  background: var(--scrim);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   opacity: 0;

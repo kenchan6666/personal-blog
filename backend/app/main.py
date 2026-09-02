@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from beanie import PydanticObjectId, init_beanie
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
@@ -784,10 +784,14 @@ def create_app(
         return project.to_owner_dict()
 
     def github_redirect(*, connected: bool) -> RedirectResponse:
-        dest = settings.github_oauth_success_url
-        joiner = "&" if "?" in dest else "?"
-        flag = "connected" if connected else "error"
-        return RedirectResponse(f"{dest}{joiner}github={flag}", status_code=302)
+        dest = urlparse(settings.github_oauth_success_url)
+        query = dict(parse_qsl(dest.query, keep_blank_values=True))
+        query["tab"] = "github"
+        query["github"] = "connected" if connected else "error"
+        return RedirectResponse(
+            urlunparse(dest._replace(query=urlencode(query))),
+            status_code=302,
+        )
 
     async def github_access_token() -> str | None:
         redis: Redis = app.state.redis

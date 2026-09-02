@@ -35,7 +35,11 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const requested = searchParams.get("tab");
-  const tab: Tab = isTab(requested) ? requested : "site";
+  const tab: Tab = isTab(requested)
+    ? requested
+    : searchParams.get("github")
+      ? "github"
+      : "site";
 
   function setTab(next: Tab) {
     const params = new URLSearchParams(searchParams.toString());
@@ -106,7 +110,9 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
             <ArticleEditor dict={dict} />
           </>
         ) : null}
-        {tab === "comments" ? <CommentModerator dict={dict} /> : null}
+        {tab === "comments" ? (
+          <CommentModerator locale={locale} dict={dict} />
+        ) : null}
       </div>
     </div>
   );
