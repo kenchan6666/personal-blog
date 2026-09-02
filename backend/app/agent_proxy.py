@@ -4,6 +4,7 @@ import codecs
 import json
 import re
 from collections.abc import AsyncIterator, Callable
+from time import monotonic
 from typing import Any, Literal
 
 import httpx
@@ -311,7 +312,45 @@ def register_agent_routes(
             assistant = ""
             buffer = ""
             decoder = codecs.getincrementaldecoder("utf-8")()
+            seen_knowledge = {
+                str(row.id): (row.updated_at.isoformat(), row.vector_synced)
+                for row in knowledge
+            }
+            last_knowledge_check = 0.0
             timeout = httpx.Timeout(180.0, connect=10.0)
+
+            async def knowledge_update_event(
+                *,
+                force: bool = False,
+            ) -> bytes | None:
+                nonlocal last_knowledge_check, seen_knowledge
+                now = monotonic()
+                if not force and now - last_knowledge_check < 0.75:
+                    return None
+                last_knowledge_check = now
+                rows = await current_store().find_all(KnowledgeRecord)
+                current = {
+                    str(row.id): (row.updated_at.isoformat(), row.vector_synced)
+                    for row in rows
+                }
+                if current == seen_knowledge:
+                    return None
+                changed_ids = sorted(
+                    record_id
+                    for record_id in set(seen_knowledge) | set(current)
+                    if seen_knowledge.get(record_id) != current.get(record_id)
+                )
+                seen_knowledge = current
+                rows.sort(key=lambda row: (row.order, row.updated_at), reverse=True)
+                payload = {
+                    "changedIds": changed_ids,
+                    "items": [row.to_owner_dict() for row in rows],
+                }
+                return (
+                    "event: knowledge_updated\n"
+                    f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+                ).encode()
+
             try:
                 async with (
                     httpx.AsyncClient(timeout=timeout) as client,
@@ -349,9 +388,16 @@ def register_agent_routes(
                         buffer = blocks.pop()
                         assistant += "".join(_sse_delta(block) for block in blocks)
                         yield chunk
+                        if not buffer:
+                            event = await knowledge_update_event()
+                            if event is not None:
+                                yield event
                     buffer += decoder.decode(b"", final=True)
                     if buffer.strip():
                         assistant += _sse_delta(buffer)
+                    event = await knowledge_update_event(force=True)
+                    if event is not None:
+                        yield event
             except httpx.HTTPError:
                 yield (
                     b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'

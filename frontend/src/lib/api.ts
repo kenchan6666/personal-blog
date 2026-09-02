@@ -1061,6 +1061,12 @@ export type AgentKnowledgeInput = {
   order: number;
 };
 
+export type AgentStreamEvent = {
+  type: "knowledge_updated";
+  changedIds: string[];
+  items: AgentKnowledge[];
+};
+
 async function ownerAgentJson<T>(
   token: string,
   path: string,
@@ -1165,6 +1171,7 @@ export async function streamOwnerAgent(
   context: string,
   files: File[],
   onDelta: (text: string) => void,
+  onEvent?: (event: AgentStreamEvent) => void,
 ): Promise<string> {
   let body: BodyInit;
   let headers: HeadersInit = { Authorization: `Bearer ${token}` };
@@ -1209,6 +1216,20 @@ export async function streamOwnerAgent(
       const payload = JSON.parse(data);
       if (event === "error") {
         streamError = payload.message || "agent_error";
+        return;
+      }
+      if (event === "knowledge_updated") {
+        onEvent?.({
+          type: "knowledge_updated",
+          changedIds: Array.isArray(payload.changedIds)
+            ? payload.changedIds.filter(
+                (value: unknown): value is string => typeof value === "string",
+              )
+            : [],
+          items: Array.isArray(payload.items)
+            ? (payload.items as AgentKnowledge[])
+            : [],
+        });
         return;
       }
       const delta = payload.choices?.[0]?.delta?.content;

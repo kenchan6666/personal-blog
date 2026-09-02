@@ -16,6 +16,7 @@ import {
   type AgentKnowledge,
   type AgentKnowledgeInput,
   type AgentMessage,
+  type AgentStreamEvent,
   type Localized,
 } from "@/lib/api";
 import { CmsModal } from "./cms-modal";
@@ -74,9 +75,14 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [savingKnowledge, setSavingKnowledge] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingConversation, setDeletingConversation] = useState(false);
+  const [agentActivity, setAgentActivity] = useState("");
+  const [recentKnowledgeIds, setRecentKnowledgeIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const activityTimerRef = useRef<number | null>(null);
 
   async function refreshConversations(token: string) {
     const rows = await listAgentConversations(token);
@@ -118,7 +124,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   useEffect(() => {
     const timer = window.setTimeout(() => void initialize(), 0);
     // The workspace is initialized once; tab remounts reload persisted state.
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      if (activityTimerRef.current !== null) {
+        window.clearTimeout(activityTimerRef.current);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -129,6 +140,26 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const latestAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant" && item.content.trim());
+
+  function handleStreamEvent(event: AgentStreamEvent) {
+    if (event.type !== "knowledge_updated") return;
+    setKnowledge(event.items);
+    setRecentKnowledgeIds(new Set(event.changedIds));
+    const changed = event.items.find((item) =>
+      event.changedIds.includes(item.id),
+    );
+    setAgentActivity(
+      changed ? `已同步到“关于我” · ${changed.title}` : "“关于我”已同步",
+    );
+    if (activityTimerRef.current !== null) {
+      window.clearTimeout(activityTimerRef.current);
+    }
+    activityTimerRef.current = window.setTimeout(() => {
+      setAgentActivity("");
+      setRecentKnowledgeIds(new Set());
+      activityTimerRef.current = null;
+    }, 2600);
+  }
 
   async function createConversation() {
     const token = getSessionToken();
@@ -230,8 +261,14 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
             ),
           );
         },
+        handleStreamEvent,
       );
-      await refreshConversations(token);
+      await Promise.all([
+        refreshConversations(token),
+        compact
+          ? Promise.resolve()
+          : listAgentKnowledge(token).then(setKnowledge),
+      ]);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Agent 暂时无法回应。");
       setMessages((current) =>
@@ -361,6 +398,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 : "会话与消息已持久保存，并会检索右侧个人资料辅助回答。"}
             </p>
           </div>
+          {agentActivity || sending ? (
+            <div className="agent-live-activity" aria-live="polite">
+              <i aria-hidden="true" />
+              <span>{agentActivity || "正在处理并同步数据…"}</span>
+            </div>
+          ) : null}
         </div>
 
         <div className="agent-messages" aria-live="polite">
@@ -565,7 +608,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               </div>
             ) : null}
             {knowledge.map((record) => (
-              <article key={record.id} className="agent-knowledge-card">
+              <article
+                key={record.id}
+                className={`agent-knowledge-card${
+                  recentKnowledgeIds.has(record.id) ? " is-live" : ""
+                }`}
+              >
                 <div className="agent-knowledge-meta">
                   <span>{CATEGORY_LABELS[record.category] ?? "其他"}</span>
                   <i

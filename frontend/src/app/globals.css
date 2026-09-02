@@ -3080,6 +3080,16 @@ html[data-theme="dark"] .ambient-orb {
   border: 1px solid var(--hairline);
   border-radius: 16px;
   background: var(--panel-fill-strong);
+  transition:
+    border-color 260ms ease,
+    box-shadow 260ms ease,
+    transform 260ms ease;
+}
+
+.agent-knowledge-card.is-live {
+  border-color: color-mix(in srgb, #ff8a65 38%, var(--hairline));
+  box-shadow: 0 10px 28px rgb(255 122 89 / 10%);
+  animation: agent-knowledge-live 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .agent-knowledge-meta {
@@ -3186,6 +3196,37 @@ html[data-theme="dark"] .ambient-orb {
   margin-top: 0.2rem;
   color: var(--text-muted);
   font-size: 0.82rem;
+}
+
+.agent-live-activity {
+  display: flex;
+  max-width: 16rem;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+  padding: 0.38rem 0.62rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--panel-fill-strong) 82%, transparent);
+  font-size: 0.7rem;
+  animation: agent-status-enter 220ms ease-out both;
+}
+
+.agent-live-activity i {
+  width: 0.42rem;
+  height: 0.42rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #ff8a65;
+  box-shadow: 0 0 0 0 rgb(255 138 101 / 35%);
+  animation: agent-live-pulse 1.6s ease-out infinite;
+}
+
+.agent-live-activity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .agent-orb {
@@ -3421,6 +3462,21 @@ html[data-theme="dark"] .ambient-orb {
   50% { opacity: 0.9; transform: scale(1.08); }
 }
 
+@keyframes agent-status-enter {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes agent-live-pulse {
+  65% { box-shadow: 0 0 0 5px rgb(255 138 101 / 0%); }
+  100% { box-shadow: 0 0 0 0 rgb(255 138 101 / 0%); }
+}
+
+@keyframes agent-knowledge-live {
+  from { opacity: 0.72; transform: translateY(7px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-copy,
   .hero-visual,
@@ -3436,7 +3492,10 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-orb::after,
-  .agent-orb .particle {
+  .agent-orb .particle,
+  .agent-live-activity,
+  .agent-live-activity i,
+  .agent-knowledge-card.is-live {
     animation: none !important;
   }
 
