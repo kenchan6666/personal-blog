@@ -57,9 +57,8 @@ RUN useradd -m -u 1000 -s /bin/bash viola && \
     chown -R viola:viola /home/viola /app
 
 COPY viola-agent/entrypoint.sh /usr/local/bin/entrypoint.sh
-COPY scripts/container-logs/hourly-log-sidecar.sh /hourly-log/hourly-log-sidecar.sh
-RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh /hourly-log/hourly-log-sidecar.sh && \
-    chmod +x /usr/local/bin/entrypoint.sh /hourly-log/hourly-log-sidecar.sh
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh
 
 USER viola
 ENV HOME=/home/viola
