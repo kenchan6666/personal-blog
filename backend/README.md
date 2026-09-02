@@ -110,8 +110,10 @@ Owner-managed CV-like blocks on the public personal-detail page (`/about`).
 
 - `GET /api/public/about?locale=zh-Hant|zh-Hans|en` — Published only, ordered
 - `GET/POST /api/owner/about-modules` and `PUT/DELETE /api/owner/about-modules/{id}` (Bearer)
+- `POST /api/owner/media` multipart field `file` (png/jpeg/webp, Bearer) — returns `{ url }` for Markdown images
+- `GET /api/public/media/content/{filename}`
 
-Kinds: `summary`, `education`, `achievement`, `experience`, `custom`. Trilingual Markdown: `title`, `body`. Status is `draft` | `published`.
+Kinds: `summary`, `education`, `achievement`, `experience`, `custom`. Each kind has a distinct public template (narrative / timeline / cards). Trilingual Markdown: `title`, `body`. Status is `draft` | `published`.
 
 ## GitHub OAuth + SourceRepo
 

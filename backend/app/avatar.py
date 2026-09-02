@@ -24,6 +24,10 @@ def hero_visual_public_url(filename: str) -> str:
     return f"/api/public/media/hero/{filename}"
 
 
+def content_public_url(filename: str) -> str:
+    return f"/api/public/media/content/{filename}"
+
+
 def media_type_for_filename(filename: str) -> str:
     return EXT_TO_TYPE.get(Path(filename).suffix.lower(), "application/octet-stream")
 

@@ -35,6 +35,9 @@ export type OwnerSite = {
   heroVisualPosY: number;
   heroVisualScale: number;
   heroVisualBlur: number;
+  articlesLead: Localized;
+  aboutLead: Localized;
+  aboutEmpty: Localized;
   links: OwnerLink[];
 };
 
@@ -69,6 +72,11 @@ export type PublicSite = {
     avatarUrl: string;
     links: PublicLink[];
   };
+  pages?: {
+    articlesLead: string;
+    aboutLead: string;
+    aboutEmpty: string;
+  };
 };
 
 export function emptyLocalized(): Localized {
@@ -97,6 +105,9 @@ export function emptyOwnerSite(): OwnerSite {
     heroVisualPosY: 50,
     heroVisualScale: 100,
     heroVisualBlur: 0,
+    articlesLead: emptyLocalized(),
+    aboutLead: emptyLocalized(),
+    aboutEmpty: emptyLocalized(),
     links: [],
   };
 }
@@ -238,6 +249,21 @@ export async function clearOwnerHeroVisual(token: string): Promise<OwnerSite> {
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerSite;
+}
+
+export async function uploadOwnerMedia(
+  token: string,
+  file: File,
+): Promise<{ url: string }> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/api/owner/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as { url: string };
 }
 
 export type SourceRepo = {

@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
-import { MarkdownBody } from "@/components/markdown-body";
+import { AboutStory } from "@/components/about-story";
 import { PageFrame } from "@/components/page-frame";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { fetchPublicAbout } from "@/lib/api";
+import type { AboutKind } from "@/lib/api";
+import { fetchPublicAbout, fetchPublicSite } from "@/lib/api";
+import { pageCopy } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,12 @@ export default async function AboutPage({
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
   const dict = getDictionary(locale);
-  const modules = await fetchPublicAbout(locale);
+  const [modules, site] = await Promise.all([
+    fetchPublicAbout(locale),
+    fetchPublicSite(locale),
+  ]);
 
-  const kindLabel: Record<string, string> = {
+  const kindLabel: Record<AboutKind, string> = {
     summary: dict.about.kindSummary,
     education: dict.about.kindEducation,
     achievement: dict.about.kindAchievement,
@@ -26,22 +31,15 @@ export default async function AboutPage({
     custom: dict.about.kindCustom,
   };
 
+  const lead = pageCopy(site, "aboutLead", dict.about.lead);
+  const empty = pageCopy(site, "aboutEmpty", dict.about.empty);
+
   return (
-    <PageFrame title={dict.about.title} lead={dict.about.lead} narrow>
+    <PageFrame title={dict.about.title} lead={lead} narrow>
       {modules.length === 0 ? (
-        <p className="text-[var(--text-muted)]">{dict.about.empty}</p>
+        <p className="about-empty">{empty}</p>
       ) : (
-        <div className="about-stack">
-          {modules.map((module) => (
-            <section key={module.slug} className="about-module">
-              <p className="about-kicker">{kindLabel[module.kind] ?? module.kind}</p>
-              {module.title ? (
-                <h2 className="about-heading display-font">{module.title}</h2>
-              ) : null}
-              {module.body ? <MarkdownBody source={module.body} /> : null}
-            </section>
-          ))}
-        </div>
+        <AboutStory modules={modules} kindLabel={kindLabel} />
       )}
     </PageFrame>
   );

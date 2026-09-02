@@ -83,7 +83,7 @@ export function GitHubConnect({ locale, dict }: Props) {
         )}
       </div>
       {flash === "ok" ? (
-        <p className="mt-3 text-sm text-[var(--accent-link)]">{a.githubConnected}</p>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">{a.githubConnected}</p>
       ) : null}
       {flash === "err" ? (
         <p className="mt-3 text-sm text-[var(--danger)]">{a.errorGeneric}</p>

@@ -239,7 +239,7 @@ export function SiteEditor({ dict }: Props) {
               {a.close}
             </button>
             {message ? (
-              <p className="text-sm text-[var(--accent-link)]">{message}</p>
+              <p className="text-sm text-[var(--text-muted)]">{message}</p>
             ) : null}
             {error ? (
               <p className="text-sm text-[var(--danger)]">{error}</p>
@@ -332,6 +332,27 @@ export function SiteEditor({ dict }: Props) {
             onChange={(heroCtaArticles) =>
               setSite({ ...site, heroCtaArticles })
             }
+          />
+          <BilingualField
+            label={a.fieldArticlesLead}
+            value={site.articlesLead}
+            onChange={(articlesLead) => setSite({ ...site, articlesLead })}
+            multiline
+            rows={3}
+          />
+          <BilingualField
+            label={a.fieldAboutLead}
+            value={site.aboutLead}
+            onChange={(aboutLead) => setSite({ ...site, aboutLead })}
+            multiline
+            rows={3}
+          />
+          <BilingualField
+            label={a.fieldAboutEmpty}
+            value={site.aboutEmpty}
+            onChange={(aboutEmpty) => setSite({ ...site, aboutEmpty })}
+            multiline
+            rows={2}
           />
           <BilingualField
             label={a.fieldBio}

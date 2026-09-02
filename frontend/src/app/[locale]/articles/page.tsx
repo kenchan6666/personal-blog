@@ -7,7 +7,9 @@ import {
   articleHref,
   fetchPublicArticleCategories,
   fetchPublicArticles,
+  fetchPublicSite,
 } from "@/lib/api";
+import { pageCopy } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +22,18 @@ export default async function ArticlesPage({
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
   const dict = getDictionary(locale);
-  const [articles, categories] = await Promise.all([
+  const [articles, categories, site] = await Promise.all([
     fetchPublicArticles(locale),
     fetchPublicArticleCategories(locale),
+    fetchPublicSite(locale),
   ]);
 
   return (
-    <PageFrame title={dict.nav.articles} lead={dict.articles.lead} narrow>
+    <PageFrame
+      title={dict.nav.articles}
+      lead={pageCopy(site, "articlesLead", dict.articles.lead)}
+      narrow
+    >
       <PostArchive
         locale={locale}
         searchPlaceholder={dict.archive.search}

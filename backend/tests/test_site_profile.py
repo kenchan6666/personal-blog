@@ -133,3 +133,44 @@ async def test_public_site_falls_back_to_filled_locale(
     assert en_body["profile"]["bio"] == "簡介"
     assert en_body["profile"]["links"][0]["label"] == "GitHub"
     assert en_body["hero"]["visual"] is None
+
+
+@pytest.mark.asyncio
+async def test_owner_can_save_public_page_copy(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    saved = await client.put(
+        "/api/owner/site",
+        json={
+            "articlesLead": {
+                "zh-Hant": "太鼓與工程筆記。",
+                "zh-Hans": "太鼓与工程笔记。",
+                "en": "Notes on taiko and engineering.",
+            },
+            "aboutLead": {
+                "zh-Hant": "學歷與經歷。",
+                "zh-Hans": "学历与经历。",
+                "en": "Education and experience.",
+            },
+            "aboutEmpty": {
+                "zh-Hant": "內容稍後補上。",
+                "zh-Hans": "内容稍后补上。",
+                "en": "More coming soon.",
+            },
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert saved.status_code == 200
+    body = saved.json()
+    assert body["articlesLead"]["zh-Hant"] == "太鼓與工程筆記。"
+    assert body["aboutLead"]["en"] == "Education and experience."
+    assert body["aboutEmpty"]["zh-Hans"] == "内容稍后补上。"
+
+    public = await client.get("/api/public/site", params={"locale": "zh-Hant"})
+    assert public.status_code == 200
+    pages = public.json()["pages"]
+    assert pages["articlesLead"] == "太鼓與工程筆記。"
+    assert pages["aboutLead"] == "學歷與經歷。"
+    assert pages["aboutEmpty"] == "內容稍後補上。"
+
+    english = await client.get("/api/public/site", params={"locale": "en"})
+    assert english.json()["pages"]["articlesLead"] == "Notes on taiko and engineering."

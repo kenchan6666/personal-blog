@@ -185,7 +185,7 @@ export function JournalEditor({ dict }: Props) {
               {a.close}
             </button>
             {message ? (
-              <p className="text-sm text-[var(--accent-link)]">{message}</p>
+              <p className="text-sm text-[var(--text-muted)]">{message}</p>
             ) : null}
             {error ? (
               <p className="text-sm text-[var(--danger)]">{error}</p>

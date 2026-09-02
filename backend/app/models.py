@@ -97,6 +97,9 @@ class SiteProfile(Document):
     hero_visual_pos_y: float = 50
     hero_visual_scale: float = 100
     hero_visual_blur: float = 0
+    articles_lead: dict[str, str] = Field(default_factory=empty_localized)
+    about_lead: dict[str, str] = Field(default_factory=empty_localized)
+    about_empty: dict[str, str] = Field(default_factory=empty_localized)
 
     class Settings:
         name = "site_profile"
@@ -149,6 +152,11 @@ class SiteProfile(Document):
                     for link in links
                 ],
             },
+            "pages": {
+                "articlesLead": pick_localized(self.articles_lead, locale),
+                "aboutLead": pick_localized(self.about_lead, locale),
+                "aboutEmpty": pick_localized(self.about_empty, locale),
+            },
         }
 
     def to_owner_dict(self) -> dict[str, Any]:
@@ -168,6 +176,9 @@ class SiteProfile(Document):
             "heroVisualPosY": self.hero_visual_pos_y,
             "heroVisualScale": self.hero_visual_scale,
             "heroVisualBlur": self.hero_visual_blur,
+            "articlesLead": self.articles_lead,
+            "aboutLead": self.about_lead,
+            "aboutEmpty": self.about_empty,
             "links": [link.model_dump() for link in self.links],
         }
 

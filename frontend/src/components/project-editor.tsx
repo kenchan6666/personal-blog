@@ -275,7 +275,7 @@ export function ProjectEditor({ locale, dict }: Props) {
                 {a.close}
               </button>
               {message ? (
-                <p className="text-sm text-[var(--accent-link)]">{message}</p>
+                <p className="text-sm text-[var(--text-muted)]">{message}</p>
               ) : null}
               {current.id && current.status === "published" ? (
                 <Link

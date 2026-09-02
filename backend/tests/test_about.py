@@ -5,7 +5,10 @@ About modules on the public personal-detail page.
 
 from __future__ import annotations
 
+import io
+
 import pytest
+from PIL import Image
 
 
 async def _owner_token(client, mailer, settings) -> str:
@@ -19,6 +22,12 @@ async def _owner_token(client, mailer, settings) -> str:
         json={"email": settings.owner_email, "code": code},
     )
     return verified.json()["session_token"]
+
+
+def _png_bytes(color: tuple[int, int, int] = (255, 0, 0)) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", (8, 8), color).save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def _about_payload(**overrides):
@@ -98,3 +107,32 @@ async def test_published_about_module_uses_simplified_or_falls_back(
         "/api/public/about", params={"locale": "zh-Hant"}
     )
     assert hant_fallback.json()[0]["title"] == "學歷"
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_cannot_upload_content_image(client):
+    response = await client.post(
+        "/api/owner/media",
+        files={"file": ("note.png", _png_bytes(), "image/png")},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_owner_can_upload_content_image_for_markdown(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    uploaded = await client.post(
+        "/api/owner/media",
+        files={"file": ("campus.png", _png_bytes((40, 80, 120)), "image/png")},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert uploaded.status_code == 200
+    url = uploaded.json()["url"]
+    assert url.startswith("/api/public/media/content/")
+
+    image = await client.get(url)
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/")
+    assert image.content[:8] == b"\x89PNG\r\n\x1a\n"

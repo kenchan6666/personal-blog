@@ -49,6 +49,15 @@ export function MarkdownBody({ source }: { source: string }) {
         </a>
       );
     },
+    img: ({ src, alt }) => {
+      const url = typeof src === "string" ? src : "";
+      const safe =
+        url.startsWith("http://") ||
+        url.startsWith("https://") ||
+        url.startsWith("/");
+      if (!safe) return null;
+      return <img src={url} alt={alt ?? ""} />;
+    },
   };
 
   return (

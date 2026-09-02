@@ -42,3 +42,12 @@ export function brandForShell(dict: Dictionary, site: PublicSite | null): string
   if (!site) return dict.brand;
   return site.brand;
 }
+
+export function pageCopy(
+  site: PublicSite | null,
+  key: "articlesLead" | "aboutLead" | "aboutEmpty",
+  fallback: string,
+): string {
+  const value = site?.pages?.[key]?.trim();
+  return value || fallback;
+}

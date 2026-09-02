@@ -94,7 +94,7 @@ export function CommentModerator({ dict }: Props) {
               </p>
               <p className="mt-2 whitespace-pre-wrap">{comment.body}</p>
               {comment.ownerReply ? (
-                <p className="mt-2 text-sm text-[var(--accent-link)]">
+                <p className="mt-2 text-sm text-[var(--text-muted)]">
                   {a.ownerReply}: {comment.ownerReply}
                 </p>
               ) : null}

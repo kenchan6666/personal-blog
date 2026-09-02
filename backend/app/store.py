@@ -47,9 +47,12 @@ def _construct_document(
     payload.pop("revision_id", None)
     coerced: dict[str, Any] = {}
     for name, field in model.model_fields.items():
-        if name not in payload:
-            continue
-        coerced[name] = TypeAdapter(field.annotation).validate_python(payload[name])
+        if name in payload:
+            coerced[name] = TypeAdapter(field.annotation).validate_python(
+                payload[name]
+            )
+        elif not field.is_required():
+            coerced[name] = field.get_default(call_default_factory=True)
     doc = model.model_construct(**coerced)
     if doc_id:
         doc.id = PydanticObjectId(str(doc_id))

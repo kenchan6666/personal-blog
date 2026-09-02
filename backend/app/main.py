@@ -24,6 +24,7 @@ from app.avatar import (
     resolve_avatar_path,
     save_avatar_file,
     save_hero_visual_file,
+    content_public_url,
 )
 from app.config import Settings
 from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
@@ -102,6 +103,9 @@ class SiteUpdateBody(BaseModel):
     heroVisualPosY: float = 50
     heroVisualScale: float = 100
     heroVisualBlur: float = 0
+    articlesLead: dict[str, str] = Field(default_factory=empty_localized)
+    aboutLead: dict[str, str] = Field(default_factory=empty_localized)
+    aboutEmpty: dict[str, str] = Field(default_factory=empty_localized)
 
 
 class ProjectBody(BaseModel):
@@ -375,6 +379,9 @@ def create_app(
         site.hero_visual_pos_y = clamp(body.heroVisualPosY, 0, 100)
         site.hero_visual_scale = clamp(body.heroVisualScale, 80, 180)
         site.hero_visual_blur = clamp(body.heroVisualBlur, 0, 48)
+        site.articles_lead = body.articlesLead
+        site.about_lead = body.aboutLead
+        site.about_empty = body.aboutEmpty
         await current_store().save(site)
         return site.to_owner_dict()
 
@@ -398,6 +405,33 @@ def create_app(
 
     @app.get("/api/public/media/avatar/{filename}")
     async def public_avatar(filename: str) -> FileResponse:
+        directory: Path = app.state.avatar_dir
+        path = resolve_avatar_path(directory, filename)
+        if path is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        media_type = media_type_for_filename(path.name)
+        return FileResponse(path, media_type=media_type)
+
+    @app.post("/api/owner/media")
+    async def owner_upload_content_image(
+        file: UploadFile = File(...),
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        settings: Settings = app.state.settings
+        directory: Path = app.state.avatar_dir
+        filename = await save_avatar_file(
+            file,
+            directory=directory,
+            max_bytes=max(settings.avatar_max_bytes, 4 * 1024 * 1024),
+            previous_filename=None,
+        )
+        return {"url": content_public_url(filename)}
+
+    @app.get("/api/public/media/content/{filename}")
+    async def public_content_image(filename: str) -> FileResponse:
         directory: Path = app.state.avatar_dir
         path = resolve_avatar_path(directory, filename)
         if path is None:
