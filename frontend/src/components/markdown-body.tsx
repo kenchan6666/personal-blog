@@ -3,6 +3,7 @@ import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { extractMarkdownHeadings } from "@/lib/headings";
+import { isBadgeImage, liftReadmeHtmlImages } from "@/lib/readme-html";
 
 function headingText(children: ReactNode): string {
   return Array.isArray(children)
@@ -13,9 +14,10 @@ function headingText(children: ReactNode): string {
 }
 
 export function MarkdownBody({ source }: { source: string }) {
-  if (!source.trim()) return null;
+  const markdown = liftReadmeHtmlImages(source);
+  if (!markdown.trim()) return null;
 
-  const ids = extractMarkdownHeadings(source).map((heading) => heading.id);
+  const ids = extractMarkdownHeadings(markdown).map((heading) => heading.id);
   let next = 0;
   const takeId = (children: ReactNode) =>
     ids[next++] ?? headingText(children);
@@ -56,14 +58,20 @@ export function MarkdownBody({ source }: { source: string }) {
         url.startsWith("https://") ||
         url.startsWith("/");
       if (!safe) return null;
-      return <img src={url} alt={alt ?? ""} />;
+      return (
+        <img
+          src={url}
+          alt={alt ?? ""}
+          className={isBadgeImage(url) ? "md-badge" : undefined}
+        />
+      );
     },
   };
 
   return (
     <div className="markdown-body typeset-reading">
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {source}
+        {markdown}
       </ReactMarkdown>
     </div>
   );

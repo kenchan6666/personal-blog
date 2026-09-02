@@ -1839,6 +1839,24 @@ html.is-route-pending .site-main {
   height: auto;
 }
 
+.gfm p:has(.md-badge) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.md-badge {
+  display: inline-block;
+  height: 1.25rem;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  border: none;
+  border-radius: 0.2rem;
+  vertical-align: middle;
+}
+
 .table-scroll {
   overflow-x: auto;
   max-width: 100%;
@@ -2213,6 +2231,23 @@ html.is-route-pending .site-main {
   margin: 1.35rem 0;
   border-radius: var(--radius-card);
   border: 1px solid var(--hairline);
+}
+
+.typeset-reading p:has(.md-badge) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.typeset-reading :where(img.md-badge) {
+  display: inline-block;
+  height: 1.25rem;
+  width: auto;
+  max-width: none;
+  margin: 0;
+  border: none;
+  border-radius: 0.2rem;
 }
 
 .typeset-reading {

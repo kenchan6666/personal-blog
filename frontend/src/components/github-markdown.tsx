@@ -2,6 +2,7 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { isBadgeImage, liftReadmeHtmlImages } from "@/lib/readme-html";
 
 type Props = {
   source: string;
@@ -18,7 +19,8 @@ function rewriteUrl(url: string, repoFullName?: string, refName?: string) {
 }
 
 export function GithubMarkdown({ source, repoFullName, refName }: Props) {
-  if (!source.trim()) return null;
+  const markdown = liftReadmeHtmlImages(source);
+  if (!markdown.trim()) return null;
   return (
     <div className="gfm">
       <ReactMarkdown
@@ -35,9 +37,20 @@ export function GithubMarkdown({ source, repoFullName, refName }: Props) {
               {children}
             </a>
           ),
+          img: ({ src, alt }) => {
+            const url = typeof src === "string" ? src : "";
+            if (!url) return null;
+            return (
+              <img
+                src={url}
+                alt={alt ?? ""}
+                className={isBadgeImage(url) ? "md-badge" : undefined}
+              />
+            );
+          },
         }}
       >
-        {source}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
