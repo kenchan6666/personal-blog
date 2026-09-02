@@ -231,6 +231,7 @@ def create_app(
             )
         bind_store(store)
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
+        print(f"[media] dir={avatar_dir}", flush=True)
         app.state.mongo = mongo
         app.state.store = store
         app.state.redis = redis
@@ -410,7 +411,11 @@ def create_app(
                 detail="not_found",
             )
         media_type = media_type_for_filename(path.name)
-        return FileResponse(path, media_type=media_type)
+        return FileResponse(
+            path,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     @app.post("/api/owner/media")
     async def owner_upload_content_image(
@@ -437,7 +442,11 @@ def create_app(
                 detail="not_found",
             )
         media_type = media_type_for_filename(path.name)
-        return FileResponse(path, media_type=media_type)
+        return FileResponse(
+            path,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     @app.post("/api/owner/hero-visual")
     async def owner_upload_hero_visual(
@@ -480,7 +489,11 @@ def create_app(
                 detail="not_found",
             )
         media_type = media_type_for_filename(path.name)
-        return FileResponse(path, media_type=media_type)
+        return FileResponse(
+            path,
+            media_type=media_type,
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     def normalize_locale(locale: str) -> str:
         return locale if locale in LOCALES else "zh-Hant"

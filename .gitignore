@@ -4,6 +4,7 @@ backend/**/__pycache__/
 backend/.pytest_cache/
 backend/.env
 backend/data/
+data/media/
 deploy/.env
 deployment/.env
 deployment/nginx-runtime/default.conf

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { localeLabels } from "@/i18n/config";
 import type { Localized } from "@/lib/api";
-import { emptyLocalized, getSessionToken, uploadOwnerMedia } from "@/lib/api";
+import { emptyLocalized, getSessionToken, mediaUrl, uploadOwnerMedia } from "@/lib/api";
 import { appendMarkdownToAll } from "@/lib/about-templates";
+import { markdownImages } from "@/lib/markdown-images";
 import { MarkdownBody } from "./markdown-body";
 
 type Props = {
@@ -137,9 +138,28 @@ export function BilingualField({
                 }
               />
             )}
+            {allowImages ? (
+              <ImagePreviews source={value[localeKey] ?? ""} />
+            ) : null}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ImagePreviews({ source }: { source: string }) {
+  const images = markdownImages(source);
+  if (images.length === 0) return null;
+  return (
+    <div className="about-image-previews mt-2">
+      {images.map((image, index) => (
+        <img
+          key={`${image.src}-${index}`}
+          src={mediaUrl(image.src)}
+          alt={image.alt || ""}
+        />
+      ))}
     </div>
   );
 }

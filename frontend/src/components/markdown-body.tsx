@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Components } from "react-markdown";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { mediaUrl } from "@/lib/api";
 import { extractMarkdownHeadings } from "@/lib/headings";
 import {
   isBadgeImage,
@@ -58,8 +59,9 @@ export function MarkdownBody({ source }: { source: string }) {
       );
     },
     img: ({ src, alt }) => {
-      const url = typeof src === "string" ? src.trim() : "";
-      if (!isSafeMarkdownImageUrl(url)) return null;
+      const raw = typeof src === "string" ? src.trim() : "";
+      const url = raw ? mediaUrl(raw) : "";
+      if (!isSafeMarkdownImageUrl(url || raw)) return null;
       if (isBadgeImage(url)) {
         return <img src={url} alt={alt ?? ""} className="md-badge" />;
       }

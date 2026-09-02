@@ -25,7 +25,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       AVATAR_DIR: /data/avatars
     volumes:
-      - avatar_data:/data/avatars
+      - ./data/media:/data/avatars
     depends_on:
       - mongo
       - redis
@@ -74,6 +74,5 @@ services:
 
 volumes:
   mongo_data:
-  avatar_data:
   certbot_www:
   certbot_certs:

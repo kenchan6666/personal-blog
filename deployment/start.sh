@@ -121,8 +121,24 @@ wait_http() {
   return 1
 }
 
+ensure_media_dir() {
+  mkdir -p "$ROOT/data/media"
+  if [ -n "$(ls -A "$ROOT/data/media" 2>/dev/null)" ]; then
+    return 0
+  fi
+  local vol
+  vol="$(docker volume ls -q | grep 'avatar_data$' | head -n 1 || true)"
+  if [ -z "$vol" ]; then
+    return 0
+  fi
+  echo "migrating $vol → data/media"
+  docker run --rm -v "$vol:/from:ro" -v "$ROOT/data/media:/to" alpine:3.20 \
+    sh -c 'cp -a /from/. /to/'
+}
+
 start_prod() {
   ensure_prod_env
+  ensure_media_dir
   mkdir -p "$DIR/nginx-runtime"
   cp "$DIR/nginx/http.conf" "$DIR/nginx-runtime/default.conf"
 

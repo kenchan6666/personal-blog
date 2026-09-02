@@ -579,8 +579,8 @@ a:visited {
 }
 
 .about-image-previews img {
-  width: 4.5rem;
-  height: 4.5rem;
+  width: 6.5rem;
+  height: 6.5rem;
   object-fit: cover;
   border-radius: 0.75rem;
   border: 1px solid var(--hairline);
