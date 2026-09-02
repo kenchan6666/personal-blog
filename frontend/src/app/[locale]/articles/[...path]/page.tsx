@@ -12,14 +12,24 @@ import { formatCount, formatPostDate } from "@/lib/post-meta";
 
 export const dynamic = "force-dynamic";
 
-export default async function ArticleDetailPage({
+export default async function ArticlePathPage({
   params,
 }: {
-  params: Promise<{ locale: string; category: string; slug: string }>;
+  params: Promise<{ locale: string; path: string[] }>;
 }) {
-  const { locale: raw, category, slug } = await params;
+  const { locale: raw, path } = await params;
   if (!isLocale(raw)) notFound();
   const locale = raw as Locale;
+
+  if (path.length === 1) {
+    const article = await fetchPublicArticle(locale, path[0]);
+    if (!article) notFound();
+    redirect(articleHref(locale, article));
+  }
+
+  if (path.length !== 2) notFound();
+
+  const [category, slug] = path;
   const dict = getDictionary(locale);
   const article = await fetchPublicArticle(locale, slug);
   if (!article) notFound();
