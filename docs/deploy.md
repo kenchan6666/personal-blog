@@ -67,7 +67,8 @@ Set these values in `deployment/.env` before using the Agent tab:
 - `AGENT_EMBEDDING_MODEL=text-embedding-3-small`: UniAPI 中已验证可用的 Embedding 模型。`gemini-embedding-001` 在部分账号无渠道，同步时会自动回退。
 - `QDRANT_URL=http://qdrant:6333`: Compose 内部向量数据库地址。
 
-Generate the two tokens with `openssl rand -hex 32`. They must be different and
+Generate the two tokens with `python deployment/ensure_agent_tokens.py deployment/.env`
+(no `openssl` or GitHub CLI). They must be different and
 must never use a `NEXT_PUBLIC_` name. The Agent reads all Owner-visible content,
 including drafts and comment email addresses. It can create/update content
 through MCP, but new records are always Draft and no delete tool is exposed.

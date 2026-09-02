@@ -177,7 +177,7 @@ python -m pytest -v
 | `PUBLIC_AGENT_DAILY_BUDGET` | 500 | 全站每日模型呼叫上限 |
 | `GITHUB_CLIENT_ID` / `_SECRET` | — | SourceRepo OAuth |
 
-`AGENT_INTERNAL_TOKEN` 與 `AGENT_SERVICE_TOKEN` 必須不同，且不得使用 `NEXT_PUBLIC_` 前綴。
+`AGENT_INTERNAL_TOKEN` 與 `AGENT_SERVICE_TOKEN` 必須不同，且不得使用 `NEXT_PUBLIC_` 前綴。若為空，`deployment/start.sh --prod`（或 `start.ps1`）會自動生成，不需要 `gh` 或 `openssl`。
 
 RAG：保存/編輯知識時立即嘗試同步；失敗仍寫 Mongo。後台可單條或「同步全部」。批量同步若偵測向量維度不兼容，只重建 Qdrant collection，再從 Mongo 恢復，不刪正文。
 

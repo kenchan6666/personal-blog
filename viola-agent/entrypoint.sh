@@ -1,6 +1,12 @@
 #!/bin/sh
 set -eu
 
+if [ "$(id -u)" = "0" ]; then
+    mkdir -p /home/viola/.viola
+    chown -R viola:viola /home/viola/.viola
+    exec gosu viola "$0" "$@"
+fi
+
 dir="$HOME/.viola"
 if [ -d "$dir" ] && [ ! -w "$dir" ]; then
     owner_uid=$(stat -c %u "$dir" 2>/dev/null || stat -f %u "$dir" 2>/dev/null)

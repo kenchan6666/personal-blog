@@ -10,7 +10,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 # Install Node.js 20 for the WhatsApp bridge
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl ca-certificates gnupg git bubblewrap openssh-client && \
+    apt-get install -y --no-install-recommends curl ca-certificates gnupg git bubblewrap openssh-client gosu && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
@@ -32,7 +32,8 @@ RUN mkdir -p viola bridge && touch viola/__init__.py && \
 COPY viola-agent/viola/ viola/
 COPY viola-agent/bridge/ bridge/
 COPY viola-agent/main.py ./
-RUN uv pip install --system --no-cache ".[api,twilio,whatsapp_webhook]"
+RUN rm -rf /app/viola/skills/github && \
+    uv pip install --system --no-cache ".[api,twilio,whatsapp_webhook]"
 
 # Portfolio MCP package (monorepo default)
 ARG MCP_PORTFOLIO_PACKAGE=""
@@ -60,7 +61,7 @@ COPY viola-agent/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && \
     chmod +x /usr/local/bin/entrypoint.sh
 
-USER viola
+USER root
 ENV HOME=/home/viola
 
 # Gateway default port

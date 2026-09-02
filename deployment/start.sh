@@ -57,6 +57,7 @@ ensure_prod_env() {
     cp "$DIR/env.example" "$DIR/.env"
     echo "created $DIR/.env from env.example — edit secrets if you need SMTP or GitHub OAuth"
   fi
+  "$(host_python)" "$DIR/ensure_agent_tokens.py" "$DIR/.env"
 }
 
 compose_prod() {

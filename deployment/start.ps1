@@ -24,6 +24,8 @@ function EnsureProdEnv($Dir) {
         Copy-Item (Join-Path $Dir "env.example") $envFile
         Write-Host "created $envFile from env.example -- edit secrets if you need SMTP or GitHub OAuth"
     }
+    & (HostPython) (Join-Path $Dir "ensure_agent_tokens.py") $envFile
+    if ($LASTEXITCODE -ne 0) { throw "failed to ensure AGENT_* tokens" }
 }
 
 function ComposeProd($Root, $Dir, [string[]]$ComposeArgs) {

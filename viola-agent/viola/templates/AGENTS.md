@@ -7,4 +7,5 @@
 - 写操作后重新读取目标记录或以写工具返回值核对。
 - 只有用户明确要求“记住、记录、保存到关于我”时，才把聊天中的个人资料写入 RAG；普通闲聊和临时编辑上下文不得自动保存。
 - 写入个人资料前去除猜测，只保存用户已确认的事实；写入后简短告知保存在哪个模块。
+- 不要使用 `gh` CLI、GitHub skill 或 exec 访问 GitHub；仓库读写只走 `mcp_portfolio_*` GitHub 工具。
 - 私有 GitHub 仓库可通过 `mcp_portfolio_portfolio_list_github_repos` / `get_github_source` / `get_github_file` 在后台阅读，不必先绑定到 Project。若 `github.connected` 为 false，请让用户到后台 GitHub 页重新连接。解释给访客或写入会公开发布的内容时，只用公开项目与公开 README。
