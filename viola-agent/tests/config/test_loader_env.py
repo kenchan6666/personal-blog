@@ -90,7 +90,7 @@ def test_uniapi_base_env_fallback_from_uni_api_base(
 ) -> None:
     monkeypatch.setenv("UNI_API_BASE", "https://api.uniapi.io")
     config = load_config(_MISSING_CONFIG)
-    assert config.providers.uniapi.api_base == "https://api.uniapi.io"
+    assert config.providers.uniapi.api_base == "https://api.uniapi.io/v1"
 
 
 def test_uniapi_base_env_normalizes_claude_path(
@@ -98,7 +98,7 @@ def test_uniapi_base_env_normalizes_claude_path(
 ) -> None:
     monkeypatch.setenv("UNI_API_BASE", "https://hk.uniapi.io/claude")
     config = load_config(_MISSING_CONFIG)
-    assert config.providers.uniapi.api_base == "https://api.uniapi.io"
+    assert config.providers.uniapi.api_base == "https://api.uniapi.io/v1"
 
 
 def test_uniapi_base_env_normalizes_portal_url(
@@ -106,7 +106,7 @@ def test_uniapi_base_env_normalizes_portal_url(
 ) -> None:
     monkeypatch.setenv("UNI_API_BASE", "https://uniapi.ai")
     config = load_config(_MISSING_CONFIG)
-    assert config.providers.uniapi.api_base == "https://api.uniapi.io"
+    assert config.providers.uniapi.api_base == "https://api.uniapi.io/v1"
 
 
 def test_get_api_base_uniapi_claude_model_uses_configured_gateway() -> None:
@@ -114,7 +114,7 @@ def test_get_api_base_uniapi_claude_model_uses_configured_gateway() -> None:
     config.providers.uniapi.api_base = "https://hk.uniapi.io/claude"
     config.agents.defaults.model = "claude-sonnet-4-6"
     config.agents.defaults.provider = "uniapi"
-    assert config.get_api_base("claude-sonnet-4-6") == "https://api.uniapi.io"
+    assert config.get_api_base("claude-sonnet-4-6") == "https://api.uniapi.io/v1"
 
 
 def test_uniapi_key_falls_back_to_openrouter_api_key(
@@ -130,7 +130,7 @@ def test_uniapi_base_falls_back_to_openrouter_base_url(
 ) -> None:
     monkeypatch.setenv("OPENROUTER_BASE_URL", "https://api.uniapi.io")
     config = load_config(_MISSING_CONFIG)
-    assert config.providers.uniapi.api_base == "https://api.uniapi.io"
+    assert config.providers.uniapi.api_base == "https://api.uniapi.io/v1"
 
 
 def test_load_mcp_fragment_reads_mcp_common_package(monkeypatch) -> None:

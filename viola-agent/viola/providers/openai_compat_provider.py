@@ -618,7 +618,7 @@ class OpenAICompatProvider(LLMProvider):
             return LLMResponse(
                 content=(
                     "Error: upstream API returned an HTML page instead of a model response. "
-                    "For UniAPI, api_base should be https://api.uniapi.io."
+                    "For UniAPI, api_base should be https://api.uniapi.io/v1."
                 ),
                 finish_reason="error",
             )

@@ -134,7 +134,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
     ),
     # === Gateways (detected by api_key / api_base, not model name) =========
     # Gateways can route any model, so they win in fallback.
-    # UniAPI: OpenAI/Claude/Gemini gateway (https://api.uniapi.io)
+    # UniAPI: OpenAI/Claude/Gemini gateway (https://api.uniapi.io/v1)
     ProviderSpec(
         name="uniapi",
         keywords=("uniapi",),
@@ -143,7 +143,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
         backend="openai_compat",
         is_gateway=True,
         detect_by_base_keyword="uniapi",
-        default_api_base="https://api.uniapi.io",
+        default_api_base="https://api.uniapi.io/v1",
         model_api_bases=(
             ("claude", "https://api.uniapi.io/claude"),
             ("anthropic", "https://api.uniapi.io/claude"),
@@ -476,7 +476,7 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 
 
 # OpenAI-compatible chat completions (not Anthropic-native /claude).
-_UNIAPI_OPENAI_COMPAT_BASE = "https://api.uniapi.io"
+_UNIAPI_OPENAI_COMPAT_BASE = "https://api.uniapi.io/v1"
 
 
 def normalize_uniapi_api_base(raw: str) -> str:
@@ -492,6 +492,10 @@ def normalize_uniapi_api_base(raw: str) -> str:
     if not base:
         return _UNIAPI_OPENAI_COMPAT_BASE
     lower = base.lower()
+    if lower == "https://api.uniapi.io":
+        return _UNIAPI_OPENAI_COMPAT_BASE
+    if lower == _UNIAPI_OPENAI_COMPAT_BASE:
+        return base
     if "uniapi.ai" in lower and "api.uniapi.io" not in lower:
         logger.warning(
             "Normalizing UniAPI api_base from portal URL {!r} to {}",

@@ -25,7 +25,7 @@ _RETRYABLE_EXCEPTIONS = (
     httpx.RemoteProtocolError,
 )
 
-_UNIAPI_DEFAULT_API_BASE = "https://api.uniapi.io"
+_UNIAPI_DEFAULT_API_BASE = "https://api.uniapi.io/v1"
 
 
 async def _post_transcription_with_retry(
