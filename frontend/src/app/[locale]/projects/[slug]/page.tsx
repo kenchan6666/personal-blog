@@ -1,12 +1,49 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { MarkdownBody } from "@/components/markdown-body";
 import { PageFrame, PagePanel } from "@/components/page-frame";
+import { PixelSpinner } from "@/components/page-loading";
 import { SourceBrowser } from "@/components/source-browser";
-import { getDictionary } from "@/i18n/dictionaries";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { fetchPublicProject, fetchPublicSource } from "@/lib/api";
+import {
+  fetchPublicProject,
+  fetchPublicSource,
+  type SourceRepo,
+} from "@/lib/api";
 
 export const dynamic = "force-dynamic";
+
+function SourceFallback({ label }: { label: string }) {
+  return (
+    <div className="source-loading">
+      <PixelSpinner label={label} />
+      <p>{label}</p>
+    </div>
+  );
+}
+
+async function ProjectSource({
+  slug,
+  dict,
+  sourceRepo,
+}: {
+  slug: string;
+  dict: Dictionary;
+  sourceRepo: SourceRepo;
+}) {
+  const source = await fetchPublicSource(slug);
+  return (
+    <PagePanel label={dict.projects.source}>
+      <SourceBrowser
+        slug={slug}
+        dict={dict}
+        sourceRepo={sourceRepo}
+        initial={source}
+      />
+    </PagePanel>
+  );
+}
 
 export default async function ProjectDetailPage({
   params,
@@ -20,10 +57,6 @@ export default async function ProjectDetailPage({
   const copy = dict.projects;
   const project = await fetchPublicProject(locale, slug);
   if (!project) notFound();
-  const source =
-    project.sourceRepo && !project.sourceRepo.private
-      ? await fetchPublicSource(project.slug)
-      : null;
 
   return (
     <PageFrame
@@ -52,14 +85,19 @@ export default async function ProjectDetailPage({
         </PagePanel>
       ) : null}
       {project.sourceRepo && !project.sourceRepo.private ? (
-        <PagePanel label={copy.source}>
-          <SourceBrowser
+        <Suspense
+          fallback={
+            <PagePanel label={copy.source}>
+              <SourceFallback label={copy.sourceLoading} />
+            </PagePanel>
+          }
+        >
+          <ProjectSource
             slug={project.slug}
             dict={dict}
             sourceRepo={project.sourceRepo}
-            initial={source}
           />
-        </PagePanel>
+        </Suspense>
       ) : null}
     </PageFrame>
   );

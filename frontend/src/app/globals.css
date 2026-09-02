@@ -312,6 +312,136 @@ a:visited {
   min-height: 100svh;
 }
 
+html.is-route-pending,
+html.is-route-pending * {
+  cursor: progress;
+}
+
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 80;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+  background: rgba(255, 92, 122, 0.18);
+}
+
+.route-progress span {
+  display: block;
+  height: 100%;
+  width: 40%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--accent-cta),
+    var(--accent-cta-end)
+  );
+  animation: route-progress-slide 1.05s ease-in-out infinite;
+}
+
+.page-loading {
+  padding: 4.5rem max(1.5rem, env(safe-area-inset-right)) 5.5rem
+    max(1.5rem, env(safe-area-inset-left));
+  max-width: 56rem;
+}
+
+.page-loading-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.pixel-spinner {
+  display: inline-block;
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--accent-cta);
+  box-shadow:
+    0.55rem 0 var(--accent-cta-end),
+    0 0.55rem var(--accent-link),
+    0.55rem 0.55rem var(--accent-cta);
+  animation: pixel-spin 0.55s steps(4) infinite;
+}
+
+@keyframes pixel-spin {
+  to {
+    transform: rotate(90deg);
+  }
+}
+
+.skel {
+  border-radius: var(--radius-card);
+  background: linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.28) 20%,
+    rgba(255, 255, 255, 0.72) 50%,
+    rgba(255, 255, 255, 0.28) 80%
+  );
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.35s ease-in-out infinite;
+}
+
+.skel-kicker {
+  width: 5.5rem;
+  height: 0.7rem;
+  margin-bottom: 0.85rem;
+}
+
+.skel-title {
+  width: min(72%, 22rem);
+  height: 2.1rem;
+  margin-bottom: 0.85rem;
+}
+
+.skel-lead {
+  width: min(90%, 34rem);
+  height: 0.95rem;
+  margin-bottom: 1.6rem;
+}
+
+.skel-panel {
+  height: 9.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--hairline);
+}
+
+.skel-panel-short {
+  height: 5.5rem;
+}
+
+@keyframes route-progress-slide {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+@keyframes skel-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-progress span,
+  .skel,
+  .pixel-spinner {
+    animation: none;
+  }
+}
+
 @media (min-width: 1024px) {
   .icon-btn.sidebar-fab {
     display: none;
@@ -1327,6 +1457,33 @@ a:visited {
 
 .gh-repo {
   width: 100%;
+  position: relative;
+}
+
+.gh-busy {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.source-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 8rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.gh-busy-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
 }
 
 .gh-repo-header {

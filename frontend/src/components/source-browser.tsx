@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { SourceRepo } from "@/lib/api";
 import {
@@ -10,6 +10,7 @@ import {
   type PublicSourceOverview,
   type SourceTreeEntry,
 } from "@/lib/api";
+import { PixelSpinner } from "./page-loading";
 import { GithubMarkdown } from "./github-markdown";
 
 type Props = {
@@ -55,11 +56,19 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
     null,
   );
   const [loadError, setLoadError] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const skipInitialFetch = useRef(Boolean(initial));
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
     let cancelled = false;
+    setBusy(true);
     void fetchPublicSource(slug, ref || undefined).then((data) => {
       if (cancelled) return;
+      setBusy(false);
       if (!data) {
         setLoadError(true);
         return;
@@ -78,10 +87,15 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
 
   async function openDir(path: string) {
     if (!overview) return;
-    const next = await fetchPublicSourceTree(slug, overview.ref, path);
-    setDir(path);
-    setTree(next);
-    setBlob(null);
+    setBusy(true);
+    try {
+      const next = await fetchPublicSourceTree(slug, overview.ref, path);
+      setDir(path);
+      setTree(next);
+      setBlob(null);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function openEntry(entry: SourceTreeEntry) {
@@ -90,8 +104,13 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
       await openDir(entry.path);
       return;
     }
-    const file = await fetchPublicSourceBlob(slug, overview.ref, entry.path);
-    setBlob(file);
+    setBusy(true);
+    try {
+      const file = await fetchPublicSourceBlob(slug, overview.ref, entry.path);
+      setBlob(file);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function goRoot() {
@@ -101,9 +120,12 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   if (!overview) {
     return (
       <section className="gh-repo">
-        <p className="text-sm text-[var(--text-muted)]">
-          {loadError ? labels.sourceUnavailable : labels.sourceLoading}
-        </p>
+        <div className="source-loading">
+          <PixelSpinner label={labels.sourceLoading} />
+          <p className="text-sm text-[var(--text-muted)]">
+            {loadError ? labels.sourceUnavailable : labels.sourceLoading}
+          </p>
+        </div>
       </section>
     );
   }
@@ -114,7 +136,12 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   const lines = blob?.content.split("\n") ?? [];
 
   return (
-    <section className="gh-repo">
+    <section className={`gh-repo${busy ? " gh-busy" : ""}`}>
+      {busy ? (
+        <div className="gh-busy-overlay">
+          <PixelSpinner label={labels.sourceLoading} />
+        </div>
+      ) : null}
       <div className="gh-repo-header">
         <div>
           <p className="gh-repo-name">

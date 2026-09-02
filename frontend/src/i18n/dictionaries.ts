@@ -28,6 +28,7 @@ const zhHant = {
   localeName: "繁中",
   openMenu: "打開選單",
   closeMenu: "關閉選單",
+  loadingPage: "載入中…",
   archive: {
     search: "搜尋",
     all: "全部",
@@ -274,6 +275,7 @@ const en = {
   localeName: "EN",
   openMenu: "Open menu",
   closeMenu: "Close menu",
+  loadingPage: "Loading…",
   archive: {
     search: "Search",
     all: "All",
@@ -497,6 +499,7 @@ const zhHans = {
   localeName: "简中",
   openMenu: "打开菜单",
   closeMenu: "关闭菜单",
+  loadingPage: "加载中…",
   nav: {
     home: "首页",
     projects: "项目",
