@@ -13,8 +13,8 @@ from beanie import PydanticObjectId, init_beanie
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, ConfigDict, Field
+from pymongo import AsyncMongoClient
 from redis.asyncio import Redis
 
 from app.auth import AuthService
@@ -43,12 +43,19 @@ from app.models import (
 from app.store import bind_store, build_store, current_store, new_document
 
 
-async def check_mongo(mongo: AsyncIOMotorClient) -> bool:
+async def check_mongo(mongo: AsyncMongoClient) -> bool:
     try:
         await mongo.admin.command("ping")
         return True
     except Exception:
         return False
+
+
+async def close_mongo(mongo: AsyncMongoClient) -> None:
+    closer = getattr(mongo, "aclose", mongo.close)
+    result = closer()
+    if hasattr(result, "__await__"):
+        await result
 
 
 async def check_redis(redis: Redis) -> bool:
@@ -181,7 +188,7 @@ def create_app(
         mongo = None
         store = build_store(settings.mongo_uri, settings.local_data_dir)
         if settings.uses_mongo:
-            mongo = AsyncIOMotorClient(settings.mongo_uri)
+            mongo = AsyncMongoClient(settings.mongo_uri)
             await init_beanie(
                 database=mongo[settings.mongo_db],
                 document_models=[SiteProfile, Project, Article, Journal, Comment],
@@ -213,7 +220,7 @@ def create_app(
         finally:
             await redis.aclose()
             if mongo is not None:
-                mongo.close()
+                await close_mongo(mongo)
             bind_store(None)
 
     app = FastAPI(title="Portfolio API", version="0.1.0", lifespan=lifespan)
