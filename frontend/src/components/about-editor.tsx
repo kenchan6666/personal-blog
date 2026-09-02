@@ -20,6 +20,7 @@ import {
 } from "@/lib/about-templates";
 import { BilingualField } from "./bilingual-field";
 import { CmsCard, StatusPill } from "./cms-card";
+import { CmsConfirm } from "./cms-confirm";
 import { CmsModal } from "./cms-modal";
 
 type Props = {
@@ -59,6 +60,7 @@ export function AboutEditor({ dict }: Props) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState(false);
 
   async function reload(token: string) {
     const list = await fetchOwnerAboutModules(token);
@@ -130,6 +132,7 @@ export function AboutEditor({ dict }: Props) {
       await reload(token);
       setOpen(false);
       setCurrent(emptyOwnerAboutModule());
+      setConfirm(false);
     } catch {
       setError(a.errorGeneric);
     } finally {
@@ -221,7 +224,7 @@ export function AboutEditor({ dict }: Props) {
                 type="button"
                 className="btn-ghost"
                 disabled={saving}
-                onClick={() => void onDelete()}
+                onClick={() => setConfirm(true)}
               >
                 {a.deleteAbout}
               </button>
@@ -328,6 +331,16 @@ export function AboutEditor({ dict }: Props) {
           />
         </form>
       </CmsModal>
+      <CmsConfirm
+        open={confirm}
+        title={a.confirmDelete}
+        hint={a.confirmDeleteHint}
+        confirmLabel={a.deleteAbout}
+        closeLabel={a.close}
+        busy={saving}
+        onClose={() => setConfirm(false)}
+        onConfirm={() => void onDelete()}
+      />
     </CmsCard>
   );
 }

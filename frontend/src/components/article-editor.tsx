@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { BilingualField } from "./bilingual-field";
 import { CmsCard, StatusPill } from "./cms-card";
+import { CmsConfirm } from "./cms-confirm";
 import { CmsModal } from "./cms-modal";
 
 type Props = {
@@ -61,6 +62,7 @@ export function ArticleEditor({ dict }: Props) {
     title: emptyLocalized(),
   });
   const [savingCategory, setSavingCategory] = useState(false);
+  const [confirm, setConfirm] = useState<null | "article" | string>(null);
 
   async function reload(token: string) {
     const [list, projectList, categoryList] = await Promise.all([
@@ -128,6 +130,7 @@ export function ArticleEditor({ dict }: Props) {
       setOpen(false);
       setCurrent(emptyOwnerArticle());
       setMessage(a.deleted);
+      setConfirm(null);
     } catch {
       setError(a.errorGeneric);
     } finally {
@@ -194,6 +197,7 @@ export function ArticleEditor({ dict }: Props) {
       if (removed && current.categorySlug === removed.slug) {
         setCurrent((prev) => ({ ...prev, categorySlug: "" }));
       }
+      setConfirm(null);
     } catch {
       setError(a.errorGeneric);
     }
@@ -257,7 +261,7 @@ export function ArticleEditor({ dict }: Props) {
                   <button
                     type="button"
                     className="btn-ghost text-xs"
-                    onClick={() => void onDeleteCategory(category.id)}
+                    onClick={() => setConfirm(category.id)}
                   >
                     {a.deleteCategory}
                   </button>
@@ -316,7 +320,7 @@ export function ArticleEditor({ dict }: Props) {
                 type="button"
                 className="btn-ghost"
                 disabled={saving}
-                onClick={() => void onDelete()}
+                onClick={() => setConfirm("article")}
               >
                 {a.deleteArticle}
               </button>
@@ -487,6 +491,19 @@ export function ArticleEditor({ dict }: Props) {
         />
       </form>
     </CmsModal>
+    <CmsConfirm
+      open={confirm !== null}
+      title={a.confirmDelete}
+      hint={a.confirmDeleteHint}
+      confirmLabel={confirm === "article" ? a.deleteArticle : a.deleteCategory}
+      closeLabel={a.close}
+      busy={saving || savingCategory}
+      onClose={() => setConfirm(null)}
+      onConfirm={() => {
+        if (confirm === "article") void onDelete();
+        else if (confirm) void onDeleteCategory(confirm);
+      }}
+    />
     </>
   );
 }

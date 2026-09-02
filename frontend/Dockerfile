@@ -5,7 +5,9 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 COPY . .
 ARG NEXT_PUBLIC_API_BASE_URL=
+ARG NEXT_PUBLIC_SITE_URL=https://kenchan0522.blog
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 RUN npm run build
 
 FROM node:22-alpine

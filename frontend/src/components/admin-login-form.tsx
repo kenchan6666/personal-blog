@@ -34,7 +34,7 @@ function mapError(message: string, dict: Dictionary): string {
 
 export function AdminLoginForm({ locale, dict }: Props) {
   const router = useRouter();
-  const [email, setEmail] = useState("ynchanhk@gmail.com");
+  const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState<"idle" | "send" | "verify">("idle");

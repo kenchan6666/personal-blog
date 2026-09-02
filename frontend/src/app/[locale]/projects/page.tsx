@@ -4,8 +4,25 @@ import { PageFrame } from "@/components/page-frame";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicProjects } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const dict = getDictionary(locale);
+  return pageMetadata({
+    locale,
+    title: dict.nav.projects,
+    path: "/projects",
+  });
+}
 
 export default async function ProjectsPage({
   params,

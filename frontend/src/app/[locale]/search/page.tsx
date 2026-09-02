@@ -8,8 +8,26 @@ import {
   fetchPublicProjects,
   fetchPublicAbout,
 } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const dict = getDictionary(locale);
+  return pageMetadata({
+    locale,
+    title: dict.search.title,
+    description: dict.search.placeholder,
+    path: "/search",
+  });
+}
 
 export default async function SearchPage({
   params,

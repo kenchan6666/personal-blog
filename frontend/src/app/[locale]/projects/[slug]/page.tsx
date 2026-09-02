@@ -11,8 +11,27 @@ import {
   fetchPublicSource,
   type SourceRepo,
 } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { locale: raw, slug } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const project = await fetchPublicProject(locale, slug);
+  if (!project) return {};
+  return pageMetadata({
+    locale,
+    title: project.title,
+    description: project.summary,
+    path: `/projects/${project.slug}`,
+  });
+}
 
 function SourceFallback({ label }: { label: string }) {
   return (

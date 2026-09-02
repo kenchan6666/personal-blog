@@ -24,14 +24,14 @@
   --sidebar-rail: 4rem;
   --font-display: var(--font-space-grotesk);
   --font-cjk: var(--font-noto-sans-tc);
-  --font-body: var(--font-source-sans), var(--font-noto-sans-tc);
+  --font-body: var(--font-noto-sans-tc), var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
   --glass-blur: 32px;
 }
 
 html.locale-zh-Hans {
   --font-cjk: var(--font-noto-sans-sc);
-  --font-body: var(--font-source-sans), var(--font-noto-sans-sc);
+  --font-body: var(--font-noto-sans-sc), var(--font-space-grotesk);
 }
 
 @theme inline {
@@ -244,7 +244,15 @@ a:visited {
   right: max(1rem, env(safe-area-inset-right));
   z-index: 40;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
+  max-width: calc(100vw - 5.5rem);
+}
+
+.site-chrome-locales {
+  display: flex;
+  gap: 0.25rem;
 }
 
 .site-chrome-link {
@@ -265,6 +273,11 @@ a:visited {
 
 .site-chrome-link:hover {
   border-color: var(--glass-highlight);
+}
+
+.site-chrome-link.is-active {
+  color: var(--accent-link);
+  border-color: var(--accent-link);
 }
 
 .site-nav.is-open ~ .site-chrome {
@@ -575,6 +588,37 @@ html.is-route-pending .site-main {
   .site-main {
     padding-left: calc(var(--sidebar-rail) + 1.75rem);
   }
+
+  .site-nav:not(.is-open) .sidebar-inner {
+    padding: 4.25rem 0.45rem 0.85rem;
+  }
+
+  .site-nav:not(.is-open) .sidebar-brand {
+    max-width: none;
+    text-align: center;
+    font-size: 1.2rem;
+  }
+
+  .site-nav:not(.is-open) .sidebar-brand-full,
+  .site-nav:not(.is-open) .nav-link-label,
+  .site-nav:not(.is-open) .sidebar-locales,
+  .site-nav:not(.is-open) .sidebar-admin {
+    display: none;
+  }
+
+  .site-nav:not(.is-open) .sidebar-brand-mark,
+  .site-nav:not(.is-open) .nav-link-icon {
+    display: block;
+  }
+
+  .site-nav:not(.is-open) .nav-link {
+    justify-content: center;
+    padding: 0.7rem 0.35rem;
+  }
+
+  .site-nav.is-open .sidebar-brand-mark {
+    display: none;
+  }
 }
 
 @supports not (
@@ -749,13 +793,42 @@ html.is-route-pending .site-main {
   color: var(--text-primary);
 }
 
+.sidebar-inner {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  padding: 4.25rem 1.15rem 1.15rem;
+}
+
+.sidebar-brand {
+  margin-bottom: 1.75rem;
+  max-width: calc(100% - 2.5rem);
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.sidebar-brand-mark {
+  display: none;
+}
+
 .nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
   border-radius: 0.75rem;
   padding: 0.625rem 0.75rem;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--text-muted);
   transition: background 160ms ease, color 160ms ease;
+}
+
+.nav-link-icon {
+  display: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
 }
 
 .nav-link:hover {
@@ -1013,6 +1086,10 @@ html.is-route-pending .site-main {
     max(0.75rem, env(safe-area-inset-bottom))
     max(0.75rem, env(safe-area-inset-left));
   overflow: auto;
+}
+
+.cms-modal-root.is-elevated {
+  z-index: 90;
 }
 
 .cms-modal-scrim {
@@ -1420,6 +1497,15 @@ html.is-route-pending .site-main {
   text-decoration: underline;
   text-decoration-color: var(--accent-cta);
   text-underline-offset: 0.22em;
+}
+
+.page-status {
+  display: flex;
+  min-height: 40vh;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem 0;
 }
 
 .page-title {
@@ -2140,7 +2226,7 @@ html.is-route-pending .site-main {
   color: var(--text-primary);
   font-family:
     var(--font-cjk),
-    var(--font-source-sans),
+    var(--font-space-grotesk),
     "PingFang SC",
     "PingFang TC",
     "Microsoft YaHei",

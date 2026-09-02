@@ -6,8 +6,27 @@ import { PostMetaLine } from "@/components/post-archive";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicJournal } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { locale: raw, slug } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const journal = await fetchPublicJournal(locale, slug);
+  if (!journal) return {};
+  return pageMetadata({
+    locale,
+    title: journal.title,
+    description: journal.summary,
+    path: `/journals/${journal.slug}`,
+  });
+}
 
 export default async function JournalDetailPage({
   params,

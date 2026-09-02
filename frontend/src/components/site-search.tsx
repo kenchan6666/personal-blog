@@ -17,6 +17,20 @@ type Props = {
   about: PublicAboutModule[];
 };
 
+function excerptAround(text: string, query: string, size = 120): string {
+  const plain = text.replace(/[#>*_`[\]]/g, " ").replace(/\s+/g, " ").trim();
+  const lower = plain.toLowerCase();
+  const index = lower.indexOf(query);
+  if (index < 0) return plain.slice(0, size);
+  const start = Math.max(0, index - 32);
+  const chunk = plain.slice(start, start + size);
+  return `${start > 0 ? "…" : ""}${chunk}${start + size < plain.length ? "…" : ""}`;
+}
+
+function haystack(...parts: Array<string | undefined>) {
+  return parts.filter(Boolean).join("\n").toLowerCase();
+}
+
 export function SiteSearch({
   locale,
   dict,
@@ -33,59 +47,62 @@ export function SiteSearch({
     const hits: { href: string; title: string; kind: string; summary: string }[] =
       [];
     for (const article of articles) {
-      if (
-        article.title.toLowerCase().includes(q) ||
-        article.summary.toLowerCase().includes(q)
-      ) {
+      if (haystack(article.title, article.summary, article.body).includes(q)) {
         hits.push({
           href: articleHref(locale, article),
           title: article.title,
           kind: dict.nav.articles,
-          summary: article.summary,
+          summary: excerptAround(
+            article.summary.includes(query.trim()) || article.title.toLowerCase().includes(q)
+              ? article.summary || article.body
+              : article.body || article.summary,
+            q,
+          ),
         });
       }
     }
     for (const journal of journals) {
-      if (
-        journal.title.toLowerCase().includes(q) ||
-        journal.summary.toLowerCase().includes(q)
-      ) {
+      if (haystack(journal.title, journal.summary, journal.body).includes(q)) {
         hits.push({
           href: `/${locale}/journals/${journal.slug}`,
           title: journal.title,
           kind: dict.nav.journals,
-          summary: journal.summary,
+          summary: excerptAround(
+            journal.summary.toLowerCase().includes(q) || journal.title.toLowerCase().includes(q)
+              ? journal.summary || journal.body
+              : journal.body || journal.summary,
+            q,
+          ),
         });
       }
     }
     for (const project of projects) {
-      if (
-        project.title.toLowerCase().includes(q) ||
-        project.summary.toLowerCase().includes(q)
-      ) {
+      if (haystack(project.title, project.summary, project.body).includes(q)) {
         hits.push({
           href: `/${locale}/projects/${project.slug}`,
           title: project.title,
           kind: dict.nav.projects,
-          summary: project.summary,
+          summary: excerptAround(
+            project.summary.toLowerCase().includes(q) || project.title.toLowerCase().includes(q)
+              ? project.summary || project.body
+              : project.body || project.summary,
+            q,
+          ),
         });
       }
     }
     for (const module of about) {
-      if (
-        module.title.toLowerCase().includes(q) ||
-        module.body.toLowerCase().includes(q)
-      ) {
+      if (haystack(module.title, module.body).includes(q)) {
         hits.push({
           href: `/${locale}/about`,
           title: module.title,
           kind: dict.nav.about,
-          summary: module.body.replace(/[#>*_`]/g, "").slice(0, 120),
+          summary: excerptAround(module.body, q),
         });
       }
     }
     return hits;
-  }, [q, articles, journals, projects, about, dict, locale]);
+  }, [q, query, articles, journals, projects, about, dict, locale]);
 
   return (
     <PageFrame title={dict.search.title} narrow>

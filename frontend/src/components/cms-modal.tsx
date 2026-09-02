@@ -12,6 +12,7 @@ type Props = {
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  elevated?: boolean;
 };
 
 export function CmsModal({
@@ -21,6 +22,7 @@ export function CmsModal({
   onClose,
   children,
   footer,
+  elevated,
 }: Props) {
   const [present, setPresent] = useState(open);
   const [entered, setEntered] = useState(false);
@@ -56,7 +58,7 @@ export function CmsModal({
 
   return createPortal(
     <div
-      className={`cms-modal-root${entered ? " is-open" : ""}`}
+      className={`cms-modal-root${entered ? " is-open" : ""}${elevated ? " is-elevated" : ""}`}
       role="presentation"
     >
       <button

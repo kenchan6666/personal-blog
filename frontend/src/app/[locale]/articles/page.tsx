@@ -9,9 +9,28 @@ import {
   fetchPublicArticles,
   fetchPublicSite,
 } from "@/lib/api";
+import { pageMetadata } from "@/lib/seo";
 import { pageCopy } from "@/lib/site-content";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const dict = getDictionary(locale);
+  const site = await fetchPublicSite(locale);
+  return pageMetadata({
+    locale,
+    title: dict.nav.articles,
+    description: pageCopy(site, "articlesLead", dict.articles.lead),
+    path: "/articles",
+  });
+}
 
 export default async function ArticlesPage({
   params,

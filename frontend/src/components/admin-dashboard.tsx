@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 import {
@@ -21,6 +21,94 @@ type Props = {
   locale: Locale;
   dict: Dictionary;
 };
+
+const TABS = ["site", "content", "comments", "github"] as const;
+type Tab = (typeof TABS)[number];
+
+function isTab(value: string | null): value is Tab {
+  return TABS.includes(value as Tab);
+}
+
+function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; onLogout: () => void }) {
+  const a = dict.admin;
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requested = searchParams.get("tab");
+  const tab: Tab = isTab(requested) ? requested : "site";
+
+  function setTab(next: Tab) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("tab", next);
+    router.replace(`${pathname}?${params.toString()}`);
+  }
+
+  const labels: Record<Tab, string> = {
+    site: a.tabSite,
+    content: a.tabContent,
+    comments: a.tabComments,
+    github: a.tabGithub,
+  };
+
+  return (
+    <div className="w-full max-w-6xl">
+      <div className="glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
+        <div>
+          <h1 className="display-font mb-1 text-2xl font-bold">
+            {a.dashboard}
+          </h1>
+          <p className="text-sm text-[var(--text-muted)]">
+            {a.signedInAs}: {email}
+          </p>
+        </div>
+        <button type="button" className="btn-ghost" onClick={onLogout}>
+          {a.logout}
+        </button>
+      </div>
+
+      <div className="segment mb-5">
+        {TABS.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className={tab === item ? "segment-active" : ""}
+            onClick={() => setTab(item)}
+          >
+            {labels[item]}
+          </button>
+        ))}
+      </div>
+
+      <div className="grid gap-5 lg:grid-cols-2">
+        {tab === "github" ? (
+          <div className="lg:col-span-2">
+            <Suspense>
+              <GitHubConnect locale={locale} dict={dict} />
+            </Suspense>
+          </div>
+        ) : null}
+        {tab === "site" ? (
+          <>
+            <div className="lg:col-span-2">
+              <SiteEditor dict={dict} />
+            </div>
+            <div className="lg:col-span-2">
+              <AboutEditor dict={dict} />
+            </div>
+          </>
+        ) : null}
+        {tab === "content" ? (
+          <>
+            <ProjectEditor locale={locale} dict={dict} />
+            <ArticleEditor dict={dict} />
+            <JournalEditor dict={dict} />
+          </>
+        ) : null}
+        {tab === "comments" ? <CommentModerator dict={dict} /> : null}
+      </div>
+    </div>
+  );
+}
 
 export function AdminDashboard({ locale, dict }: Props) {
   const router = useRouter();
@@ -56,38 +144,8 @@ export function AdminDashboard({ locale, dict }: Props) {
   if (!email) return null;
 
   return (
-    <div className="w-full max-w-6xl">
-      <div className="glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
-        <div>
-          <h1 className="display-font mb-1 text-2xl font-bold">
-            {dict.admin.dashboard}
-          </h1>
-          <p className="text-sm text-[var(--text-muted)]">
-            {dict.admin.signedInAs}: {email}
-          </p>
-        </div>
-        <button type="button" className="btn-ghost" onClick={logout}>
-          {dict.admin.logout}
-        </button>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <div className="lg:col-span-2">
-          <Suspense>
-            <GitHubConnect locale={locale} dict={dict} />
-          </Suspense>
-        </div>
-        <div className="lg:col-span-2">
-          <SiteEditor dict={dict} />
-        </div>
-        <div className="lg:col-span-2">
-          <AboutEditor dict={dict} />
-        </div>
-        <ProjectEditor locale={locale} dict={dict} />
-        <ArticleEditor dict={dict} />
-        <JournalEditor dict={dict} />
-        <CommentModerator dict={dict} />
-      </div>
-    </div>
+    <Suspense fallback={<p className="text-[var(--text-muted)]">{dict.admin.verifying}</p>}>
+      <AdminTabs locale={locale} dict={dict} email={email} onLogout={logout} />
+    </Suspense>
   );
 }

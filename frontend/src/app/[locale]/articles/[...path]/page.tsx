@@ -9,8 +9,33 @@ import { isLocale, type Locale } from "@/i18n/config";
 import { articleHref, fetchPublicArticle, type PublicArticle } from "@/lib/api";
 import { extractMarkdownHeadings } from "@/lib/headings";
 import { formatCount, formatPostDate } from "@/lib/post-meta";
+import { pageMetadata, pathWithoutLocale } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+async function loadArticle(locale: Locale, path: string[]) {
+  if (path.length === 1) return fetchPublicArticle(locale, path[0]);
+  if (path.length === 2) return fetchPublicArticle(locale, path[1]);
+  return null;
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; path: string[] }>;
+}) {
+  const { locale: raw, path } = await params;
+  if (!isLocale(raw)) return {};
+  const locale = raw as Locale;
+  const article = await loadArticle(locale, path);
+  if (!article) return {};
+  return pageMetadata({
+    locale,
+    title: article.title,
+    description: article.summary,
+    path: pathWithoutLocale(locale, articleHref(locale, article)),
+  });
+}
 
 export default async function ArticlePathPage({
   params,

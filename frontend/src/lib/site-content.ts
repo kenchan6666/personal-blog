@@ -50,23 +50,11 @@ export function brandForShell(dict: Dictionary, site: PublicSite | null): string
   return publicBrand(site?.brand, dict.brand);
 }
 
-const STOCK_PAGE_COPY = new Set([
-  "技術或項目向的深度寫作。",
-  "技术或项目向的深度写作。",
-  "Long-form writing on engineering and projects.",
-  "學歷、經歷與自我描述。",
-  "学历、经历与自我描述。",
-  "Education, experience, and a short self-description.",
-]);
-
 export function pageCopy(
   site: PublicSite | null,
   key: "articlesLead" | "aboutLead" | "aboutEmpty",
   fallback: string,
 ): string {
-  const value = site?.pages?.[key]?.trim() ?? "";
-  if (value && !STOCK_PAGE_COPY.has(value)) return value;
-  const next = fallback.trim();
-  if (next && !STOCK_PAGE_COPY.has(next)) return next;
-  return "";
+  const value = site?.pages?.[key]?.trim();
+  return value || fallback;
 }
