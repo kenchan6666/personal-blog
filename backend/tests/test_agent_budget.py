@@ -5,7 +5,6 @@ from app.agent_activity import (
 )
 from app.agent_budget import (
     LONG_MAX_TOKENS,
-    SHORT_MAX_TOKENS,
     TOOL_MAX_TOKENS,
     owner_chat_max_tokens,
     strip_tool_noise,
@@ -13,11 +12,8 @@ from app.agent_budget import (
 from app.owner_actor import force_draft_if_service, owner_actor
 
 
-def test_owner_chat_uses_short_budget_for_ordinary_questions() -> None:
-    assert owner_chat_max_tokens("这个项目做什么") == SHORT_MAX_TOKENS
-
-
-def test_owner_chat_uses_tool_budget_for_github_readme() -> None:
+def test_owner_chat_uses_tool_budget_by_default() -> None:
+    assert owner_chat_max_tokens("这个项目做什么") == TOOL_MAX_TOKENS
     assert owner_chat_max_tokens("读取 customer 仓库的 README.md") == TOOL_MAX_TOKENS
     assert owner_chat_max_tokens("list my github repos") == TOOL_MAX_TOKENS
 

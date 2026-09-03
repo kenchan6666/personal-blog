@@ -26,6 +26,7 @@ from viola.utils.helpers import (
     strip_think,
     truncate_text,
 )
+from viola.utils.inline_tools import looks_like_tool_preamble, recover_inline_tool_calls
 from viola.utils.prompt_templates import render_template
 from viola.utils.runtime import (
     EMPTY_FINAL_RESPONSE_MESSAGE,
@@ -248,6 +249,7 @@ class AgentRunner:
         workspace_violation_counts: dict[str, int] = {}
         empty_content_retries = 0
         length_recovery_count = 0
+        preamble_retries = 0
         had_injections = False
         injection_cycles = 0
 
@@ -279,6 +281,20 @@ class AgentRunner:
             context = AgentHookContext(iteration=iteration, messages=messages)
             await hook.before_iteration(context)
             response = await self._request_model(spec, messages_for_model, hook, context)
+            if not response.tool_calls:
+                recovered = recover_inline_tool_calls(
+                    response.content or "",
+                    available_names=list(spec.tools.tool_names) if spec.tools else None,
+                )
+                if recovered:
+                    response.tool_calls = recovered
+                    if response.finish_reason not in {"tool_calls", "stop"}:
+                        response.finish_reason = "tool_calls"
+                    logger.info(
+                        "Recovered {} inline tool call(s) for {}",
+                        len(recovered),
+                        spec.session_key or "default",
+                    )
             raw_usage = self._usage_dict(response.usage)
             context.response = response
             context.usage = dict(raw_usage)
@@ -377,6 +393,7 @@ class AgentRunner:
                 )
                 empty_content_retries = 0
                 length_recovery_count = 0
+                preamble_retries = 0
                 # Checkpoint 1: drain injections after tools, before next LLM call
                 _drained, injection_cycles = await self._try_drain_injections(
                     spec, messages, None, injection_cycles,
@@ -446,6 +463,33 @@ class AgentRunner:
                     messages.append(build_length_recovery_message())
                     await hook.after_iteration(context)
                     continue
+
+            if (
+                not response.has_tool_calls
+                and looks_like_tool_preamble(clean)
+                and preamble_retries < 1
+            ):
+                preamble_retries += 1
+                logger.info(
+                    "Tool preamble without calls on turn {} for {}; continuing",
+                    iteration,
+                    spec.session_key or "default",
+                )
+                if hook.wants_streaming():
+                    await hook.on_stream_end(context, resuming=True)
+                messages.append(build_assistant_message(
+                    clean,
+                    reasoning_content=response.reasoning_content,
+                    thinking_blocks=response.thinking_blocks,
+                ))
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "不要再预告。立刻调用 mcp_portfolio GitHub 工具读取你刚才点名的仓库和文件。"
+                    ),
+                })
+                await hook.after_iteration(context)
+                continue
 
             assistant_message: dict[str, Any] | None = None
             if response.finish_reason != "error" and not is_blank_text(clean):

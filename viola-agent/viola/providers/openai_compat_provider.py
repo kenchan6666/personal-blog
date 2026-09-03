@@ -815,6 +815,9 @@ class OpenAICompatProvider(LLMProvider):
                     reasoning_parts.append(text)
                 for idx, tc in enumerate(delta.get("tool_calls") or []):
                     _accum_tc(tc, idx)
+                function_call = delta.get("function_call")
+                if function_call:
+                    _accum_tc({"index": 0, "function": function_call}, 0)
                 usage = cls._extract_usage(chunk_map) or usage
                 continue
 
@@ -835,6 +838,22 @@ class OpenAICompatProvider(LLMProvider):
                     reasoning_parts.append(reasoning)
             for tc in (delta.tool_calls or []) if delta else []:
                 _accum_tc(tc, getattr(tc, "index", 0))
+            if delta:
+                function_call = getattr(delta, "function_call", None)
+                if function_call:
+                    _accum_tc(
+                        {
+                            "index": 0,
+                            "function": {
+                                "name": getattr(function_call, "name", None)
+                                or (function_call.get("name") if isinstance(function_call, dict) else None),
+                                "arguments": getattr(function_call, "arguments", None)
+                                or (function_call.get("arguments") if isinstance(function_call, dict) else None)
+                                or "",
+                            },
+                        },
+                        0,
+                    )
 
         return cls._finalize_response(
             LLMResponse(
