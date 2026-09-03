@@ -17,10 +17,10 @@ import {
   type AgentConversationSummary,
   type AgentKnowledge,
   type AgentKnowledgeInput,
-  type AgentMessage,
   type AgentStreamEvent,
   type Localized,
 } from "@/lib/api";
+import { messagesWithThinking, type ChatMessage } from "@/lib/agent-thinking";
 import { CmsModal } from "./cms-modal";
 import { MarkdownBody } from "./markdown-body";
 
@@ -30,7 +30,6 @@ type Props = {
   onInsert?: (locale: keyof Localized, text: string) => void;
 };
 
-type DisplayMessage = AgentMessage & { id: string };
 type MobilePane = "conversations" | "chat" | "knowledge";
 
 const ACTIVE_CONVERSATION_KEY = "portfolio_agent_active_conversation";
@@ -79,19 +78,12 @@ function pinChangedKnowledge(
   ];
 }
 
-function messageRows(messages: AgentMessage[]): DisplayMessage[] {
-  return messages.map((message, index) => ({
-    ...message,
-    id: `${message.createdAt}-${index}`,
-  }));
-}
-
 export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [conversations, setConversations] = useState<
     AgentConversationSummary[]
   >([]);
   const [activeId, setActiveId] = useState("");
-  const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [knowledge, setKnowledge] = useState<AgentKnowledge[]>([]);
   const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(
     null,
@@ -101,6 +93,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [input, setInput] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [loading, setLoading] = useState(true);
   const [savingKnowledge, setSavingKnowledge] = useState(false);
   const [syncingAllKnowledge, setSyncingAllKnowledge] = useState(false);
@@ -133,7 +126,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   async function openConversation(token: string, id: string) {
     const conversation = await getAgentConversation(token, id);
     setActiveId(id);
-    setMessages(messageRows(conversation.messages));
+    setThinking(Boolean(conversation.thinking));
+    setMessages(
+      messagesWithThinking(conversation.messages, conversation.thinking),
+    );
     window.localStorage.setItem(ACTIVE_CONVERSATION_KEY, id);
   }
 
@@ -208,8 +204,9 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     .reverse()
     .find((item) => item.role === "assistant");
   const liveText = Boolean(liveAssistant?.content.trim());
-  const isThinking = sending && Boolean(liveAssistant) && !liveText;
-  const isToolWait = sending && liveText && awaitingMore;
+  const awaitingTurn = sending || thinking;
+  const isThinking = awaitingTurn && Boolean(liveAssistant) && !liveText;
+  const isToolWait = awaitingTurn && liveText && awaitingMore;
   const isStreaming = sending && liveText && !awaitingMore;
   const livePhase = isStreaming
     ? "streaming"
@@ -218,14 +215,59 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       : "";
 
   useEffect(() => {
-    if (!sending) {
+    if (!awaitingTurn) {
       setAwaitingMore(false);
       return undefined;
     }
     setAwaitingMore(false);
     const timer = window.setTimeout(() => setAwaitingMore(true), 850);
     return () => window.clearTimeout(timer);
-  }, [sending, liveAssistant?.content]);
+  }, [awaitingTurn, liveAssistant?.content]);
+
+  useEffect(() => {
+    if (!thinking || sending || !activeId) return undefined;
+    const token = getSessionToken();
+    if (!token) return undefined;
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const conversation = await getAgentConversation(token, activeId);
+        if (cancelled) return;
+        setThinking(Boolean(conversation.thinking));
+        setMessages(
+          messagesWithThinking(conversation.messages, conversation.thinking),
+        );
+        setConversations((rows) =>
+          rows.map((row) =>
+            row.id === conversation.id
+              ? {
+                  ...row,
+                  thinking: conversation.thinking,
+                  preview: conversation.preview,
+                  messageCount: conversation.messageCount,
+                  updatedAt: conversation.updatedAt,
+                }
+              : row,
+          ),
+        );
+        if (!conversation.thinking) {
+          const last = conversation.messages[conversation.messages.length - 1];
+          if (!last || last.role !== "assistant" || !last.content.trim()) {
+            setError("这一轮没有收到完整回复，请再发一次。");
+          }
+          if (!compact) setKnowledge(await listAgentKnowledge(token));
+        }
+      } catch {
+        /* keep the thinking placeholder until the next poll */
+      }
+    };
+    const timer = window.setInterval(() => void pull(), 2000);
+    void pull();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [thinking, sending, activeId, compact]);
 
   function handleStreamEvent(event: AgentStreamEvent) {
     if (event.type === "tool_activity") {
@@ -316,9 +358,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     event.preventDefault();
     const text = input.trim();
     const token = getSessionToken();
-    if ((!text && files.length === 0) || !token || !activeId || sending) return;
+    if ((!text && files.length === 0) || !token || !activeId || sending || thinking)
+      return;
 
-    const user: DisplayMessage = {
+    const user: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: text || "请分析这些文件。",
@@ -342,6 +385,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setFiles([]);
     setError("");
     setToolActivity("");
+    setThinking(true);
     setSending(true);
 
     const editorContext = context
@@ -373,6 +417,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       if (!reply.trim()) {
         throw new Error("这一轮没有收到完整回复，请再发一次。");
       }
+      setThinking(false);
       await Promise.all([
         refreshConversations(token),
         compact
@@ -380,6 +425,30 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           : listAgentKnowledge(token).then(setKnowledge),
       ]);
     } catch (reason) {
+      const aborted =
+        (reason instanceof DOMException && reason.name === "AbortError") ||
+        (reason instanceof Error && reason.name === "AbortError");
+      if (aborted) {
+        setThinking(true);
+        return;
+      }
+      const busy =
+        reason instanceof Error &&
+        reason.message.includes("agent_turn_in_progress");
+      if (busy) {
+        setThinking(true);
+        try {
+          const latest = await getAgentConversation(token, activeId);
+          setThinking(Boolean(latest.thinking));
+          setMessages(
+            messagesWithThinking(latest.messages, latest.thinking),
+          );
+        } catch {
+          /* keep the optimistic thinking bubble */
+        }
+        return;
+      }
+      setThinking(false);
       setError(reason instanceof Error ? reason.message : "Agent 暂时无法回应。");
       setMessages((current) =>
         current.filter(
@@ -546,7 +615,11 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                   onClick={() => selectConversation(conversation.id)}
                 >
                   <strong>{conversation.title}</strong>
-                  <span>{conversation.preview || "开始一段新对话"}</span>
+                  <span>
+                    {conversation.thinking
+                      ? "思考中…"
+                      : conversation.preview || "开始一段新对话"}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -586,7 +659,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 : "会话与消息已持久保存，并会检索右侧个人资料辅助回答。"}
             </p>
           </div>
-          {sending && (livePhase || toolActivity) ? (
+          {awaitingTurn && (livePhase || toolActivity) ? (
             <div
               className={`agent-live-activity is-${livePhase || "thinking"}${
                 toolActivity ? " has-label" : ""
@@ -628,7 +701,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
             <article
               key={message.id}
               className={`agent-message is-${message.role}${
-                sending && message.id === liveAssistant?.id
+                awaitingTurn && message.id === liveAssistant?.id
                   ? isStreaming
                     ? " is-streaming"
                     : " is-thinking"
@@ -642,7 +715,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 message.content ? (
                   <>
                     <MarkdownBody source={message.content} />
-                    {sending && message.id === liveAssistant?.id ? (
+                    {awaitingTurn && message.id === liveAssistant?.id ? (
                       isToolWait ? (
                         <span className="agent-thinking" aria-label="正在思考">
                           <i />
@@ -655,7 +728,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                       )
                     ) : null}
                   </>
-                ) : sending && message.id === liveAssistant?.id ? (
+                ) : awaitingTurn && message.id === liveAssistant?.id ? (
                   <span className="agent-thinking" aria-label="正在思考">
                     <i />
                     <i />
@@ -724,7 +797,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               value={input}
               rows={compact ? 2 : 3}
               placeholder="输入消息…"
-              disabled={sending || !activeId}
+              disabled={awaitingTurn || !activeId}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
@@ -737,10 +810,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               type="submit"
               className="agent-send"
               disabled={
-                sending || !activeId || (!input.trim() && files.length === 0)
+                awaitingTurn || !activeId || (!input.trim() && files.length === 0)
               }
             >
-              {sending ? "•••" : "发送"}
+              {awaitingTurn ? "•••" : "发送"}
             </button>
           </div>
         </form>

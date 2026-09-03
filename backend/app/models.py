@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from beanie import Document
@@ -448,9 +448,31 @@ class AgentMessage(BaseModel):
         }
 
 
+THINKING_STALE_SECONDS = 720
+
+
+def conversation_is_thinking(
+    thinking: bool,
+    thinking_at: datetime | None,
+    *,
+    now: datetime | None = None,
+) -> bool:
+    if not thinking:
+        return False
+    if thinking_at is None:
+        return True
+    clock = now or utc_now()
+    started = thinking_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return clock - started < timedelta(seconds=THINKING_STALE_SECONDS)
+
+
 class AgentConversation(Document):
     title: str = "新对话"
     messages: list[AgentMessage] = Field(default_factory=list)
+    thinking: bool = False
+    thinking_at: datetime | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
 
@@ -464,6 +486,7 @@ class AgentConversation(Document):
             "title": self.title,
             "preview": preview[:120],
             "messageCount": len(self.messages),
+            "thinking": conversation_is_thinking(self.thinking, self.thinking_at),
             "createdAt": self.created_at.isoformat(),
             "updatedAt": self.updated_at.isoformat(),
         }

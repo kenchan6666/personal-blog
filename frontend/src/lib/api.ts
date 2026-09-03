@@ -1115,6 +1115,7 @@ export type AgentConversationSummary = {
   title: string;
   preview: string;
   messageCount: number;
+  thinking?: boolean;
   createdAt: string;
   updatedAt: string;
 };

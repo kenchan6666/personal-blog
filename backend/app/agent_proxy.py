@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import codecs
 import json
 import re
@@ -124,6 +125,7 @@ def register_agent_routes(
     require_owner: Callable[..., Any],
 ) -> None:
     rag = AgentRag(app.state.settings)
+    app.state.agent_turns = {}
 
     @app.get("/api/owner/agent/conversations")
     async def list_conversations(
@@ -335,12 +337,23 @@ def register_agent_routes(
         if conversation is None:
             raise _not_found("agent_conversation_not_found")
 
+        turn_key = str(parsed_id)
+        turns: dict[str, asyncio.Task[None]] = app.state.agent_turns
+        running = turns.get(turn_key)
+        if running is not None and not running.done():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="agent_turn_in_progress",
+            )
+
         display_message = message or "请分析这些文件。"
         conversation.messages.append(
             AgentMessage(role="user", content=display_message, files=file_names)
         )
         if not conversation.messages[:-1] and conversation.title == "新对话":
             conversation.title = display_message.replace("\n", " ")[:36]
+        conversation.thinking = True
+        conversation.thinking_at = utc_now()
         conversation.updated_at = utc_now()
         await current_store().save(conversation)
 
@@ -378,7 +391,9 @@ def register_agent_routes(
                 }
             }
 
-        async def relay() -> AsyncIterator[bytes]:
+        outbound: asyncio.Queue[bytes | None] = asyncio.Queue()
+
+        async def consume() -> None:
             assistant = ""
             buffer = ""
             decoder = codecs.getincrementaldecoder("utf-8")()
@@ -423,78 +438,97 @@ def register_agent_routes(
                 ).encode()
 
             try:
-                async with (
-                    httpx.AsyncClient(timeout=timeout) as client,
-                    client.stream(
-                        "POST",
-                        target,
-                        headers=headers,
-                        **request_kwargs,
-                    ) as upstream,
-                ):
-                    if upstream.status_code >= 400:
-                        raw = await upstream.aread()
-                        error_message = "Agent service unavailable"
-                        try:
-                            payload = json.loads(raw)
-                            error_message = str(
-                                payload.get("error", {}).get("message")
-                                or error_message
+                try:
+                    async with (
+                        httpx.AsyncClient(timeout=timeout) as client,
+                        client.stream(
+                            "POST",
+                            target,
+                            headers=headers,
+                            **request_kwargs,
+                        ) as upstream,
+                    ):
+                        if upstream.status_code >= 400:
+                            raw = await upstream.aread()
+                            error_message = "Agent service unavailable"
+                            try:
+                                payload = json.loads(raw)
+                                error_message = str(
+                                    payload.get("error", {}).get("message")
+                                    or error_message
+                                )
+                            except (
+                                json.JSONDecodeError,
+                                UnicodeDecodeError,
+                                AttributeError,
+                            ):
+                                pass
+                            await outbound.put(
+                                (
+                                    "event: error\n"
+                                    f"data: {json.dumps({'message': error_message})}\n\n"
+                                ).encode()
                             )
-                        except (
-                            json.JSONDecodeError,
-                            UnicodeDecodeError,
-                            AttributeError,
-                        ):
-                            pass
-                        yield (
-                            "event: error\n"
-                            f"data: {json.dumps({'message': error_message})}\n\n"
-                        ).encode()
-                        return
-                    async for chunk in upstream.aiter_bytes():
-                        text = decoder.decode(chunk)
-                        buffer += text
-                        blocks = re.split(r"\r?\n\r?\n", buffer)
-                        buffer = blocks.pop()
-                        for block in blocks:
-                            assistant += _sse_delta(block)
-                            forwarded = rewrite_owner_sse_block(block)
+                            return
+                        async for chunk in upstream.aiter_bytes():
+                            text = decoder.decode(chunk)
+                            buffer += text
+                            blocks = re.split(r"\r?\n\r?\n", buffer)
+                            buffer = blocks.pop()
+                            for block in blocks:
+                                assistant += _sse_delta(block)
+                                forwarded = rewrite_owner_sse_block(block)
+                                if forwarded:
+                                    await outbound.put(forwarded)
+                            if not buffer:
+                                event = await knowledge_update_event()
+                                if event is not None:
+                                    await outbound.put(event)
+                        buffer += decoder.decode(b"", final=True)
+                        if buffer.strip():
+                            assistant += _sse_delta(buffer)
+                            forwarded = rewrite_owner_sse_block(buffer)
                             if forwarded:
-                                yield forwarded
-                        if not buffer:
-                            event = await knowledge_update_event()
-                            if event is not None:
-                                yield event
-                    buffer += decoder.decode(b"", final=True)
-                    if buffer.strip():
-                        assistant += _sse_delta(buffer)
-                        forwarded = rewrite_owner_sse_block(buffer)
-                        if forwarded:
-                            yield forwarded
-                    event = await knowledge_update_event(force=True)
-                    if event is not None:
-                        yield event
-            except httpx.HTTPError:
-                yield (
-                    b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
-                )
-                return
-            cleaned = strip_tool_noise(assistant)
-            if cleaned:
-                latest = await current_store().get(
-                    AgentConversation,
-                    parsed_id,
-                )
-                if latest is not None:
-                    latest.messages.append(
-                        AgentMessage(role="assistant", content=cleaned)
+                                await outbound.put(forwarded)
+                        event = await knowledge_update_event(force=True)
+                        if event is not None:
+                            await outbound.put(event)
+                except httpx.HTTPError:
+                    await outbound.put(
+                        b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
                     )
+                    return
+                cleaned = strip_tool_noise(assistant)
+                latest = await current_store().get(AgentConversation, parsed_id)
+                if latest is not None:
+                    if cleaned:
+                        latest.messages.append(
+                            AgentMessage(role="assistant", content=cleaned)
+                        )
+                    latest.thinking = False
+                    latest.thinking_at = None
                     latest.updated_at = utc_now()
                     await current_store().save(latest)
-            else:
-                yield empty_turn_sse()
+                if not cleaned:
+                    await outbound.put(empty_turn_sse())
+            finally:
+                latest = await current_store().get(AgentConversation, parsed_id)
+                if latest is not None and latest.thinking:
+                    latest.thinking = False
+                    latest.thinking_at = None
+                    latest.updated_at = utc_now()
+                    await current_store().save(latest)
+                turns.pop(turn_key, None)
+                await outbound.put(None)
 
+        async def relay() -> AsyncIterator[bytes]:
+            while True:
+                item = await outbound.get()
+                if item is None:
+                    break
+                yield item
+
+        turns[turn_key] = asyncio.create_task(consume())
         return StreamingResponse(
             relay(),
             media_type="text/event-stream",

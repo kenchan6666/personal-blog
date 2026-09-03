@@ -554,7 +554,10 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
             beat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await beat
-            if not task.done():
+            if disconnected:
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+            elif not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task

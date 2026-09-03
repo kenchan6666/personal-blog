@@ -35,6 +35,7 @@ async def test_agent_conversation_history_is_persistent(client, settings) -> Non
     )
     assert loaded.status_code == 200
     assert loaded.json()["messages"] == []
+    assert loaded.json()["thinking"] is False
 
 
 @pytest.mark.asyncio
@@ -84,3 +85,18 @@ async def test_about_me_knowledge_can_be_edited(client, settings) -> None:
     )
     assert synced_all.status_code == 200
     assert synced_all.json()[0]["id"] == record_id
+
+
+def test_live_thinking_expires_after_the_stale_window() -> None:
+    from datetime import timedelta
+
+    from app.models import conversation_is_thinking, utc_now
+
+    now = utc_now()
+    assert conversation_is_thinking(True, now, now=now) is True
+    assert (
+        conversation_is_thinking(True, now - timedelta(seconds=800), now=now)
+        is False
+    )
+    assert conversation_is_thinking(False, now, now=now) is False
+    assert conversation_is_thinking(True, None, now=now) is True
