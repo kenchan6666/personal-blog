@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.agent_activity import rewrite_owner_sse_block
 from app.agent_budget import owner_chat_max_tokens, strip_tool_noise
 from app.agent_rag import AgentRag, knowledge_context
 from app.models import AgentConversation, AgentMessage, KnowledgeRecord, utc_now
@@ -438,8 +439,11 @@ def register_agent_routes(
                         buffer += text
                         blocks = re.split(r"\r?\n\r?\n", buffer)
                         buffer = blocks.pop()
-                        assistant += "".join(_sse_delta(block) for block in blocks)
-                        yield chunk
+                        for block in blocks:
+                            assistant += _sse_delta(block)
+                            forwarded = rewrite_owner_sse_block(block)
+                            if forwarded:
+                                yield forwarded
                         if not buffer:
                             event = await knowledge_update_event()
                             if event is not None:
@@ -447,6 +451,9 @@ def register_agent_routes(
                     buffer += decoder.decode(b"", final=True)
                     if buffer.strip():
                         assistant += _sse_delta(buffer)
+                        forwarded = rewrite_owner_sse_block(buffer)
+                        if forwarded:
+                            yield forwarded
                     event = await knowledge_update_event(force=True)
                     if event is not None:
                         yield event

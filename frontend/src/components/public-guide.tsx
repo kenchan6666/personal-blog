@@ -36,15 +36,31 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [awaitingMore, setAwaitingMore] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const liveAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant");
-  const isThinking =
-    sending && Boolean(liveAssistant) && !liveAssistant?.content.trim();
-  const isStreaming = sending && Boolean(liveAssistant?.content.trim());
-  const livePhase = isStreaming ? "streaming" : isThinking ? "thinking" : "";
+  const liveText = Boolean(liveAssistant?.content.trim());
+  const isThinking = sending && Boolean(liveAssistant) && !liveText;
+  const isToolWait = sending && liveText && awaitingMore;
+  const isStreaming = sending && liveText && !awaitingMore;
+  const livePhase = isStreaming
+    ? "streaming"
+    : isThinking || isToolWait
+      ? "thinking"
+      : "";
+
+  useEffect(() => {
+    if (!sending) {
+      setAwaitingMore(false);
+      return undefined;
+    }
+    setAwaitingMore(false);
+    const timer = window.setTimeout(() => setAwaitingMore(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [sending, liveAssistant?.content]);
 
   useEffect(() => {
     if (!open) return;
@@ -184,7 +200,19 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
                   <>
                     <MarkdownBody source={message.content} />
                     {sending && message.id === liveAssistant?.id ? (
-                      <span className="agent-stream-caret" aria-hidden="true" />
+                      isToolWait ? (
+                        <span
+                          className="agent-thinking"
+                          aria-label={dict.thinking}
+                        >
+                          <i />
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      ) : (
+                        <span className="agent-stream-caret" aria-hidden="true" />
+                      )
                     ) : null}
                   </>
                 ) : (

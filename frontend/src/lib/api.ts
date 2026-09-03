@@ -1144,11 +1144,16 @@ export type AgentKnowledgeInput = {
   order: number;
 };
 
-export type AgentStreamEvent = {
-  type: "knowledge_updated";
-  changedIds: string[];
-  items: AgentKnowledge[];
-};
+export type AgentStreamEvent =
+  | {
+      type: "knowledge_updated";
+      changedIds: string[];
+      items: AgentKnowledge[];
+    }
+  | {
+      type: "tool_activity";
+      label: string;
+    };
 
 async function ownerAgentJson<T>(
   token: string,
@@ -1329,6 +1334,14 @@ export async function streamOwnerAgent(
             ? (payload.items as AgentKnowledge[])
             : [],
         });
+        return;
+      }
+      if (event === "tool_activity") {
+        const label =
+          typeof payload.label === "string" ? payload.label.trim() : "";
+        if (label) {
+          onEvent?.({ type: "tool_activity", label });
+        }
         return;
       }
       const delta = payload.choices?.[0]?.delta?.content;

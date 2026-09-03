@@ -99,10 +99,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingConversation, setDeletingConversation] = useState(false);
   const [agentActivity, setAgentActivity] = useState("");
+  const [toolActivity, setToolActivity] = useState("");
   const [recentKnowledgeIds, setRecentKnowledgeIds] = useState<Set<string>>(
     new Set(),
   );
   const [error, setError] = useState("");
+  const [awaitingMore, setAwaitingMore] = useState(false);
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -189,13 +191,31 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const liveAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant");
-  const isThinking =
-    sending && Boolean(liveAssistant) && !liveAssistant?.content.trim();
-  const isStreaming =
-    sending && Boolean(liveAssistant?.content.trim());
-  const livePhase = isStreaming ? "streaming" : isThinking ? "thinking" : "";
+  const liveText = Boolean(liveAssistant?.content.trim());
+  const isThinking = sending && Boolean(liveAssistant) && !liveText;
+  const isToolWait = sending && liveText && awaitingMore;
+  const isStreaming = sending && liveText && !awaitingMore;
+  const livePhase = isStreaming
+    ? "streaming"
+    : isThinking || isToolWait
+      ? "thinking"
+      : "";
+
+  useEffect(() => {
+    if (!sending) {
+      setAwaitingMore(false);
+      return undefined;
+    }
+    setAwaitingMore(false);
+    const timer = window.setTimeout(() => setAwaitingMore(true), 850);
+    return () => window.clearTimeout(timer);
+  }, [sending, liveAssistant?.content]);
 
   function handleStreamEvent(event: AgentStreamEvent) {
+    if (event.type === "tool_activity") {
+      setToolActivity(event.label);
+      return;
+    }
     if (event.type !== "knowledge_updated") return;
     setKnowledge(event.items);
     setRecentKnowledgeIds(new Set(event.changedIds));
@@ -291,6 +311,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setInput("");
     setFiles([]);
     setError("");
+    setToolActivity("");
     setSending(true);
 
     const editorContext = context
@@ -333,6 +354,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         ),
       );
     } finally {
+      setToolActivity("");
       setSending(false);
     }
   }
@@ -531,16 +553,13 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 : "会话与消息已持久保存，并会检索右侧个人资料辅助回答。"}
             </p>
           </div>
-          {agentActivity ? (
-            <div className="agent-live-activity" aria-live="polite">
-              <i aria-hidden="true" />
-              <span>{agentActivity}</span>
-            </div>
-          ) : livePhase ? (
+          {sending && (livePhase || toolActivity) ? (
             <div
-              className={`agent-live-activity is-${livePhase}`}
+              className={`agent-live-activity is-${livePhase || "thinking"}${
+                toolActivity ? " has-label" : ""
+              }`}
               aria-live="polite"
-              aria-label={isStreaming ? "正在输出" : "正在思考"}
+              aria-label={toolActivity || (isStreaming ? "正在输出" : "正在思考")}
             >
               <span className="agent-status-bars" aria-hidden="true">
                 <i />
@@ -548,6 +567,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 <i />
                 <i />
               </span>
+              {toolActivity ? <span>{toolActivity}</span> : null}
+            </div>
+          ) : agentActivity ? (
+            <div className="agent-live-activity" aria-live="polite">
+              <i aria-hidden="true" />
+              <span>{agentActivity}</span>
             </div>
           ) : null}
         </div>
@@ -585,7 +610,16 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                   <>
                     <MarkdownBody source={message.content} />
                     {sending && message.id === liveAssistant?.id ? (
-                      <span className="agent-stream-caret" aria-hidden="true" />
+                      isToolWait ? (
+                        <span className="agent-thinking" aria-label="正在思考">
+                          <i />
+                          <i />
+                          <i />
+                          <i />
+                        </span>
+                      ) : (
+                        <span className="agent-stream-caret" aria-hidden="true" />
+                      )
                     ) : null}
                   </>
                 ) : (

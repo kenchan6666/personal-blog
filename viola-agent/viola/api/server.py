@@ -418,7 +418,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
         await resp.prepare(request)
 
         chunk_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
-        queue: asyncio.Queue[str | None] = asyncio.Queue()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         stream_failed = False
         emitted_content = False
 
@@ -426,13 +426,30 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
             nonlocal emitted_content
             if token:
                 emitted_content = True
-            await queue.put(token)
+            await queue.put(("delta", token))
 
         async def _on_stream_end(*_a: Any, **_kw: Any) -> None:
             # Agent stream-end callbacks mark generation segment boundaries.
             # Tool-backed requests may continue after a segment ends, so the
             # HTTP SSE stream is closed only when process_direct returns.
             return None
+
+        async def _on_progress(_content: str = "", **kwargs: Any) -> None:
+            events = kwargs.get("tool_events") or []
+            starts = [
+                event
+                for event in events
+                if isinstance(event, dict) and event.get("phase", "start") == "start"
+            ]
+            if starts:
+                await queue.put(("tool_activity", starts))
+
+        def _sse_tool_activity(tools: list[dict[str, Any]]) -> bytes:
+            payload = {"tools": tools}
+            return (
+                "event: tool_activity\n"
+                f"data: {_json.dumps(payload, ensure_ascii=False)}\n\n"
+            ).encode()
 
         async def _run() -> None:
             nonlocal stream_failed
@@ -447,6 +464,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                             chat_id=API_CHAT_ID,
                             on_stream=_on_stream,
                             on_stream_end=_on_stream_end,
+                            on_progress=_on_progress,
                             max_tokens=max_tokens,
                         ),
                         timeout=timeout_s,
@@ -454,7 +472,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                     if not emitted_content:
                         response_text = _response_text(response)
                         if response_text.strip():
-                            await queue.put(response_text)
+                            await queue.put(("delta", response_text))
             except Exception:
                 stream_failed = True
                 logger.exception("Streaming error for session {}", session_key)
@@ -464,10 +482,15 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
         task = asyncio.create_task(_run())
         try:
             while True:
-                token = await queue.get()
-                if token is None:
+                item = await queue.get()
+                if item is None:
                     break
-                await resp.write(_sse_chunk(token, model_name, chunk_id))
+                kind, payload = item
+                if kind == "tool_activity" and isinstance(payload, list):
+                    await resp.write(_sse_tool_activity(payload))
+                    continue
+                if kind == "delta" and isinstance(payload, str):
+                    await resp.write(_sse_chunk(payload, model_name, chunk_id))
         finally:
             if not task.done():
                 task.cancel()

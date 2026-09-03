@@ -3,7 +3,18 @@ from __future__ import annotations
 import re
 
 SHORT_MAX_TOKENS = 1024
+TOOL_MAX_TOKENS = 4096
 LONG_MAX_TOKENS = 8192
+
+_TOOL_HINTS = (
+    "readme",
+    "github",
+    "仓库",
+    "倉庫",
+    "repository",
+    "源码",
+    "源碼",
+)
 
 _LONG_FORM = (
     "全文",
@@ -34,6 +45,8 @@ def owner_chat_max_tokens(message: str, *, editor_context: str = "") -> int:
     lowered = (message or "").casefold()
     if any(hint.casefold() in lowered for hint in _LONG_FORM):
         return LONG_MAX_TOKENS
+    if any(hint.casefold() in lowered for hint in _TOOL_HINTS):
+        return TOOL_MAX_TOKENS
     return SHORT_MAX_TOKENS
 
 
