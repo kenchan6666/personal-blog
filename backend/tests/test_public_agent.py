@@ -9,7 +9,11 @@ from app.public_agent import (
     _is_portfolio_question,
     _limited,
     _system_prompt,
+    guide_chat_payloads,
+    looks_incomplete_guide,
+    parse_guide_sse_block,
     public_guide_max_tokens,
+    should_continue_guide,
 )
 
 
@@ -82,8 +86,39 @@ def test_public_prompt_stays_source_bound_without_lecturing() -> None:
 
 
 def test_public_guide_floor_stops_mid_sentence_truncation() -> None:
-    assert public_guide_max_tokens(350) == 1024
-    assert public_guide_max_tokens(2048) == 2048
+    assert public_guide_max_tokens(350) == 4096
+    assert public_guide_max_tokens(1024) == 4096
+    assert public_guide_max_tokens(8192) == 8192
+
+
+def test_guide_continues_when_model_hits_length_or_mid_clause() -> None:
+    assert should_continue_guide("length", "完整的一句。")
+    assert should_continue_guide("max_tokens", "完整的一句。")
+    assert should_continue_guide("stop", "")
+    assert should_continue_guide(
+        "stop",
+        "Ken 的代表项目是 Personal Blog，技术栈包括 FastAPI 和",
+    )
+    assert not should_continue_guide(
+        "stop",
+        "详见 [项目](/zh-Hant/projects/personal-blog)。",
+    )
+    assert looks_incomplete_guide("他主要使用 Next.js 与")
+    assert looks_incomplete_guide("他擅长")
+    delta, reason = parse_guide_sse_block(
+        'data: {"choices":[{"delta":{"content":"Hi"},"finish_reason":"length"}]}'
+    )
+    assert delta == "Hi"
+    assert reason == "length"
+    parts, parts_reason = parse_guide_sse_block(
+        'data: {"choices":[{"delta":{"content":[{"type":"text","text":"完"}]},'
+        '"finish_reason":"max_tokens"}]}'
+    )
+    assert parts == "完"
+    assert parts_reason == "max_tokens"
+    payloads = guide_chat_payloads("gemini-2.5-flash", [], 4096)
+    assert payloads[0]["thinking_budget"] == 0
+    assert "thinking_budget" not in payloads[1]
 
 
 def test_github_anonymous_requests_do_not_send_empty_bearer() -> None:

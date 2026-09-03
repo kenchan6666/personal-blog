@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = "portfolio_about_me"
     public_agent_enabled: bool = True
     public_agent_model: str = "gemini-2.5-flash"
-    public_agent_max_tokens: int = 1024
+    public_agent_max_tokens: int = 4096
     public_agent_rate_minute: int = 4
     public_agent_rate_hour: int = 20
     public_agent_rate_day: int = 40
