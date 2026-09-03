@@ -80,7 +80,7 @@ flowchart TD
 | `PORTFOLIO_WRITE_ENABLED` | MCP 寫入；Compose 生產為 `true` |
 | `UNI_API_KEY` | 缺則 Owner RAG 與公開 Guide 無法呼叫模型 |
 
-## 本版本：硬編碼 Prompt 與大模型（1.0.5）
+## 本版本：硬編碼 Prompt 與大模型（1.0.6）
 
 > 運行時以 `deployment/.env` 為準；下表為本版本基線。  
 > **憲法原則**：凡修改 prompt 模板或變更本節記載的大模型基線，必須在同一變更集更新本節、新增版本檔，並更新 [docs/prompt-model-versions/](docs/prompt-model-versions/)。
@@ -97,7 +97,7 @@ flowchart TD
 | Owner 工具說明 | [`viola-agent/viola/templates/TOOLS.md`](viola-agent/viola/templates/TOOLS.md) |
 | Public Guide 系統提示 | [`backend/app/public_agent.py`](backend/app/public_agent.py) `_system_prompt()` |
 
-Owner 預設 `max_tokens=4096`。若模型只預告「即將讀取某倉庫」而未發 function call，執行層會還原成 GitHub 工具並繼續。
+Owner 預設 `max_tokens=4096`。公開導覽對訪客給出有證據的短答，輸出至少 1024 token，避免 Gemini 思考佔額後句子被截斷。
 
 歷史版本：[docs/prompt-model-versions/](docs/prompt-model-versions/)。
 

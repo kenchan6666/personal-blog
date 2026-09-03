@@ -9,6 +9,7 @@ from app.public_agent import (
     _is_portfolio_question,
     _limited,
     _system_prompt,
+    public_guide_max_tokens,
 )
 
 
@@ -53,6 +54,7 @@ def test_topic_gate_accepts_portfolio_questions_and_project_names() -> None:
 
     assert _is_portfolio_question("你有哪些代表项目？", projects)
     assert _is_portfolio_question("Explain Personal Blog", projects)
+    assert _is_portfolio_question("他适合后端岗位吗？", projects)
     assert not _is_portfolio_question("Write a sorting algorithm for me", projects)
 
 
@@ -72,8 +74,16 @@ def test_public_prompt_stays_source_bound_without_lecturing() -> None:
     assert "You have no tools" in prompt
     assert "Use only PUBLIC_CONTEXT" in prompt
     assert "Do not mention being a guide" in prompt
+    assert "hiring visitor" in prompt
+    assert "Finish every sentence" in prompt or "finish every sentence" in prompt
+    assert "220 Chinese" not in prompt
     assert "read-only public portfolio guide" not in prompt
     assert "Private GitHub repositories are out of scope" not in prompt
+
+
+def test_public_guide_floor_stops_mid_sentence_truncation() -> None:
+    assert public_guide_max_tokens(350) == 1024
+    assert public_guide_max_tokens(2048) == 2048
 
 
 def test_github_anonymous_requests_do_not_send_empty_bearer() -> None:
