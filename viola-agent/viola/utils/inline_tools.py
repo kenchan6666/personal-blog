@@ -10,8 +10,8 @@ from viola.providers.base import ToolCallRequest
 _ALNUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 _PREAMBLE = re.compile(
-    r"(?is)(我将|我会|我來|我来|我需要先|I(?:['’]?ll| will)|Let me).{0,48}"
-    r"(读取|讀取|分析|调用|調用|列出|read|fetch|analy[sz]e|look|list)"
+    r"(?is)(我将|我会|我來|我来|我需要先|我需要|首先.{0,12}我|I(?:['’]?ll| will)|Let me).{0,48}"
+    r"(读取|讀取|分析|调用|調用|列出|查看|看看|先看|整理|read|fetch|analy[sz]e|look|list)"
 )
 
 _ANNOUNCED_FILE = re.compile(
@@ -29,7 +29,11 @@ _ANNOUNCED_HOMEPAGE = re.compile(
 )
 
 _ANNOUNCED_ABOUT_LIST = re.compile(
-    r"(?is)列出所有\s*About|list all About"
+    r"(?is)"
+    r"(?:列出所有\s*About|list all About)"
+    r"|(?:查看|看看|读取|讀取|先看|整理).{0,40}"
+    r"(?:关于我|關於我|About)\s*[\"'「」『』“”‘’]{0,2}\s*(?:页面|頁面|页|頁)"
+    r"|(?:关于我|關於我|About)\s*[\"'「」『』“”‘’]{0,2}\s*(?:页面|頁面)\s*(?:内容|內容|格式)"
 )
 
 _JSON_FENCE = re.compile(r"(?is)```(?:json|xml)?\s*([\s\S]*?)```")

@@ -51,3 +51,19 @@ def test_recovers_homepage_confused_with_about_main() -> None:
     )
     assert listed.arguments["kind"] == "about"
     assert looks_like_tool_preamble(text)
+
+
+def test_recovers_announced_about_page_read() -> None:
+    text = (
+        "好的，请稍等，我来帮你整理一下“关于我”页面的格式。\n\n"
+        "首先，我需要查看当前的“关于我”页面内容。"
+    )
+    calls = recover_inline_tool_calls(
+        text,
+        available_names=["mcp_portfolio_portfolio_list_content"],
+    )
+    assert len(calls) == 1
+    assert calls[0].name == "mcp_portfolio_portfolio_list_content"
+    assert calls[0].arguments["kind"] == "about"
+    assert looks_like_tool_preamble(text)
+    assert recover_inline_tool_calls("先查看关于我 RAG 里已有的事实。") == []

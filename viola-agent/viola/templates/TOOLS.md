@@ -2,7 +2,7 @@
 
 - `mcp_portfolio_portfolio_overview`：需要全站上下文时使用；返回里的 `surfaces` 标明首页与 About。
 - 改首页 / Hero / 简介 / 技能 / 经历条：`portfolio_get_site` 再 `portfolio_update_site`。不要找名叫 main 的 About 页。同一轮把已确认事实写入 RAG。
-- 改 About 页：`portfolio_list_content` kind=`about`，用返回的 id 或 slug（模块 kind 为 summary / education / experience / achievement / custom）。同一轮同步 RAG。
+- 查看或改 About 页：同一轮 `portfolio_list_content` kind=`about`，用返回的 id 或 slug（模块 kind 为 summary / education / experience / achievement / custom）。同一轮同步 RAG。
 - `mcp_portfolio_portfolio_list_content` / `get_content`：写作前读取相关 Project / Article / Journal / About 模块。
 - `mcp_portfolio_portfolio_create_content`：创建 Draft 项目、文章、日志或 About 模块。写完后同步 RAG。不要在创建时发布。
 - `mcp_portfolio_portfolio_update_content`：只传用户要求改变的字段；About 用 kind=`about`。不能把 Draft 升为 published。已发布记录普通更新会保持 published。写完后同步 RAG。
