@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_portfolio.server import PortfolioApi, _merge, _repo_parts, _resolve_repo
+from mcp_portfolio.server import (
+    PortfolioApi,
+    _clip_text,
+    _merge,
+    _repo_parts,
+    _resolve_repo,
+    _without_publish,
+)
 
 
 def test_portfolio_client_requires_service_token(monkeypatch) -> None:
@@ -35,6 +42,18 @@ def test_merge_preserves_omitted_locales() -> None:
         "en": "New",
     }
     assert merged["status"] == "draft"
+
+
+def test_update_payload_cannot_publish() -> None:
+    assert _without_publish({"status": "published", "title": "A"})["status"] == "draft"
+    assert _without_publish({"status": "draft"})["status"] == "draft"
+
+
+def test_clip_text_keeps_short_source_and_marks_long_source() -> None:
+    assert _clip_text("short") == "short"
+    clipped = _clip_text("x" * 9000, 100)
+    assert clipped.endswith("[truncated]")
+    assert len(clipped) < 9000
 
 
 def test_repo_parts_accept_owner_name_or_short_name() -> None:

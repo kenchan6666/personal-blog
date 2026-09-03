@@ -13,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, status
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
+from app.agent_budget import owner_chat_max_tokens, strip_tool_noise
 from app.agent_rag import AgentRag, knowledge_context
 from app.models import AgentConversation, AgentMessage, KnowledgeRecord, utc_now
 from app.store import current_store, new_document
@@ -86,6 +87,18 @@ async def _sync_knowledge(rag: AgentRag, record: KnowledgeRecord) -> None:
     record.vector_synced, record.vector_sync_error = await rag.sync_with_status(record)
     record.updated_at = utc_now()
     await current_store().save(record)
+
+
+async def sync_stale_knowledge(settings: Any) -> None:
+    rag = AgentRag(settings)
+    rows = await current_store().find_all(KnowledgeRecord)
+    for row in rows:
+        if row.vector_synced:
+            continue
+        try:
+            await _sync_knowledge(rag, row)
+        except Exception:
+            continue
 
 
 def register_agent_routes(
@@ -322,6 +335,10 @@ def register_agent_routes(
                 + editor_context
             )
         forwarded_message = display_message + "".join(additions)
+        max_tokens = owner_chat_max_tokens(
+            display_message,
+            editor_context=editor_context,
+        )
         target = f"{settings.agent_api_url.rstrip('/')}/v1/chat/completions"
         headers = _agent_headers(settings.agent_internal_token)
         if files:
@@ -329,6 +346,7 @@ def register_agent_routes(
                 "message": forwarded_message,
                 "session_id": _session_id(conversation_id),
                 "stream": "true",
+                "max_tokens": str(max_tokens),
             }
             request_kwargs: dict[str, Any] = {"data": data, "files": files}
         else:
@@ -337,6 +355,7 @@ def register_agent_routes(
                     "model": "viola",
                     "stream": True,
                     "session_id": _session_id(conversation_id),
+                    "max_tokens": max_tokens,
                     "messages": [{"role": "user", "content": forwarded_message}],
                 }
             }
@@ -436,14 +455,15 @@ def register_agent_routes(
                     b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
                 )
                 return
-            if assistant.strip():
+            cleaned = strip_tool_noise(assistant)
+            if cleaned:
                 latest = await current_store().get(
                     AgentConversation,
                     parsed_id,
                 )
                 if latest is not None:
                     latest.messages.append(
-                        AgentMessage(role="assistant", content=assistant)
+                        AgentMessage(role="assistant", content=cleaned)
                     )
                     latest.updated_at = utc_now()
                     await current_store().save(latest)

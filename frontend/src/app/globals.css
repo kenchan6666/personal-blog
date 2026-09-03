@@ -2489,6 +2489,8 @@ html.is-locale-hold .article-page {
 }
 
 .gh-box-body {
+  min-width: 0;
+  overflow-x: auto;
   padding: 1rem 1rem 1.25rem;
 }
 
@@ -2499,6 +2501,7 @@ html.is-locale-hold .article-page {
 }
 
 .gh-code {
+  min-width: 0;
   overflow-x: auto;
   font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 0.8rem;
@@ -3770,7 +3773,11 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-composer {
-    padding: 0.75rem 0.85rem max(0.85rem, env(safe-area-inset-bottom));
+    padding: 0.75rem 0.85rem
+      max(
+        0.85rem,
+        calc(env(safe-area-inset-bottom) + var(--agent-keyboard-inset, 0px))
+      );
   }
 
   .public-guide-panel {
@@ -3926,12 +3933,14 @@ html[data-theme="dark"] .ambient-orb {
 
 .agent-message {
   width: fit-content;
-  max-width: min(84%, 48rem);
-  padding: 0.8rem 1rem;
+  max-width: min(100%, 36rem);
+  min-width: 0;
+  padding: 0.7rem 0.85rem;
   border: 1px solid var(--hairline);
   border-radius: 18px;
-  font-size: 0.92rem;
-  line-height: 1.65;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .agent-message.is-user {
@@ -3942,9 +3951,49 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 .agent-message.is-assistant {
+  width: min(100%, 36rem);
   align-self: flex-start;
   border-bottom-left-radius: 5px;
   background: var(--panel-fill-strong);
+}
+
+.agent-message .markdown-body.typeset-reading,
+.public-guide-message .markdown-body.typeset-reading {
+  --typeset-size: 0.86rem;
+  --typeset-leading: 1.55;
+  --typeset-flow: 0.62rem;
+}
+
+.agent-message .typeset-reading :where(h1),
+.public-guide-message .typeset-reading :where(h1) {
+  margin-block-start: 0.8em;
+  font-size: 1.12em;
+}
+
+.agent-message .typeset-reading :where(h2),
+.public-guide-message .typeset-reading :where(h2) {
+  margin-block-start: 0.75em;
+  font-size: 1.05em;
+}
+
+.agent-message .typeset-reading :where(h3),
+.public-guide-message .typeset-reading :where(h3) {
+  margin-block-start: 0.65em;
+  font-size: 1em;
+}
+
+.agent-message .typeset-reading :where(pre),
+.public-guide-message .typeset-reading :where(pre) {
+  max-height: 14rem;
+  overflow: auto;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.74rem;
+}
+
+.agent-message .typeset-reading :where(img),
+.public-guide-message .typeset-reading :where(img) {
+  max-height: 11rem;
+  object-fit: contain;
 }
 
 .agent-message.is-assistant > :first-child {
@@ -4004,7 +4053,7 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 .agent-composer {
-  padding: 1rem 1.2rem 1.2rem;
+  padding: 1rem 1.2rem calc(1.2rem + var(--agent-keyboard-inset, 0px));
   border-top: 1px solid var(--hairline);
 }
 

@@ -193,6 +193,16 @@ def _chat_completion_response(
     }
 
 
+def _parse_max_tokens(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        tokens = int(value)
+    except (TypeError, ValueError):
+        return None
+    return tokens if tokens > 0 else None
+
+
 def _response_text(value: Any) -> str:
     """Normalize process_direct output to plain assistant text."""
     if value is None:
@@ -283,14 +293,15 @@ def _multipart_field_name(part: Any) -> str:
 
 async def _parse_multipart(
     request: web.Request,
-) -> tuple[str, list[str], str | None, str | None, bool]:
-    """Parse multipart/form-data. Returns text, media, session, model, stream."""
+) -> tuple[str, list[str], str | None, str | None, bool, int | None]:
+    """Parse multipart/form-data. Returns text, media, session, model, stream, max_tokens."""
     media_dir = get_media_dir("api")
     reader = await request.multipart()
     text = ""
     session_id = None
     model = None
     stream = False
+    max_tokens = None
     media_paths: list[str] = []
 
     while True:
@@ -310,6 +321,8 @@ async def _parse_multipart(
         elif pname == "stream":
             raw_stream = (await part.read()).decode("utf-8").strip().lower()
             stream = raw_stream in {"1", "true", "yes", "on"}
+        elif pname == "max_tokens":
+            max_tokens = _parse_max_tokens((await part.read()).decode("utf-8"))
         elif is_file_field:
             raw = await part.read()
             if len(raw) > MAX_FILE_SIZE:
@@ -332,7 +345,7 @@ async def _parse_multipart(
     if not text:
         text = "请分析上传的文件"
 
-    return text, media_paths, session_id, model, stream
+    return text, media_paths, session_id, model, stream, max_tokens
 
 
 # ---------------------------------------------------------------------------
@@ -353,9 +366,12 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
     model_name: str = request.app.get("model_name", "viola")
 
     stream = False
+    max_tokens = None
     try:
         if content_type.startswith("multipart/"):
-            text, media_paths, session_id, requested_model, stream = await _parse_multipart(request)
+            text, media_paths, session_id, requested_model, stream, max_tokens = (
+                await _parse_multipart(request)
+            )
             twilio_dir = get_media_dir("api")
             text, twilio_paths = await ingest_twilio_media_lines(text, twilio_dir)
             media_paths.extend(twilio_paths)
@@ -366,6 +382,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                 return _error_json(400, "Invalid JSON body")
             stream = body.get("stream", False)
             requested_model = body.get("model")
+            max_tokens = _parse_max_tokens(body.get("max_tokens"))
             text, media_paths = _parse_json_content(body)
             twilio_dir = get_media_dir("api")
             text, twilio_paths = await ingest_twilio_media_lines(text, twilio_dir)
@@ -430,6 +447,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                             chat_id=API_CHAT_ID,
                             on_stream=_on_stream,
                             on_stream_end=_on_stream_end,
+                            max_tokens=max_tokens,
                         ),
                         timeout=timeout_s,
                     )
@@ -474,6 +492,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                         session_key=session_key,
                         channel="api",
                         chat_id=API_CHAT_ID,
+                        max_tokens=max_tokens,
                     ),
                     timeout=timeout_s,
                 )
@@ -488,6 +507,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                             session_key=session_key,
                             channel="api",
                             chat_id=API_CHAT_ID,
+                            max_tokens=max_tokens,
                         ),
                         timeout=timeout_s,
                     )

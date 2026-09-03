@@ -583,8 +583,15 @@ def build_status_content(
     return "\n".join(lines)
 
 
+_MANAGED_WORKSPACE_TEMPLATES = frozenset({"AGENTS.md", "TOOLS.md"})
+
+
 def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
-    """Sync bundled templates to workspace. Only creates missing files."""
+    """Sync bundled templates to workspace.
+
+    Missing files are created. Managed prompt files (AGENTS.md, TOOLS.md)
+    are overwritten so deploys refresh instructions without wiping memory.
+    """
     from importlib.resources import files as pkg_files
 
     try:
@@ -597,10 +604,14 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
     added: list[str] = []
 
     def _write(src, dest: Path):
-        if dest.exists():
+        managed = dest.name in _MANAGED_WORKSPACE_TEMPLATES
+        if dest.exists() and not managed:
             return
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(src.read_text(encoding="utf-8") if src else "", encoding="utf-8")
+        text = src.read_text(encoding="utf-8") if src else ""
+        if dest.exists() and dest.read_text(encoding="utf-8") == text:
+            return
+        dest.write_text(text, encoding="utf-8")
         added.append(str(dest.relative_to(workspace)))
 
     for item in tpl.iterdir():

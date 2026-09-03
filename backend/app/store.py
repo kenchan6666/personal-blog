@@ -16,6 +16,7 @@ from app.models import (
     Comment,
     Journal,
     KnowledgeRecord,
+    OwnerSecret,
     Project,
     SiteProfile,
 )
@@ -31,6 +32,7 @@ MODELS = (
     Comment,
     AgentConversation,
     KnowledgeRecord,
+    OwnerSecret,
 )
 
 _STORE: "Store | None" = None

@@ -203,7 +203,7 @@ async def test_owner_can_read_unbound_private_github_repo(
         params={"path": "readme.md"},
     )
     assert mixed.status_code == 200
-    assert mixed.json()["content"] == "do-not-leak\n"
+    assert mixed.json()["content"] == "# Secret\nprivate notes\n"
 
     unknown = await client.get(
         "/api/owner/github/repos/someone/else",

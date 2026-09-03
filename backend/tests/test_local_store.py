@@ -16,6 +16,7 @@ from app.config import Settings
 from app.github import RecordingGitHub
 from app.mailer import RecordingMailer
 from app.main import create_app
+from app.memory_redis import MemoryRedis
 
 
 def _local_settings(tmp_path: Path) -> Settings:
@@ -61,7 +62,12 @@ async def _owner_token(client: AsyncClient, mailer: RecordingMailer, settings: S
 async def test_health_reports_local_store_when_mongo_uri_is_empty(tmp_path):
     settings = _local_settings(tmp_path)
     mailer = RecordingMailer()
-    application = create_app(settings, mailer=mailer, github=RecordingGitHub())
+    application = create_app(
+        settings,
+        mailer=mailer,
+        github=RecordingGitHub(),
+        redis=MemoryRedis(),
+    )
     async with LifespanManager(application):
         transport = ASGITransport(app=application)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -80,7 +86,12 @@ async def test_empty_mongo_uri_persists_site_and_project_to_json(tmp_path):
     mailer = RecordingMailer()
     data_dir = Path(settings.local_data_dir)
 
-    application = create_app(settings, mailer=mailer, github=RecordingGitHub())
+    application = create_app(
+        settings,
+        mailer=mailer,
+        github=RecordingGitHub(),
+        redis=MemoryRedis(),
+    )
     async with LifespanManager(application):
         await application.state.redis.flushdb()
         await application.state.store.delete_all()
@@ -113,7 +124,12 @@ async def test_empty_mongo_uri_persists_site_and_project_to_json(tmp_path):
     assert site_rows[0]["brand"]["zh-Hant"] == "本地站"
     assert project_rows[0]["slug"] == "local-demo"
 
-    restarted = create_app(settings, mailer=RecordingMailer(), github=RecordingGitHub())
+    restarted = create_app(
+        settings,
+        mailer=RecordingMailer(),
+        github=RecordingGitHub(),
+        redis=MemoryRedis(),
+    )
     async with LifespanManager(restarted):
         transport = ASGITransport(app=restarted)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

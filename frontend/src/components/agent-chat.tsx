@@ -106,6 +106,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const activityTimerRef = useRef<number | null>(null);
 
   async function refreshConversations(token: string) {
@@ -160,6 +161,27 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
+
+  useEffect(() => {
+    const root = workspaceRef.current;
+    const viewport = window.visualViewport;
+    if (!root || !viewport) return undefined;
+    const sync = () => {
+      const inset = Math.max(
+        0,
+        window.innerHeight - viewport.height - viewport.offsetTop,
+      );
+      root.style.setProperty("--agent-keyboard-inset", `${inset}px`);
+    };
+    sync();
+    viewport.addEventListener("resize", sync);
+    viewport.addEventListener("scroll", sync);
+    return () => {
+      viewport.removeEventListener("resize", sync);
+      viewport.removeEventListener("scroll", sync);
+      root.style.removeProperty("--agent-keyboard-inset");
+    };
+  }, []);
 
   const latestAssistant = [...messages]
     .reverse()
@@ -409,6 +431,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
 
   return (
     <section
+      ref={workspaceRef}
       className={`agent-workspace${compact ? " is-compact" : ""} is-${mobilePane}`}
     >
       {!compact ? (

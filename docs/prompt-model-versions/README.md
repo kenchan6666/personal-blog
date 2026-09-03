@@ -4,7 +4,8 @@
 
 | 版本 | 狀態 | 說明 |
 | --- | --- | --- |
-| [1.0.2](./1.0.2.md) | 當前 | 公開導覽語氣簡化；Owner Agent 讀取已授權 GitHub |
+| [1.0.3](./1.0.3.md) | 當前 | Owner 短答、氣泡縮小、源碼工具回傳截斷 |
+| [1.0.2](./1.0.2.md) | 歷史 | 公開導覽語氣簡化；Owner Agent 讀取已授權 GitHub |
 | [1.0.1](./1.0.1.md) | 歷史 | Embedding 渠道失敗時回退備用模型 |
 | [1.0.0](./1.0.0.md) | 歷史 | 公開只讀 Portfolio Guide、Owner Agent + RAG、UniAPI Gemini 基線 |
 

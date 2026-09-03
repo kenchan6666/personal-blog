@@ -424,6 +424,15 @@ def utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class OwnerSecret(Document):
+    name: str = ""
+    value: str = ""
+    updated_at: datetime = Field(default_factory=utc_now)
+
+    class Settings:
+        name = "owner_secrets"
+
+
 class AgentMessage(BaseModel):
     role: str
     content: str

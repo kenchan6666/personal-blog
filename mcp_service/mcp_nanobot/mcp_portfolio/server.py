@@ -77,6 +77,12 @@ def _merge(current: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _without_publish(payload: dict[str, Any]) -> dict[str, Any]:
+    if payload.get("status") == "published":
+        return {**payload, "status": "draft"}
+    return payload
+
+
 def _find(items: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
     wanted = identifier.strip().lower().strip("/")
     for item in items:
@@ -85,6 +91,28 @@ def _find(items: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
         if str(item.get("slug", "")).lower().strip("/") == wanted:
             return item
     raise RuntimeError(f"Content not found: {identifier}")
+
+
+_SOURCE_CLIP = 8000
+
+
+def _clip_text(value: str, limit: int = _SOURCE_CLIP) -> str:
+    text = value or ""
+    if len(text) <= limit:
+        return text
+    return text[:limit].rstrip() + "\n\n[truncated]"
+
+
+def _clip_source_payload(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+    clipped = dict(payload)
+    readme = clipped.get("readme")
+    if isinstance(readme, dict) and isinstance(readme.get("content"), str):
+        clipped["readme"] = {**readme, "content": _clip_text(str(readme["content"]))}
+    if isinstance(clipped.get("content"), str):
+        clipped["content"] = _clip_text(str(clipped["content"]))
+    return clipped
 
 
 def _repo_parts(full_name: str) -> tuple[str, str]:
@@ -258,6 +286,7 @@ def create_server() -> FastMCP:
         payload.pop("id", None)
         payload.pop("sourceRepo", None)
         payload.pop("protected", None)
+        payload = _without_publish(payload)
         return api.request(
             "PUT", f"{_COLLECTION_PATHS[kind]}/{item_id}", json=payload
         )
@@ -353,9 +382,11 @@ def create_server() -> FastMCP:
         owner, name = _resolve_repo(api, full_name)
         suffix = "/tree" if path else ""
         params = httpx.QueryParams({"ref": ref, "path": path})
-        return api.request(
-            "GET",
-            f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}{suffix}?{params}",
+        return _clip_source_payload(
+            api.request(
+                "GET",
+                f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}{suffix}?{params}",
+            )
         )
 
     @server.tool()
@@ -367,9 +398,11 @@ def create_server() -> FastMCP:
         """Read one file. Prefer this for README.md; the name is matched case-insensitively."""
         owner, name = _resolve_repo(api, full_name)
         params = httpx.QueryParams({"ref": ref, "path": path})
-        return api.request(
-            "GET",
-            f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}/blob?{params}",
+        return _clip_source_payload(
+            api.request(
+                "GET",
+                f"/api/owner/github/repos/{quote(owner, safe='')}/{quote(name, safe='')}/blob?{params}",
+            )
         )
 
     @server.tool()
@@ -385,9 +418,11 @@ def create_server() -> FastMCP:
         params = httpx.QueryParams({"ref": ref, "path": path})
         slug = quote(project_slug.strip(), safe="")
         try:
-            return api.request(
-                "GET",
-                f"/api/owner/projects/{slug}{suffix}?{params}",
+            return _clip_source_payload(
+                api.request(
+                    "GET",
+                    f"/api/owner/projects/{slug}{suffix}?{params}",
+                )
             )
         except RuntimeError as exc:
             if "404" not in str(exc) and "not_found" not in str(exc):
@@ -404,9 +439,11 @@ def create_server() -> FastMCP:
         params = httpx.QueryParams({"ref": ref, "path": path})
         slug = quote(project_slug.strip(), safe="")
         try:
-            return api.request(
-                "GET",
-                f"/api/owner/projects/{slug}/source/blob?{params}",
+            return _clip_source_payload(
+                api.request(
+                    "GET",
+                    f"/api/owner/projects/{slug}/source/blob?{params}",
+                )
             )
         except RuntimeError as exc:
             if "404" not in str(exc) and "not_found" not in str(exc):

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from collections.abc import AsyncIterator
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,7 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from pymongo import AsyncMongoClient
 from redis.asyncio import Redis
 
-from app.agent_proxy import register_agent_routes
+from app.agent_proxy import register_agent_routes, sync_stale_knowledge
+from app.github_token import persist_github_owner_token, restore_github_owner_token
+from app.owner_actor import force_draft_if_service, owner_actor
 from app.auth import AuthService
 from app.avatar import (
     ensure_avatar_dir,
@@ -54,6 +57,7 @@ from app.models import (
     Journal,
     KnowledgeRecord,
     LinkItem,
+    OwnerSecret,
     Project,
     SiteProfile,
     SourceRepo,
@@ -208,6 +212,7 @@ def create_app(
     mailer: Mailer | None = None,
     github: GitHubClient | None = None,
     translator: MachineTranslator | None = None,
+    redis: Redis | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     backend = settings.mail_backend.lower()
@@ -250,8 +255,11 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        await redis.ping()
+        app_redis = redis
+        owns_redis = app_redis is None
+        if app_redis is None:
+            app_redis = Redis.from_url(settings.redis_url, decode_responses=True)
+            await app_redis.ping()
         mongo = None
         store = build_store(settings.mongo_uri, settings.local_data_dir)
         if settings.uses_mongo:
@@ -268,21 +276,23 @@ def create_app(
                     Comment,
                     AgentConversation,
                     KnowledgeRecord,
+                    OwnerSecret,
                 ],
             )
         bind_store(store)
+        await restore_github_owner_token(app_redis, GITHUB_TOKEN_KEY)
         avatar_dir = ensure_avatar_dir(settings.avatar_dir)
         print(f"[media] dir={avatar_dir}", flush=True)
         app.state.mongo = mongo
         app.state.store = store
-        app.state.redis = redis
+        app.state.redis = app_redis
         app.state.settings = settings
         app.state.mailer = resolved_mailer
         app.state.github = resolved_github
         app.state.translator = resolved_translator
         app.state.avatar_dir = avatar_dir
         app.state.auth = AuthService(
-            redis=redis,
+            redis=app_redis,
             settings=settings,
             mailer=resolved_mailer,
         )
@@ -300,10 +310,15 @@ def create_app(
             f"[store] kind={store.kind} mongo={'on' if settings.uses_mongo else 'off'}",
             flush=True,
         )
+        sync_task = asyncio.create_task(sync_stale_knowledge(settings))
         try:
             yield
         finally:
-            await redis.aclose()
+            sync_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await sync_task
+            if owns_redis:
+                await app_redis.aclose()
             if mongo is not None:
                 await close_mongo(mongo)
             bind_store(None)
@@ -334,8 +349,11 @@ def create_app(
             token = ""
         service_token = settings.agent_service_token.strip()
         if service_token and secrets.compare_digest(token, service_token):
+            owner_actor.set("service")
             return settings.owner_email
-        return await auth.resolve_session(token or None)
+        email = await auth.resolve_session(token or None)
+        owner_actor.set("session")
+        return email
 
     register_agent_routes(app, require_owner)
     register_public_agent_routes(app)
@@ -582,7 +600,7 @@ def create_app(
         project.title = body.title
         project.summary = body.summary
         project.body = body.body
-        project.status = body.status
+        project.status = force_draft_if_service(body.status)
         project.order = body.order
 
     async def ensure_unique_slug(slug: str, exclude_id: str | None = None) -> None:
@@ -993,6 +1011,7 @@ def create_app(
         except GitHubOAuthError:
             return github_redirect(connected=False)
         await redis.set(GITHUB_TOKEN_KEY, access)
+        await persist_github_owner_token(access)
         return github_redirect(connected=True)
 
     def parse_github_full_name(owner: str, name: str) -> str:
@@ -1247,11 +1266,11 @@ def create_app(
         article.title = body.title
         article.summary = body.summary
         article.body = body.body
-        article.status = body.status
+        article.status = force_draft_if_service(body.status)
         article.order = body.order
         article.related_project_slug = body.relatedProjectSlug.strip().lower()
         article.category_slug = category_slug
-        if body.status == "published" and article.published_at is None:
+        if article.status == "published" and article.published_at is None:
             article.published_at = datetime.now(timezone.utc)
 
     async def ensure_unique_article_slug(
@@ -1486,9 +1505,9 @@ def create_app(
         journal.title = body.title
         journal.summary = body.summary
         journal.body = body.body
-        journal.status = body.status
+        journal.status = force_draft_if_service(body.status)
         journal.order = body.order
-        if body.status == "published" and journal.published_at is None:
+        if journal.status == "published" and journal.published_at is None:
             journal.published_at = datetime.now(timezone.utc)
 
     async def ensure_unique_journal_slug(
@@ -1595,7 +1614,7 @@ def create_app(
         module.kind = kind
         module.title = body.title
         module.body = body.body
-        module.status = body.status
+        module.status = force_draft_if_service(body.status)
         module.order = body.order
 
     async def ensure_unique_about_slug(
