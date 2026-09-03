@@ -64,6 +64,17 @@ def test_repo_parts_accept_owner_name_or_short_name() -> None:
         _repo_parts("")
 
 
+def test_next_knowledge_order_puts_new_facts_on_top() -> None:
+    class FakeApi:
+        def request(self, method, path, json=None):
+            assert path == "/api/owner/agent/knowledge"
+            return [{"order": 2}, {"order": 5}, {"order": 1}]
+
+    from mcp_portfolio.server import _next_knowledge_order
+
+    assert _next_knowledge_order(FakeApi()) == 6
+
+
 def test_find_about_rejects_homepage_alias_named_main() -> None:
     modules = [
         {

@@ -9,6 +9,7 @@ from app.agent_budget import (
     owner_chat_max_tokens,
     strip_tool_noise,
 )
+from app.agent_proxy import pin_changed_knowledge_rows
 from app.owner_actor import force_draft_if_service, owner_actor
 
 
@@ -85,3 +86,13 @@ def test_service_actor_cannot_publish() -> None:
 def test_owner_sse_forwards_keepalive_comments() -> None:
     forwarded = rewrite_owner_sse_block(": keepalive")
     assert forwarded == b": keepalive\n\n"
+
+
+def test_changed_knowledge_rows_move_to_the_front() -> None:
+    class Row:
+        def __init__(self, record_id: str) -> None:
+            self.id = record_id
+
+    rows = [Row("a"), Row("b"), Row("c")]
+    pinned = pin_changed_knowledge_rows(rows, ["c"])
+    assert [str(row.id) for row in pinned] == ["c", "a", "b"]

@@ -31,6 +31,16 @@ _KNOWLEDGE_CATEGORIES = {
 }
 
 
+def pin_changed_knowledge_rows(
+    rows: list[KnowledgeRecord],
+    changed_ids: list[str],
+) -> list[KnowledgeRecord]:
+    wanted = set(changed_ids)
+    head = [row for row in rows if str(row.id) in wanted]
+    tail = [row for row in rows if str(row.id) not in wanted]
+    return head + tail
+
+
 class ConversationCreate(BaseModel):
     title: str = "新对话"
 
@@ -395,6 +405,7 @@ def register_agent_routes(
                 )
                 seen_knowledge = current
                 rows.sort(key=lambda row: (row.order, row.updated_at), reverse=True)
+                rows = pin_changed_knowledge_rows(rows, changed_ids)
                 payload = {
                     "changedIds": changed_ids,
                     "items": [row.to_owner_dict() for row in rows],

@@ -64,8 +64,15 @@ const SYNC_ERROR_LABELS: Record<string, string> = {
   vector_store_unavailable: "Qdrant 不可用",
 };
 
-function syncErrorText(code: string): string {
-  return SYNC_ERROR_LABELS[code] ?? "向量同步失败";
+function pinChangedKnowledge(
+  items: AgentKnowledge[],
+  changedIds: string[],
+): AgentKnowledge[] {
+  const wanted = new Set(changedIds);
+  return [
+    ...items.filter((item) => wanted.has(item.id)),
+    ...items.filter((item) => !wanted.has(item.id)),
+  ];
 }
 
 function messageRows(messages: AgentMessage[]): DisplayMessage[] {
@@ -108,8 +115,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const knowledgeListRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const activityTimerRef = useRef<number | null>(null);
+  const knowledgeRevealTimerRef = useRef<number | null>(null);
 
   async function refreshConversations(token: string) {
     const rows = await listAgentConversations(token);
@@ -155,6 +164,9 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       window.clearTimeout(timer);
       if (activityTimerRef.current !== null) {
         window.clearTimeout(activityTimerRef.current);
+      }
+      if (knowledgeRevealTimerRef.current !== null) {
+        window.clearTimeout(knowledgeRevealTimerRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -217,22 +229,36 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       return;
     }
     if (event.type !== "knowledge_updated") return;
-    setKnowledge(event.items);
-    setRecentKnowledgeIds(new Set(event.changedIds));
-    const changed = event.items.find((item) =>
-      event.changedIds.includes(item.id),
-    );
+    const pinned = pinChangedKnowledge(event.items, event.changedIds);
+    setKnowledge(pinned);
+    setRecentKnowledgeIds(new Set());
+    const changed = pinned.find((item) => event.changedIds.includes(item.id));
     setAgentActivity(
       changed ? `已同步到“关于我” · ${changed.title}` : "“关于我”已同步",
     );
+    if (!compact) setMobilePane("knowledge");
     if (activityTimerRef.current !== null) {
       window.clearTimeout(activityTimerRef.current);
     }
+    if (knowledgeRevealTimerRef.current !== null) {
+      window.clearTimeout(knowledgeRevealTimerRef.current);
+    }
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    window.requestAnimationFrame(() => {
+      knowledgeListRef.current?.scrollTo({
+        top: 0,
+        behavior: reduce ? "auto" : "smooth",
+      });
+    });
+    knowledgeRevealTimerRef.current = window.setTimeout(() => {
+      setRecentKnowledgeIds(new Set(event.changedIds));
+      knowledgeRevealTimerRef.current = null;
+    }, reduce ? 0 : 280);
     activityTimerRef.current = window.setTimeout(() => {
       setAgentActivity("");
       setRecentKnowledgeIds(new Set());
       activityTimerRef.current = null;
-    }, 2600);
+    }, reduce ? 1200 : 2880);
   }
 
   async function createConversation() {
@@ -811,7 +837,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               </div>
             </form>
           ) : null}
-          <div className="agent-knowledge-list">
+          <div className="agent-knowledge-list" ref={knowledgeListRef}>
             {knowledge.length === 0 && editingKnowledgeId === null ? (
               <div className="agent-empty">
                 还没有个人资料。添加后，Agent 会按问题检索相关内容。

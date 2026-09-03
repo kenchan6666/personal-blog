@@ -4298,7 +4298,8 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 @keyframes agent-knowledge-live {
-  from { opacity: 0.72; transform: translateY(7px) scale(0.985); }
+  from { opacity: 0.78; transform: translateY(10px) scale(0.98); }
+  55% { transform: translateY(-2px) scale(1.01); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 

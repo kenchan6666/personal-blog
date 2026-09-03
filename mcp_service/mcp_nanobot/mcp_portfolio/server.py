@@ -77,6 +77,12 @@ def _merge(current: dict[str, Any], changes: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _next_knowledge_order(api: PortfolioApi) -> int:
+    items = api.request("GET", "/api/owner/agent/knowledge") or []
+    orders = [int(item.get("order") or 0) for item in items if isinstance(item, dict)]
+    return (max(orders) if orders else 0) + 1
+
+
 def _without_publish(payload: dict[str, Any]) -> dict[str, Any]:
     if payload.get("status") == "published":
         return {**payload, "status": "draft"}
@@ -416,7 +422,7 @@ def create_server() -> FastMCP:
         content: str,
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Save a personal fact or experience after the Owner explicitly asks to remember it."""
+        """Save a confirmed personal fact. Used in the same turn as a site write; do not invent facts."""
         api.require_write()
         return api.request(
             "POST",
@@ -426,7 +432,7 @@ def create_server() -> FastMCP:
                 "category": category,
                 "content": content,
                 "tags": tags or [],
-                "order": 0,
+                "order": _next_knowledge_order(api),
             },
         )
 
@@ -439,7 +445,7 @@ def create_server() -> FastMCP:
         tags: list[str] | None = None,
         order: int = 0,
     ) -> dict[str, Any]:
-        """Update one About Me record after the Owner identifies the record and desired change."""
+        """Update one About Me record with confirmed facts after listing knowledge."""
         api.require_write()
         return api.request(
             "PUT",
@@ -449,7 +455,7 @@ def create_server() -> FastMCP:
                 "category": category,
                 "content": content,
                 "tags": tags or [],
-                "order": order,
+                "order": _next_knowledge_order(api),
             },
         )
 
