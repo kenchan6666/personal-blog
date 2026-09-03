@@ -358,7 +358,7 @@ def register_agent_routes(
         await current_store().save(conversation)
 
         knowledge = await current_store().find_all(KnowledgeRecord)
-        matches = await rag.search(display_message, knowledge)
+        matches = await rag.search(display_message, knowledge, limit=4)
         additions = [knowledge_context(matches)]
         if editor_context:
             additions.append(

@@ -6,6 +6,9 @@ import { fetchPublicSite } from "@/lib/api";
 import { pageMetadata, siteShareImage } from "@/lib/seo";
 import { brandForShell } from "@/lib/site-content";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }

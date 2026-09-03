@@ -270,12 +270,14 @@ class AgentRag:
 def knowledge_context(records: list[KnowledgeRecord]) -> str:
     if not records:
         return ""
-    rows = [
-        f"### {record.title}（{record.category}）\n{record.content}"
-        for record in records
-    ]
+    rows: list[str] = []
+    for record in records[:4]:
+        body = (record.content or "").strip()
+        if len(body) > 360:
+            body = body[:360].rstrip() + "…"
+        rows.append(f"### {record.title}（{record.category}）\n{body}")
     return (
-        "\n\n以下是“关于我”知识库中与本次问题最相关的资料。"
+        "\n\n以下是“关于我”知识库中与本次问题最相关的资料（仅本轮检索，不是完整记忆）。"
         "只在确实相关时使用，不要虚构未提供的信息：\n\n"
         + "\n\n".join(rows)
     )

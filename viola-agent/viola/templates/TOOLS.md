@@ -13,7 +13,7 @@
 - 私有仓只在后台对话中使用，不要把私有细节写进会公开发布的内容。
 - `mcp_portfolio_portfolio_list_comments`：可读取待审核及历史评论。
 - `mcp_portfolio_portfolio_comment_action`：仅在用户明确要求时审核、拒绝或回复。
-- `mcp_portfolio_portfolio_list_knowledge`：查看“关于我”RAG 资料（私有记忆，不是首页）。改站点前先读，避免重复条目。
+- `mcp_portfolio_portfolio_list_knowledge`：查看“关于我”RAG（跨对话的私有记忆，不是首页，也不是完整聊天记录）。改站点或需要身份事实时先读，避免重复条目。
 - `mcp_portfolio_portfolio_remember_knowledge`：把已确认事实写入知识库。改站点内容的同一轮必须调用；闲聊不调用。
 - `mcp_portfolio_portfolio_update_knowledge`：修正既有 RAG 条目；先 `list_knowledge` 确认目标记录。只写事实。
 

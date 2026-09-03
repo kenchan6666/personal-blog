@@ -68,6 +68,18 @@ async def test_rag_falls_back_to_readable_keyword_search() -> None:
 
     assert [item.title for item in matches] == ["工作经历"]
     assert "不要虚构" in knowledge_context(matches)
+    clipped = knowledge_context(
+        [
+            record(
+                "长资料",
+                "other",
+                "字" * 500,
+                [],
+            )
+        ]
+    )
+    assert "…" in clipped
+    assert clipped.count("字") < 500
 
 
 @pytest.mark.asyncio

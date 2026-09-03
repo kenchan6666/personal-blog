@@ -141,7 +141,6 @@ export class PublicApiError extends Error {
   }
 }
 
-const PUBLIC_REVALIDATE = 60;
 const PUBLIC_FETCH_MS = 8_000;
 
 function publicFetch(url: string, init?: RequestInit) {
@@ -152,13 +151,13 @@ function publicFetch(url: string, init?: RequestInit) {
 }
 
 async function publicJson<T>(url: string): Promise<T> {
-  const res = await publicFetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
+  const res = await publicFetch(url, { cache: "no-store" });
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
 }
 
 async function publicJsonOrNull<T>(url: string): Promise<T | null> {
-  const res = await publicFetch(url, { next: { revalidate: PUBLIC_REVALIDATE } });
+  const res = await publicFetch(url, { cache: "no-store" });
   if (res.status === 404) return null;
   if (!res.ok) throw new PublicApiError(res.status);
   return (await res.json()) as T;
