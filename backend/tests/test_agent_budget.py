@@ -47,6 +47,13 @@ def test_owner_tool_activity_uses_repo_and_file_names() -> None:
         )
         == "文章 · hello-world"
     )
+    assert (
+        format_owner_tool_label(
+            "mcp_portfolio_portfolio_publish_content",
+            {"kind": "project", "identifier": "glass-api"},
+        )
+        == "项目 · glass-api"
+    )
 
 
 def test_tool_activity_sse_rewrites_to_short_label() -> None:
@@ -74,6 +81,7 @@ def test_service_actor_cannot_publish() -> None:
     try:
         assert force_draft_if_service("published") == "draft"
         assert force_draft_if_service("draft") == "draft"
+        assert force_draft_if_service("published", "published") == "published"
     finally:
         owner_actor.reset(token)
     token = owner_actor.set("session")

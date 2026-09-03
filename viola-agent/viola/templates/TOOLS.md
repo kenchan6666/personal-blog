@@ -4,8 +4,9 @@
 - 改首页 / Hero / 简介 / 技能 / 经历条：`portfolio_get_site` 再 `portfolio_update_site`。不要找名叫 main 的 About 页。同一轮把已确认事实写入 RAG。
 - 改 About 页：`portfolio_list_content` kind=`about`，用返回的 id 或 slug（模块 kind 为 summary / education / experience / achievement / custom）。同一轮同步 RAG。
 - `mcp_portfolio_portfolio_list_content` / `get_content`：写作前读取相关 Project / Article / Journal / About 模块。
-- `mcp_portfolio_portfolio_create_content`：创建 Draft 项目、文章、日志或 About 模块。写完后同步 RAG。
-- `mcp_portfolio_portfolio_update_content`：只传用户要求改变的字段；About 用 kind=`about`。写完后同步 RAG。
+- `mcp_portfolio_portfolio_create_content`：创建 Draft 项目、文章、日志或 About 模块。写完后同步 RAG。不要在创建时发布。
+- `mcp_portfolio_portfolio_update_content`：只传用户要求改变的字段；About 用 kind=`about`。不能把 Draft 升为 published。已发布记录普通更新会保持 published。写完后同步 RAG。
+- `mcp_portfolio_portfolio_publish_content`：仅在 Owner 明确要求发布时调用。kind 为 project / article / journal / about，identifier 为 id 或 slug。首页 SiteProfile 与分类不用此工具。发布后同步 RAG。
 - `mcp_portfolio_portfolio_list_github_repos`：列出 Owner 已授权的全部 GitHub 仓库（含私有）。未连接时先请用户到后台 GitHub 页授权。
 - `mcp_portfolio_portfolio_get_github_source` / `get_github_file`：用 `owner/name` 或唯一仓库短名（如 `fabric_demo`）读取已授权仓库。README 文件名大小写不敏感。第一动作就是调用工具，禁止只预告。读完只摘要，不要把整份文件贴回对话。
 - `mcp_portfolio_portfolio_get_project_source` / `get_source_file`：读取已绑定 SourceRepo 的项目源码。

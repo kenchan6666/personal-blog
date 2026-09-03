@@ -16,6 +16,7 @@
       "portfolio_get_content",
       "portfolio_create_content",
       "portfolio_update_content",
+      "portfolio_publish_content",
       "portfolio_update_site",
       "portfolio_list_comments",
       "portfolio_list_knowledge",

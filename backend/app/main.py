@@ -600,8 +600,21 @@ def create_app(
         project.title = body.title
         project.summary = body.summary
         project.body = body.body
-        project.status = force_draft_if_service(body.status)
+        project.status = force_draft_if_service(body.status, project.status)
         project.order = body.order
+
+    async def publish_owner_record(model: type, record_id: PydanticObjectId) -> dict[str, Any]:
+        row = await current_store().get(model, record_id)
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        row.status = "published"
+        if hasattr(row, "published_at") and row.published_at is None:
+            row.published_at = datetime.now(timezone.utc)
+        await current_store().save(row)
+        return row.to_owner_dict()
 
     async def ensure_unique_slug(slug: str, exclude_id: str | None = None) -> None:
         existing = await current_store().find_one(Project, slug=slug)
@@ -964,6 +977,13 @@ def create_app(
         await current_store().save(project)
         return project.to_owner_dict()
 
+    @app.post("/api/owner/projects/{project_id}/publish")
+    async def owner_publish_project(
+        project_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        return await publish_owner_record(Project, project_id)
+
     def github_redirect(*, connected: bool) -> RedirectResponse:
         dest = urlparse(settings.github_oauth_success_url)
         query = dict(parse_qsl(dest.query, keep_blank_values=True))
@@ -1266,7 +1286,7 @@ def create_app(
         article.title = body.title
         article.summary = body.summary
         article.body = body.body
-        article.status = force_draft_if_service(body.status)
+        article.status = force_draft_if_service(body.status, article.status)
         article.order = body.order
         article.related_project_slug = body.relatedProjectSlug.strip().lower()
         article.category_slug = category_slug
@@ -1466,6 +1486,13 @@ def create_app(
         await current_store().save(article)
         return article.to_owner_dict()
 
+    @app.post("/api/owner/articles/{article_id}/publish")
+    async def owner_publish_article(
+        article_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        return await publish_owner_record(Article, article_id)
+
     @app.delete("/api/owner/articles/{article_id}")
     async def owner_delete_article(
         article_id: PydanticObjectId,
@@ -1505,7 +1532,7 @@ def create_app(
         journal.title = body.title
         journal.summary = body.summary
         journal.body = body.body
-        journal.status = force_draft_if_service(body.status)
+        journal.status = force_draft_if_service(body.status, journal.status)
         journal.order = body.order
         if journal.status == "published" and journal.published_at is None:
             journal.published_at = datetime.now(timezone.utc)
@@ -1578,6 +1605,13 @@ def create_app(
         await current_store().save(journal)
         return journal.to_owner_dict()
 
+    @app.post("/api/owner/journals/{journal_id}/publish")
+    async def owner_publish_journal(
+        journal_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        return await publish_owner_record(Journal, journal_id)
+
     @app.delete("/api/owner/journals/{journal_id}")
     async def owner_delete_journal(
         journal_id: PydanticObjectId,
@@ -1614,7 +1648,7 @@ def create_app(
         module.kind = kind
         module.title = body.title
         module.body = body.body
-        module.status = force_draft_if_service(body.status)
+        module.status = force_draft_if_service(body.status, module.status)
         module.order = body.order
 
     async def ensure_unique_about_slug(
@@ -1669,6 +1703,13 @@ def create_app(
         await ensure_unique_about_slug(module.slug, exclude_id=str(module.id))
         await current_store().save(module)
         return module.to_owner_dict()
+
+    @app.post("/api/owner/about-modules/{module_id}/publish")
+    async def owner_publish_about_module(
+        module_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        return await publish_owner_record(AboutModule, module_id)
 
     @app.delete("/api/owner/about-modules/{module_id}")
     async def owner_delete_about_module(

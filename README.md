@@ -14,7 +14,7 @@
 - **公開作品集**：Profile、About 模組、Published Project / Article / Journal、審核後留言。
 - **Owner CMS**：信箱 OTP 登入；三語 Markdown、機翻輔助、頭像與內容圖上傳。
 - **GitHub 源碼瀏覽**：Project 可綁 SourceRepo；公開倉提供 README / 分支 / tree / blob，私有倉不對訪客代理檔案。
-- **Owner Agent**：後台持久對話、檔案上傳、MCP 讀寫 CMS（新建一律 Draft，無刪除工具）、「關於我」RAG。
+- **Owner Agent**：後台持久對話、檔案上傳、MCP 讀寫 CMS（新建一律 Draft；Owner 明確要求時可發布，無刪除工具）、「關於我」RAG。
 - **公開導覽**：側欄玻璃抽屜，只讀 Published 內容與公開 README；Redis 限流與主題閘門，不暴露 Owner 權限。
 - **單機部署**：nginx 終止 TLS，反向代理到 Next.js 與 FastAPI；Mongo、Redis、Qdrant、Viola 同機 Compose。
 
@@ -80,7 +80,7 @@ flowchart TD
 | `PORTFOLIO_WRITE_ENABLED` | MCP 寫入；Compose 生產為 `true` |
 | `UNI_API_KEY` | 缺則 Owner RAG 與公開 Guide 無法呼叫模型 |
 
-## 本版本：硬編碼 Prompt 與大模型（1.0.9）
+## 本版本：硬編碼 Prompt 與大模型（1.0.10）
 
 > 運行時以 `deployment/.env` 為準；下表為本版本基線。  
 > **憲法原則**：凡修改 prompt 模板或變更本節記載的大模型基線，必須在同一變更集更新本節、新增版本檔，並更新 [docs/prompt-model-versions/](docs/prompt-model-versions/)。
@@ -97,7 +97,7 @@ flowchart TD
 | Owner 工具說明 | [`viola-agent/viola/templates/TOOLS.md`](viola-agent/viola/templates/TOOLS.md) |
 | Public Guide 系統提示 | [`backend/app/public_agent.py`](backend/app/public_agent.py) `_system_prompt()` |
 
-Owner 預設 `max_tokens=4096`。首页走 SiteProfile（`get_site` / `update_site`），About 是 `/about` 模块，不是名叫 `main` 的页面。凡改站点内容，同一轮必须把已确认事实写入「关于我」RAG。公開導覽必須給訪客完整回答：輸出至少 4096 token，關閉 thinking 以免佔用輸出額度；若模型仍在句中截斷會自動續寫到結束。
+Owner 預設 `max_tokens=4096`。首页走 SiteProfile（`get_site` / `update_site`），About 是 `/about` 模块，不是名叫 `main` 的页面。新建内容保持 Draft，仅在 Owner 明确要求发布时调用 `portfolio_publish_content`。凡改站点内容，同一轮必须把已确认事实写入「关于我」RAG。公開導覽必須給訪客完整回答：輸出至少 4096 token，關閉 thinking 以免佔用輸出額度；若模型仍在句中截斷會自動續寫到結束。
 
 歷史版本：[docs/prompt-model-versions/](docs/prompt-model-versions/)。
 

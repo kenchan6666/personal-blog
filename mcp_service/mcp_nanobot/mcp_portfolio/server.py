@@ -83,10 +83,26 @@ def _next_knowledge_order(api: PortfolioApi) -> int:
     return (max(orders) if orders else 0) + 1
 
 
-def _without_publish(payload: dict[str, Any]) -> dict[str, Any]:
-    if payload.get("status") == "published":
-        return {**payload, "status": "draft"}
+def _guard_status_on_update(
+    current: dict[str, Any], payload: dict[str, Any]
+) -> dict[str, Any]:
+    current_status = str(current.get("status") or "draft")
+    next_status = str(payload.get("status") or current_status)
+    if next_status == "published" and current_status != "published":
+        raise RuntimeError(
+            "Cannot publish with portfolio_update_content. "
+            "Call portfolio_publish_content after the Owner explicitly asks to publish."
+        )
     return payload
+
+
+def _publish_path(kind: ContentKind, item_id: str) -> str:
+    if kind == "category":
+        raise RuntimeError(
+            "Categories have no draft/published status. "
+            "portfolio_publish_content is for project, article, journal, and about."
+        )
+    return f"{_COLLECTION_PATHS[kind]}/{item_id}/publish"
 
 
 _HOMEPAGE_ALIASES = frozenset(
@@ -380,10 +396,18 @@ def create_server() -> FastMCP:
         payload.pop("id", None)
         payload.pop("sourceRepo", None)
         payload.pop("protected", None)
-        payload = _without_publish(payload)
+        payload = _guard_status_on_update(current, payload)
         return api.request(
             "PUT", f"{_COLLECTION_PATHS[kind]}/{item_id}", json=payload
         )
+
+    @server.tool()
+    def portfolio_publish_content(kind: ContentKind, identifier: str) -> dict[str, Any]:
+        """Publish a Draft record. Only after the Owner explicitly asks to publish. Not for category or homepage SiteProfile."""
+        api.require_write()
+        items = api.request("GET", _COLLECTION_PATHS[kind])
+        current = _find(items, identifier, kind=kind)
+        return api.request("POST", _publish_path(kind, str(current["id"])))
 
     @server.tool()
     def portfolio_update_site(changes: dict[str, Any]) -> dict[str, Any]:

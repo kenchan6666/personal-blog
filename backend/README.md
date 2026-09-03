@@ -85,6 +85,7 @@ Avatars, hero, and Markdown content images are stored under `AVATAR_DIR` (local 
 - `GET /api/public/projects?locale=` — Published only, ordered
 - `GET /api/public/projects/{slug}?locale=` — 404 for Draft / missing
 - `GET/POST /api/owner/projects` and `PUT /api/owner/projects/{id}` (Bearer)
+- `POST /api/owner/projects/{id}/publish` (Bearer; CMS session or Agent service token)
 
 Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `published`. Locales: `zh-Hant`, `zh-Hans`, `en`.
 
@@ -93,6 +94,7 @@ Bilingual Markdown fields: `title`, `summary`, `body`. Status is `draft` | `publ
 - `GET /api/public/articles?locale=` — Published only
 - `GET /api/public/articles/{slug}?locale=` — includes `relatedProject` when that Project is Published
 - `GET/POST /api/owner/articles`, `PUT/DELETE /api/owner/articles/{id}` (Bearer)
+- `POST /api/owner/articles/{id}/publish` (Bearer; CMS session or Agent service token)
 
 Optional `relatedProjectSlug` and `categorySlug`. A missing or deleted category leaves the Article untagged. A Draft related Project is omitted from the public payload.
 
@@ -101,6 +103,7 @@ Optional `relatedProjectSlug` and `categorySlug`. A missing or deleted category 
 - `GET /api/public/journals?locale=` — Published only
 - `GET /api/public/journals/{slug}?locale=`
 - `GET/POST /api/owner/journals`, `PUT/DELETE /api/owner/journals/{id}` (Bearer)
+- `POST /api/owner/journals/{id}/publish` (Bearer; CMS session or Agent service token)
 
 Journals have no `relatedProject`. Sending `relatedProjectSlug` is rejected with 400.
 
@@ -110,6 +113,7 @@ Owner-managed CV-like blocks on the public personal-detail page (`/about`).
 
 - `GET /api/public/about?locale=zh-Hant|zh-Hans|en` — Published only, ordered
 - `GET/POST /api/owner/about-modules` and `PUT/DELETE /api/owner/about-modules/{id}` (Bearer)
+- `POST /api/owner/about-modules/{id}/publish` (Bearer; CMS session or Agent service token)
 - `POST /api/owner/media` multipart field `file` (png/jpeg/webp, Bearer) — returns `{ url }` for Markdown images
 - `GET /api/public/media/content/{filename}`
 - `POST /api/owner/translate` (Bearer) — fills empty `zh-Hant` / `zh-Hans` / `en` from one original. Chinese uses script conversion; English uses machine translation. Filled locales are kept. Public pages still show stored text only.

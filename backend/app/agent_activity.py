@@ -74,7 +74,12 @@ def format_owner_tool_label(name: str, arguments: Any = None) -> str:
         return _join(repo, path) or repo
     if "list_github_repos" in key:
         return "GitHub"
-    if "create_content" in key or "update_content" in key or "get_content" in key:
+    if (
+        "create_content" in key
+        or "update_content" in key
+        or "publish_content" in key
+        or "get_content" in key
+    ):
         return _join(kind, identifier) or identifier or kind
     if "list_content" in key:
         return kind or identifier

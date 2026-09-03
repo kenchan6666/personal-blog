@@ -6,10 +6,11 @@ from mcp_portfolio.server import (
     PortfolioApi,
     _clip_text,
     _find,
+    _guard_status_on_update,
     _merge,
+    _publish_path,
     _repo_parts,
     _resolve_repo,
-    _without_publish,
 )
 
 
@@ -45,9 +46,40 @@ def test_merge_preserves_omitted_locales() -> None:
     assert merged["status"] == "draft"
 
 
-def test_update_payload_cannot_publish() -> None:
-    assert _without_publish({"status": "published", "title": "A"})["status"] == "draft"
-    assert _without_publish({"status": "draft"})["status"] == "draft"
+def test_update_payload_cannot_promote_draft_to_published() -> None:
+    with pytest.raises(RuntimeError, match="portfolio_publish_content"):
+        _guard_status_on_update(
+            {"status": "draft"},
+            {"status": "published", "title": "A"},
+        )
+    kept = _guard_status_on_update(
+        {"status": "published", "title": "A"},
+        {"status": "published", "title": "B"},
+    )
+    assert kept["status"] == "published"
+    drafted = _guard_status_on_update(
+        {"status": "published"},
+        {"status": "draft"},
+    )
+    assert drafted["status"] == "draft"
+
+
+def test_publish_path_rejects_category() -> None:
+    assert _publish_path("project", "abc") == "/api/owner/projects/abc/publish"
+    assert _publish_path("about", "xyz") == "/api/owner/about-modules/xyz/publish"
+    with pytest.raises(RuntimeError, match="Categories"):
+        _publish_path("category", "abc")
+
+
+def test_fragment_enables_publish_tool() -> None:
+    import json
+    from pathlib import Path
+
+    fragment_path = (
+        Path(__file__).resolve().parents[2] / "mcp_common" / "fragment.json"
+    )
+    fragment = json.loads(fragment_path.read_text(encoding="utf-8"))
+    assert "portfolio_publish_content" in fragment["portfolio"]["enabledTools"]
 
 
 def test_clip_text_keeps_short_source_and_marks_long_source() -> None:
