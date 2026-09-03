@@ -5,6 +5,7 @@ import pytest
 from mcp_portfolio.server import (
     PortfolioApi,
     _clip_text,
+    _find,
     _merge,
     _repo_parts,
     _resolve_repo,
@@ -61,6 +62,22 @@ def test_repo_parts_accept_owner_name_or_short_name() -> None:
     assert _repo_parts("taiko_bot_qq") == ("", "taiko_bot_qq")
     with pytest.raises(RuntimeError, match="owner/name"):
         _repo_parts("")
+
+
+def test_find_about_rejects_homepage_alias_named_main() -> None:
+    modules = [
+        {
+            "id": "abc",
+            "slug": "self-intro",
+            "kind": "summary",
+            "title": {"zh-Hans": "自我描述", "en": "About me"},
+        }
+    ]
+    with pytest.raises(RuntimeError, match="SiteProfile"):
+        _find(modules, "main", kind="about")
+    found = _find(modules, "summary", kind="about")
+    assert found["slug"] == "self-intro"
+    assert _find(modules, "自我描述", kind="about")["id"] == "abc"
 
 
 def test_resolve_repo_accepts_unique_short_name() -> None:

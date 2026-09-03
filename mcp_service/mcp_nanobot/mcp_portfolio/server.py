@@ -83,14 +83,79 @@ def _without_publish(payload: dict[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _find(items: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
+_HOMEPAGE_ALIASES = frozenset(
+    {
+        "main",
+        "home",
+        "homepage",
+        "index",
+        "hero",
+        "首页",
+        "首頁",
+        "主页",
+        "主頁",
+    }
+)
+
+
+def _known_labels(items: list[dict[str, Any]]) -> str:
+    labels: list[str] = []
+    for item in items[:12]:
+        slug = str(item.get("slug") or item.get("id") or "")
+        kind = str(item.get("kind") or "")
+        labels.append(f"{slug} ({kind})" if kind else slug)
+    return ", ".join(labels) or "(none)"
+
+
+def _title_values(item: dict[str, Any]) -> list[str]:
+    title = item.get("title")
+    if isinstance(title, dict):
+        return [str(value).strip() for value in title.values() if value]
+    if isinstance(title, str) and title.strip():
+        return [title.strip()]
+    return []
+
+
+def _find(
+    items: list[dict[str, Any]],
+    identifier: str,
+    *,
+    kind: str = "",
+) -> dict[str, Any]:
     wanted = identifier.strip().lower().strip("/")
-    for item in items:
-        if str(item.get("id", "")) == identifier:
-            return item
-        if str(item.get("slug", "")).lower().strip("/") == wanted:
-            return item
-    raise RuntimeError(f"Content not found: {identifier}")
+    if kind == "about" and wanted in _HOMEPAGE_ALIASES:
+        raise RuntimeError(
+            "Homepage `/` is SiteProfile, not an About module. "
+            "Call portfolio_get_site / portfolio_update_site. "
+            "About `/about` is a list of modules "
+            "(summary, education, experience, achievement, custom); "
+            "list them with portfolio_list_content kind=about. "
+            f"There is no About page named {identifier}."
+        )
+
+    def matches(item: dict[str, Any], field: str) -> bool:
+        if field == "id":
+            return str(item.get("id", "")) == identifier
+        if field == "slug":
+            return str(item.get("slug", "")).lower().strip("/") == wanted
+        if field == "kind":
+            return str(item.get("kind", "")).lower() == wanted
+        if field == "title":
+            return any(value.lower() == wanted for value in _title_values(item))
+        return False
+
+    for field in ("id", "slug", "kind", "title"):
+        hits = [item for item in items if matches(item, field)]
+        if len(hits) == 1:
+            return hits[0]
+        if len(hits) > 1:
+            raise RuntimeError(
+                f"Ambiguous {kind or 'content'} {identifier}. "
+                f"Matches: {_known_labels(hits)}"
+            )
+    raise RuntimeError(
+        f"Content not found: {identifier}. Known: {_known_labels(items)}"
+    )
 
 
 _SOURCE_CLIP = 8000
@@ -189,8 +254,31 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_overview() -> dict[str, Any]:
-        """Read the complete owner-visible site overview, including drafts and comments."""
+        """Read the owner-visible site: homepage SiteProfile, About modules, drafts and comments."""
         return {
+            "surfaces": {
+                "homepage": {
+                    "route": "/",
+                    "tools": ["portfolio_get_site", "portfolio_update_site"],
+                    "fields": [
+                        "heroHeadline",
+                        "heroSupport",
+                        "bio",
+                        "skills",
+                        "experience",
+                        "links",
+                        "aboutLead",
+                    ],
+                },
+                "about": {
+                    "route": "/about",
+                    "tools": ["portfolio_list_content kind=about"],
+                    "note": (
+                        "About is modules (summary, education, experience, "
+                        "achievement, custom), not a page named main."
+                    ),
+                },
+            },
             "site": api.request("GET", "/api/owner/site"),
             "projects": api.request("GET", "/api/owner/projects"),
             "articles": api.request("GET", "/api/owner/articles"),
@@ -203,7 +291,7 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_get_site() -> dict[str, Any]:
-        """Read all editable profile, hero, page-lead, skill, experience and link fields."""
+        """Read homepage `/` SiteProfile: hero, bio, skills, experience, links, page leads. Not About; there is no page named main."""
         return api.request("GET", "/api/owner/site")
 
     @server.tool()
@@ -213,7 +301,7 @@ def create_server() -> FastMCP:
         status: Literal["draft", "published", "all"] = "all",
         limit: int = 50,
     ) -> dict[str, Any]:
-        """List owner-visible projects, articles, journals, About modules or article categories."""
+        """List projects, articles, journals, About modules (`kind=about` is `/about`, not the homepage), or article categories."""
         items = api.request("GET", _COLLECTION_PATHS[kind])
         query_lower = query.strip().lower()
         if status != "all":
@@ -233,9 +321,9 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_get_content(kind: ContentKind, identifier: str) -> dict[str, Any]:
-        """Get one content record by id or slug, including every language and draft field."""
+        """Get one record by id, slug, About kind, or title. About identifier is never `main`; homepage is portfolio_get_site."""
         items = api.request("GET", _COLLECTION_PATHS[kind])
-        return _find(items, identifier)
+        return _find(items, identifier, kind=kind)
 
     @server.tool()
     def portfolio_create_content(
@@ -280,7 +368,7 @@ def create_server() -> FastMCP:
         if "id" in changes or "sourceRepo" in changes:
             raise RuntimeError("id and sourceRepo cannot be changed with this tool")
         items = api.request("GET", _COLLECTION_PATHS[kind])
-        current = _find(items, identifier)
+        current = _find(items, identifier, kind=kind)
         item_id = str(current["id"])
         payload = _merge(current, changes)
         payload.pop("id", None)
@@ -293,7 +381,7 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_update_site(changes: dict[str, Any]) -> dict[str, Any]:
-        """Update selected site/profile fields while preserving all omitted fields."""
+        """Update homepage `/` SiteProfile. Use for 首页, Hero, 简介, 技能, 经历条. Pass only changed fields. About modules use update_content kind=about."""
         api.require_write()
         current = api.request("GET", "/api/owner/site")
         payload = _merge(current, changes)

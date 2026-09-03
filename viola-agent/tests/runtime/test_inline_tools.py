@@ -29,3 +29,25 @@ def test_recovers_json_tool_fence() -> None:
 def test_plain_chat_is_not_a_preamble() -> None:
     assert not looks_like_tool_preamble("这个项目用 FastAPI 和 Next.js。")
     assert recover_inline_tool_calls("这个项目用 FastAPI 和 Next.js。") == []
+
+
+def test_recovers_homepage_confused_with_about_main() -> None:
+    text = (
+        "我无法直接更新您的主页，因为我未能找到名为 \"main\" 的 About 页面。\n\n"
+        "我需要先列出所有 About 页面，以确定正确的标识符。"
+    )
+    calls = recover_inline_tool_calls(
+        text,
+        available_names=[
+            "mcp_portfolio_portfolio_get_site",
+            "mcp_portfolio_portfolio_list_content",
+        ],
+    )
+    names = {call.name for call in calls}
+    assert "mcp_portfolio_portfolio_get_site" in names
+    assert "mcp_portfolio_portfolio_list_content" in names
+    listed = next(
+        call for call in calls if "list_content" in call.name
+    )
+    assert listed.arguments["kind"] == "about"
+    assert looks_like_tool_preamble(text)

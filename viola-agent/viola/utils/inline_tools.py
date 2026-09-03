@@ -10,8 +10,8 @@ from viola.providers.base import ToolCallRequest
 _ALNUM = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 _PREAMBLE = re.compile(
-    r"(?is)(我将|我会|我來|我来|I(?:['’]?ll| will)|Let me).{0,48}"
-    r"(读取|讀取|分析|调用|調用|read|fetch|analy[sz]e|look)"
+    r"(?is)(我将|我会|我來|我来|我需要先|I(?:['’]?ll| will)|Let me).{0,48}"
+    r"(读取|讀取|分析|调用|調用|列出|read|fetch|analy[sz]e|look|list)"
 )
 
 _ANNOUNCED_FILE = re.compile(
@@ -20,6 +20,16 @@ _ANNOUNCED_FILE = re.compile(
     r"(?:\s*(?:仓库|倉庫|repo(?:sitory)?))?"
     r"(?:\s*(?:的|'s|of))?\s*"
     r"[`\"']?(?P<path>README(?:\.[A-Za-z0-9]+)?|[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+)[`\"']?"
+)
+
+_ANNOUNCED_HOMEPAGE = re.compile(
+    r"(?is)(?:主页|主頁|首页|首頁|homepage).{0,80}(?:About|about|关于|關於)"
+    r"|名为\s*[\"']?main[\"']?\s*的\s*About"
+    r"|(?:未能找到|找不到).{0,40}main.{0,40}(?:About|about)"
+)
+
+_ANNOUNCED_ABOUT_LIST = re.compile(
+    r"(?is)列出所有\s*About|list all About"
 )
 
 _JSON_FENCE = re.compile(r"(?is)```(?:json|xml)?\s*([\s\S]*?)```")
@@ -60,6 +70,11 @@ def recover_inline_tool_calls(
             },
         )
 
+    if _ANNOUNCED_HOMEPAGE.search(text):
+        add("get_site", {})
+    if _ANNOUNCED_ABOUT_LIST.search(text):
+        add("list_content", {"kind": "about"})
+
     for match in _XML_CALL.finditer(text):
         attrs, body = match.group(1) or "", match.group(2) or ""
         parsed = _parse_json_object(body) or _parse_xml_body(attrs, body)
@@ -94,8 +109,20 @@ def _resolve_name(wanted: str, available: list[str] | None) -> str:
         for name in names:
             if "get_github_file" in name.casefold():
                 return name
+    if names and lowered in {"get_site", "portfolio_get_site"}:
+        for name in names:
+            if name.casefold().endswith("get_site"):
+                return name
+    if names and lowered in {"list_content", "portfolio_list_content"}:
+        for name in names:
+            if "list_content" in name.casefold():
+                return name
     if not names and lowered in {"get_github_file", "portfolio_get_github_file"}:
         return "mcp_portfolio_portfolio_get_github_file"
+    if not names and lowered in {"get_site", "portfolio_get_site"}:
+        return "mcp_portfolio_portfolio_get_site"
+    if not names and lowered in {"list_content", "portfolio_list_content"}:
+        return "mcp_portfolio_portfolio_list_content"
     return wanted if not names else ""
 
 
