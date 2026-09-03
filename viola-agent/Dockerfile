@@ -18,14 +18,16 @@ WORKDIR /app
 
 # Install Python dependencies first (cached layer)
 COPY viola-agent/pyproject.toml viola-agent/README.md viola-agent/LICENSE ./
-RUN mkdir -p viola && touch viola/__init__.py && \
+RUN mkdir -p viola bridge && touch viola/__init__.py && \
     uv pip install --system --no-cache . && \
     rm -rf viola
 
-# Copy the full source and install
+# Copy the full source and install. Keep an empty bridge/ so hatchling's
+# force-include succeeds without shipping the WhatsApp Node tree.
 COPY viola-agent/viola/ viola/
 COPY viola-agent/main.py ./
-RUN rm -rf /app/viola/skills/github && \
+RUN mkdir -p bridge && \
+    rm -rf /app/viola/skills/github && \
     uv pip install --system --no-cache ".[api]"
 
 # Portfolio MCP package (monorepo default)
