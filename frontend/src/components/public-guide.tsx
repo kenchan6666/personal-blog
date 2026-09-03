@@ -7,6 +7,10 @@ import {
   streamPublicGuide,
   type PublicGuideMessage,
 } from "@/lib/api";
+import {
+  nextTypedText,
+  typewriterDelayMs,
+} from "@/lib/guide-typewriter";
 import { MarkdownBody } from "./markdown-body";
 
 type Props = {
@@ -17,6 +21,36 @@ type Props = {
 };
 
 type DisplayMessage = PublicGuideMessage & { id: string };
+
+function useGuideTypewriter(target: string) {
+  const [shown, setShown] = useState("");
+  const [reduce, setReduce] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setReduce(mq.matches);
+    const frame = window.requestAnimationFrame(sync);
+    mq.addEventListener("change", sync);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      mq.removeEventListener("change", sync);
+    };
+  }, []);
+
+  const from = target.startsWith(shown) ? shown : "";
+  const text = reduce ? target : from;
+  const typing = !reduce && Boolean(target) && text !== target;
+
+  useEffect(() => {
+    if (!typing) return undefined;
+    const timer = window.setTimeout(() => {
+      setShown(nextTypedText(from, target));
+    }, typewriterDelayMs(from, target));
+    return () => window.clearTimeout(timer);
+  }, [from, target, typing]);
+
+  return { text, typing };
+}
 
 function errorText(code: string, dict: Dictionary["guide"]): string {
   if (code === "public_agent_busy") {
@@ -39,16 +73,22 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
-  const [awaitingMore, setAwaitingMore] = useState(false);
+  const [idleSince, setIdleSince] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const liveAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant");
-  const liveText = Boolean(liveAssistant?.content.trim());
-  const isThinking = sending && Boolean(liveAssistant) && !liveText;
+  const { text: typed, typing } = useGuideTypewriter(
+    liveAssistant?.content ?? "",
+  );
+  const liveText = Boolean(typed.trim());
+  const awaitingTurn = sending || typing;
+  const gapKey = `${sending ? "1" : "0"}:${typed}`;
+  const awaitingMore = idleSince === gapKey && awaitingTurn && !typing;
+  const isThinking = awaitingTurn && Boolean(liveAssistant) && !typed.trim();
   const isToolWait = sending && liveText && awaitingMore;
-  const isStreaming = sending && liveText && !awaitingMore;
+  const isStreaming = awaitingTurn && liveText && !awaitingMore;
   const livePhase = isStreaming
     ? "streaming"
     : isThinking || isToolWait
@@ -56,14 +96,10 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
       : "";
 
   useEffect(() => {
-    if (!sending) {
-      setAwaitingMore(false);
-      return undefined;
-    }
-    setAwaitingMore(false);
-    const timer = window.setTimeout(() => setAwaitingMore(true), 850);
+    if (!sending && !typing) return undefined;
+    const timer = window.setTimeout(() => setIdleSince(gapKey), 850);
     return () => window.clearTimeout(timer);
-  }, [sending, liveAssistant?.content]);
+  }, [gapKey, sending, typing]);
 
   useEffect(() => {
     if (!open) return;
@@ -82,12 +118,15 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
   }, [onClose, open]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }, [messages]);
+    endRef.current?.scrollIntoView({
+      behavior: typing ? "auto" : "smooth",
+      block: "nearest",
+    });
+  }, [messages, typed, typing]);
 
   async function ask(question: string) {
     const text = question.trim();
-    if (!text || sending) return;
+    if (!text || sending || typing) return;
     const history: PublicGuideMessage[] = messages
       .filter((message) => message.content.trim())
       .map(({ role, content }) => ({ role, content }))
@@ -178,7 +217,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
                   <button
                     key={prompt}
                     type="button"
-                    disabled={sending}
+                    disabled={awaitingTurn}
                     onClick={() => void ask(prompt)}
                   >
                     {prompt}
@@ -187,50 +226,55 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
               </div>
             </div>
           ) : null}
-          {messages.map((message) => (
-            <article
-              key={message.id}
-              className={`public-guide-message is-${message.role}${
-                sending && message.id === liveAssistant?.id
-                  ? isStreaming
-                    ? " is-streaming"
-                    : " is-thinking"
-                  : ""
-              }`}
-            >
-              {message.role === "assistant" ? (
-                message.content ? (
-                  <>
-                    <MarkdownBody source={message.content} />
-                    {sending && message.id === liveAssistant?.id ? (
-                      isToolWait ? (
-                        <span
-                          className="agent-thinking"
-                          aria-label={dict.thinking}
-                        >
-                          <i />
-                          <i />
-                          <i />
-                          <i />
-                        </span>
-                      ) : (
-                        <span className="agent-stream-caret" aria-hidden="true" />
-                      )
-                    ) : null}
-                  </>
+          {messages.map((message) => {
+            const live = message.id === liveAssistant?.id;
+            const source =
+              live && message.role === "assistant" ? typed : message.content;
+            return (
+              <article
+                key={message.id}
+                className={`public-guide-message is-${message.role}${
+                  awaitingTurn && live
+                    ? isStreaming
+                      ? " is-streaming"
+                      : " is-thinking"
+                    : ""
+                }`}
+              >
+                {message.role === "assistant" ? (
+                  source ? (
+                    <>
+                      <MarkdownBody source={source} />
+                      {awaitingTurn && live ? (
+                        isToolWait ? (
+                          <span
+                            className="agent-thinking"
+                            aria-label={dict.thinking}
+                          >
+                            <i />
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                        ) : (
+                          <span className="agent-stream-caret" aria-hidden="true" />
+                        )
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="agent-thinking" aria-label={dict.waitingModel}>
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )
                 ) : (
-                  <span className="agent-thinking" aria-label={dict.waitingModel}>
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                )
-              ) : (
-                <p>{message.content}</p>
-              )}
-            </article>
-          ))}
+                  <p>{message.content}</p>
+                )}
+              </article>
+            );
+          })}
           <div ref={endRef} />
         </div>
 
@@ -248,7 +292,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
               rows={2}
               maxLength={400}
               value={input}
-              disabled={sending}
+              disabled={awaitingTurn}
               placeholder={dict.placeholder}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={(event) => {
@@ -260,10 +304,10 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
             />
             <button
               type="submit"
-              disabled={sending || !input.trim()}
+              disabled={awaitingTurn || !input.trim()}
               aria-label={dict.send}
             >
-              {sending ? "..." : dict.send}
+              {awaitingTurn ? "..." : dict.send}
             </button>
           </div>
           <p>{dict.privacy}</p>
