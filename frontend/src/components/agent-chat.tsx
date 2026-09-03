@@ -64,6 +64,10 @@ const SYNC_ERROR_LABELS: Record<string, string> = {
   vector_store_unavailable: "Qdrant 不可用",
 };
 
+function syncErrorText(code: string): string {
+  return SYNC_ERROR_LABELS[code] ?? "向量同步失败";
+}
+
 function pinChangedKnowledge(
   items: AgentKnowledge[],
   changedIds: string[],
