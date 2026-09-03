@@ -43,7 +43,8 @@ _KIMI_THINKING_MODELS: frozenset[str] = frozenset({
     "kimi-k2.6",
     "k2.6-code-preview",
 })
-_OPENAI_COMPAT_REQUEST_TIMEOUT_S = 120.0
+_OPENAI_COMPAT_REQUEST_TIMEOUT_S = 300.0
+_OPENAI_COMPAT_IDLE_TIMEOUT_S = 180.0
 
 # Maps ProviderSpec.thinking_style → extra_body builder.
 # Each builder takes a bool (thinking_enabled) and returns the dict to
@@ -76,6 +77,11 @@ def _is_kimi_thinking_model(model_name: str) -> bool:
 def _openai_compat_timeout_s() -> float:
     """Return the bounded request timeout used for OpenAI-compatible providers."""
     return _float_env("VIOLA_OPENAI_COMPAT_TIMEOUT_S", _OPENAI_COMPAT_REQUEST_TIMEOUT_S)
+
+
+def _openai_compat_idle_timeout_s() -> float:
+    """Seconds to wait for the next streamed token before treating the call as stalled."""
+    return _float_env("VIOLA_STREAM_IDLE_TIMEOUT_S", _OPENAI_COMPAT_IDLE_TIMEOUT_S)
 
 
 def _float_env(name: str, default: float) -> float:
@@ -991,7 +997,7 @@ class OpenAICompatProvider(LLMProvider):
         tool_choice: str | dict[str, Any] | None = None,
         on_content_delta: Callable[[str], Awaitable[None]] | None = None,
     ) -> LLMResponse:
-        idle_timeout_s = int(os.environ.get("VIOLA_STREAM_IDLE_TIMEOUT_S", "90"))
+        idle_timeout_s = _openai_compat_idle_timeout_s()
         try:
             kwargs = self._build_kwargs(
                 messages, tools, model, max_tokens, temperature,

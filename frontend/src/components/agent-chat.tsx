@@ -353,7 +353,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       : "";
 
     try {
-      await streamOwnerAgent(
+      const reply = await streamOwnerAgent(
         token,
         activeId,
         user.content,
@@ -370,6 +370,9 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         },
         handleStreamEvent,
       );
+      if (!reply.trim()) {
+        throw new Error("这一轮没有收到完整回复，请再发一次。");
+      }
       await Promise.all([
         refreshConversations(token),
         compact
@@ -652,14 +655,14 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                       )
                     ) : null}
                   </>
-                ) : (
+                ) : sending && message.id === liveAssistant?.id ? (
                   <span className="agent-thinking" aria-label="正在思考">
                     <i />
                     <i />
                     <i />
                     <i />
                   </span>
-                )
+                ) : null
               ) : (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               )}

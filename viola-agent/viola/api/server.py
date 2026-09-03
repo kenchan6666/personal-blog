@@ -237,6 +237,30 @@ def _sse_chunk(delta: str, model: str, chunk_id: str, finish_reason: str | None 
 _SSE_DONE = b"data: [DONE]\n\n"
 _SSE_KEEPALIVE = b": keepalive\n\n"
 _STREAM_HEARTBEAT_S = 15
+_SSE_DISCONNECT_NAMES = frozenset({
+    "ClientConnectionResetError",
+    "ClientConnectionError",
+    "ConnectionResetError",
+    "ConnectionAbortedError",
+    "BrokenPipeError",
+})
+
+
+def _is_sse_disconnect(exc: BaseException) -> bool:
+    if isinstance(exc, (ConnectionError, BrokenPipeError)):
+        return True
+    return type(exc).__name__ in _SSE_DISCONNECT_NAMES
+
+
+async def _write_sse(resp: web.StreamResponse, data: bytes) -> bool:
+    try:
+        await resp.write(data)
+        return True
+    except Exception as exc:
+        if _is_sse_disconnect(exc):
+            logger.info("SSE client disconnected ({})", type(exc).__name__)
+            return False
+        raise
 
 
 def _timeout_notice(timeout_s: float) -> str:
@@ -505,6 +529,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
 
         beat = asyncio.create_task(_heartbeat())
         task = asyncio.create_task(_run())
+        disconnected = False
         try:
             while True:
                 item = await queue.get()
@@ -512,13 +537,19 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                     break
                 kind, payload = item
                 if kind == "heartbeat":
-                    await resp.write(_SSE_KEEPALIVE)
+                    if not await _write_sse(resp, _SSE_KEEPALIVE):
+                        disconnected = True
+                        break
                     continue
                 if kind == "tool_activity" and isinstance(payload, list):
-                    await resp.write(_sse_tool_activity(payload))
+                    if not await _write_sse(resp, _sse_tool_activity(payload)):
+                        disconnected = True
+                        break
                     continue
                 if kind == "delta" and isinstance(payload, str):
-                    await resp.write(_sse_chunk(payload, model_name, chunk_id))
+                    if not await _write_sse(resp, _sse_chunk(payload, model_name, chunk_id)):
+                        disconnected = True
+                        break
         finally:
             beat.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -528,9 +559,9 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
 
-        if not stream_failed:
-            await resp.write(_sse_chunk("", model_name, chunk_id, finish_reason="stop"))
-            await resp.write(_SSE_DONE)
+        if not stream_failed and not disconnected:
+            await _write_sse(resp, _sse_chunk("", model_name, chunk_id, finish_reason="stop"))
+            await _write_sse(resp, _SSE_DONE)
         return resp
 
     # -- non-streaming path (original logic) --

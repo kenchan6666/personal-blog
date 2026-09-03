@@ -60,6 +60,8 @@ services:
       VIOLA_AGENTS__DEFAULTS__TIMEZONE: Asia/Hong_Kong
       VIOLA_TOOLS__PERSISTENCE_VIA_MCP_ONLY: "true"
       VIOLA_CUSTOMER_SERVICE_ONLY: "false"
+      VIOLA_OPENAI_COMPAT_TIMEOUT_S: "300"
+      VIOLA_STREAM_IDLE_TIMEOUT_S: "180"
     command:
       ["serve", "--host", "0.0.0.0", "-w", "/home/viola/.viola/portfolio", "--timeout", "600", "--verbose"]
     volumes:

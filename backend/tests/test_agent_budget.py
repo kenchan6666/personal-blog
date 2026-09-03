@@ -9,7 +9,7 @@ from app.agent_budget import (
     owner_chat_max_tokens,
     strip_tool_noise,
 )
-from app.agent_proxy import pin_changed_knowledge_rows
+from app.agent_proxy import empty_turn_sse, pin_changed_knowledge_rows
 from app.owner_actor import force_draft_if_service, owner_actor
 
 
@@ -94,6 +94,12 @@ def test_service_actor_cannot_publish() -> None:
 def test_owner_sse_forwards_keepalive_comments() -> None:
     forwarded = rewrite_owner_sse_block(": keepalive")
     assert forwarded == b": keepalive\n\n"
+
+
+def test_empty_turn_sse_tells_the_owner_to_retry() -> None:
+    payload = empty_turn_sse().decode()
+    assert payload.startswith("event: error")
+    assert "再试一次" in payload
 
 
 def test_changed_knowledge_rows_move_to_the_front() -> None:

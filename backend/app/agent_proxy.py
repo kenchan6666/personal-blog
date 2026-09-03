@@ -94,6 +94,13 @@ def _sse_delta(block: str) -> str:
         return ""
 
 
+def empty_turn_sse() -> bytes:
+    return (
+        "event: error\n"
+        f"data: {json.dumps({'message': '这一轮没有收到完整回复，请再试一次。'}, ensure_ascii=False)}\n\n"
+    ).encode()
+
+
 async def _sync_knowledge(rag: AgentRag, record: KnowledgeRecord) -> None:
     record.vector_synced, record.vector_sync_error = await rag.sync_with_status(record)
     record.updated_at = utc_now()
@@ -485,6 +492,8 @@ def register_agent_routes(
                     )
                     latest.updated_at = utc_now()
                     await current_store().save(latest)
+            else:
+                yield empty_turn_sse()
 
         return StreamingResponse(
             relay(),

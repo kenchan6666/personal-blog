@@ -6,7 +6,8 @@ One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, the internal
 the API proxy protect every chat and upload. A chat turn may run up to 600s
 (Viola `--timeout 600`); nginx and the API proxy match that window. The stream
 sends SSE keepalives so a silent Gemini thinking pass is not cut as a network
-error.
+error. UniAPI chat calls themselves may take up to 300s (idle 180s) so a long
+tool turn with a large session is not killed as `request timed out`.
 
 Local Mongo/Redis on host ports (`docker compose up -d`) is unchanged. This file is the **production/demo** stack.
 
