@@ -67,9 +67,127 @@ export const ABOUT_KIND_BODIES: Record<AboutKind, Localized> = {
   },
 };
 
+export const ABOUT_KIND_ORDER: AboutKind[] = [
+  "summary",
+  "education",
+  "experience",
+  "achievement",
+  "custom",
+];
+
+export const ABOUT_KIND_SLUG: Record<AboutKind, string> = {
+  summary: "summary",
+  education: "education",
+  experience: "experience",
+  achievement: "achievement",
+  custom: "note",
+};
+
+const ABOUT_KIND_BASE_ORDER: Record<AboutKind, number> = {
+  summary: 0,
+  education: 10,
+  experience: 20,
+  achievement: 30,
+  custom: 40,
+};
+
 export function localizedIsEmpty(value: Localized | undefined): boolean {
   if (!value) return true;
   return !value["zh-Hant"]?.trim() && !value["zh-Hans"]?.trim() && !value.en?.trim();
+}
+
+export function localizedEqual(
+  left: Localized | undefined,
+  right: Localized | undefined,
+): boolean {
+  const a = filledOrEmpty(left);
+  const b = filledOrEmpty(right);
+  return a["zh-Hant"] === b["zh-Hant"] && a["zh-Hans"] === b["zh-Hans"] && a.en === b.en;
+}
+
+export function slugForAboutKind(kind: AboutKind, taken: Iterable<string>): string {
+  const base = ABOUT_KIND_SLUG[kind];
+  const used = new Set(taken);
+  if (!used.has(base)) return base;
+  let n = 2;
+  while (used.has(`${base}-${n}`)) n += 1;
+  return `${base}-${n}`;
+}
+
+export function nextAboutOrder(
+  kind: AboutKind,
+  modules: { kind: AboutKind; order: number }[],
+): number {
+  const same = modules.filter((item) => item.kind === kind);
+  if (same.length === 0) return ABOUT_KIND_BASE_ORDER[kind];
+  return Math.max(...same.map((item) => item.order)) + 1;
+}
+
+export function draftAboutModule(
+  kind: AboutKind,
+  existing: { slug: string; kind: AboutKind; order: number }[],
+): {
+  slug: string;
+  kind: AboutKind;
+  title: Localized;
+  body: Localized;
+  status: "draft" | "published";
+  order: number;
+} {
+  return {
+    slug: slugForAboutKind(
+      kind,
+      existing.map((item) => item.slug),
+    ),
+    kind,
+    title: ABOUT_KIND_TITLES[kind],
+    body: ABOUT_KIND_BODIES[kind],
+    status: "draft",
+    order: nextAboutOrder(kind, existing),
+  };
+}
+
+export function applyAboutKindChange(
+  current: {
+    id?: string;
+    slug: string;
+    kind: AboutKind;
+    title: Localized;
+    body: Localized;
+  },
+  nextKind: AboutKind,
+  takenSlugs: Iterable<string>,
+): {
+  slug: string;
+  kind: AboutKind;
+  title: Localized;
+  body: Localized;
+} {
+  if (current.id) {
+    return {
+      slug: current.slug,
+      kind: nextKind,
+      title: current.title,
+      body: current.body,
+    };
+  }
+  const prev = current.kind;
+  const titleDefault =
+    localizedIsEmpty(current.title) ||
+    localizedEqual(current.title, ABOUT_KIND_TITLES[prev]);
+  const bodyDefault =
+    localizedIsEmpty(current.body) ||
+    localizedEqual(current.body, ABOUT_KIND_BODIES[prev]);
+  const slugDefault =
+    !current.slug.trim() ||
+    current.slug === ABOUT_KIND_SLUG[prev] ||
+    current.slug.startsWith(`${ABOUT_KIND_SLUG[prev]}-`);
+  return {
+    kind: nextKind,
+    title: titleDefault ? ABOUT_KIND_TITLES[nextKind] : current.title,
+    body: bodyDefault ? ABOUT_KIND_BODIES[nextKind] : current.body,
+    slug: slugDefault ? slugForAboutKind(nextKind, takenSlugs) : current.slug,
+  };
 }
 
 export function filledOrEmpty(value: Localized | undefined): Localized {

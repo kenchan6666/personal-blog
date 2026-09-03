@@ -58,7 +58,11 @@ export default async function AboutPage({
       {modules.length === 0 ? (
         <p className="about-empty">{empty}</p>
       ) : (
-        <AboutStory modules={modules} kindLabel={kindLabel} />
+        <AboutStory
+          modules={modules}
+          kindLabel={kindLabel}
+          tocLabel={dict.about.toc}
+        />
       )}
     </PageFrame>
   );

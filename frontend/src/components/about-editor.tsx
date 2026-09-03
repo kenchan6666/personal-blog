@@ -15,7 +15,10 @@ import {
 } from "@/lib/api";
 import {
   ABOUT_KIND_BODIES,
+  ABOUT_KIND_ORDER,
   ABOUT_KIND_TITLES,
+  applyAboutKindChange,
+  draftAboutModule,
   localizedIsEmpty,
 } from "@/lib/about-templates";
 import { BilingualField } from "./bilingual-field";
@@ -26,14 +29,6 @@ import { CmsModal } from "./cms-modal";
 type Props = {
   dict: Dictionary;
 };
-
-const KINDS: AboutKind[] = [
-  "summary",
-  "education",
-  "achievement",
-  "experience",
-  "custom",
-];
 
 function payloadOf(module: OwnerAboutModule): Omit<OwnerAboutModule, "id"> {
   const { id: _id, ...rest } = module;
@@ -47,6 +42,17 @@ function kindLabel(dict: Dictionary, kind: AboutKind) {
     achievement: dict.about.kindAchievement,
     experience: dict.about.kindExperience,
     custom: dict.about.kindCustom,
+  };
+  return map[kind];
+}
+
+function kindBlurb(dict: Dictionary, kind: AboutKind) {
+  const map = {
+    summary: dict.admin.kindBlurbSummary,
+    education: dict.admin.kindBlurbEducation,
+    achievement: dict.admin.kindBlurbAchievement,
+    experience: dict.admin.kindBlurbExperience,
+    custom: dict.admin.kindBlurbCustom,
   };
   return map[kind];
 }
@@ -83,10 +89,23 @@ export function AboutEditor({ dict }: Props) {
     setOpen(true);
   }
 
+  function openNew(kind: AboutKind) {
+    openEditor({ id: "", ...draftAboutModule(kind, modules) });
+  }
+
   function closeEditor() {
     setOpen(false);
     setMessage(null);
     setError(null);
+  }
+
+  function changeKind(kind: AboutKind) {
+    const next = applyAboutKindChange(
+      current,
+      kind,
+      modules.filter((item) => item.id !== current.id).map((item) => item.slug),
+    );
+    setCurrent({ ...current, ...next });
   }
 
   function applyKindTemplate() {
@@ -140,6 +159,32 @@ export function AboutEditor({ dict }: Props) {
     }
   }
 
+  async function move(module: OwnerAboutModule, direction: -1 | 1) {
+    const token = getSessionToken();
+    if (!token || saving) return;
+    const items = modules.filter((item) => item.kind === module.kind);
+    const index = items.findIndex((item) => item.id === module.id);
+    const swap = items[index + direction];
+    if (index < 0 || !swap) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await saveOwnerAboutModule(token, module.id, {
+        ...payloadOf(module),
+        order: swap.order,
+      });
+      await saveOwnerAboutModule(token, swap.id, {
+        ...payloadOf(swap),
+        order: module.order,
+      });
+      await reload(token);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const previewProps = {
     editLabel: a.editTab,
     previewLabel: a.preview,
@@ -163,7 +208,7 @@ export function AboutEditor({ dict }: Props) {
         <button
           type="button"
           className="btn-ghost text-sm"
-          onClick={() => openEditor(emptyOwnerAboutModule())}
+          onClick={() => openNew("custom")}
         >
           {a.newAbout}
         </button>
@@ -174,34 +219,79 @@ export function AboutEditor({ dict }: Props) {
       ) : null}
       {loading ? (
         <p className="text-sm text-[var(--text-muted)]">{a.loadingAbout}</p>
-      ) : modules.length === 0 ? (
-        <p className="text-sm text-[var(--text-muted)]">{a.emptyAbout}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {modules.map((module) => (
-            <li key={module.id}>
-              <button
-                type="button"
-                className="tile"
-                onClick={() => openEditor(module)}
-              >
-                <span className="font-semibold">
-                  {localizedText(module.title, a.untitledAbout)}
-                </span>
-                <span className="ml-3 text-xs text-[var(--text-muted)]">
-                  {kindLabel(dict, module.kind)}
-                </span>
-                <span className="ml-3">
-                  <StatusPill
-                    published={module.status === "published"}
-                    publishedLabel={a.statusPublished}
-                    draftLabel={a.statusDraft}
-                  />
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div className="about-kind-board">
+          {ABOUT_KIND_ORDER.map((kind) => {
+            const items = modules.filter((item) => item.kind === kind);
+            return (
+              <section key={kind} className="about-kind-group">
+                <p className="about-kind-label">{kindLabel(dict, kind)}</p>
+                {items.length === 0 ? (
+                  <button
+                    type="button"
+                    className="tile about-kind-starter"
+                    onClick={() => openNew(kind)}
+                  >
+                    <strong>
+                      {a.addAboutKind} {kindLabel(dict, kind)}
+                    </strong>
+                    <span>{kindBlurb(dict, kind)}</span>
+                  </button>
+                ) : (
+                  <>
+                    {items.map((module, index) => {
+                      return (
+                        <div key={module.id} className="about-module-row">
+                          <div className="about-order">
+                            <button
+                              type="button"
+                              aria-label={a.moveAboutUp}
+                              disabled={saving || index <= 0}
+                              onClick={() => void move(module, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={a.moveAboutDown}
+                              disabled={saving || index >= items.length - 1}
+                              onClick={() => void move(module, 1)}
+                            >
+                              ↓
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="tile"
+                            onClick={() => openEditor(module)}
+                          >
+                            <span className="font-semibold">
+                              {localizedText(module.title, a.untitledAbout)}
+                            </span>
+                            <span className="ml-3">
+                              <StatusPill
+                                published={module.status === "published"}
+                                publishedLabel={a.statusPublished}
+                                draftLabel={a.statusDraft}
+                              />
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      className="about-kind-more"
+                      onClick={() => openNew(kind)}
+                    >
+                      {a.addAnotherAbout}
+                    </button>
+                  </>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
 
       <CmsModal
@@ -209,7 +299,7 @@ export function AboutEditor({ dict }: Props) {
         title={
           current.id
             ? localizedText(current.title, a.untitledAbout)
-            : a.newAbout
+            : `${a.addAboutKind} ${kindLabel(dict, current.kind)}`
         }
         closeLabel={a.close}
         onClose={closeEditor}
@@ -246,34 +336,33 @@ export function AboutEditor({ dict }: Props) {
         }
       >
         <form id="about-form" onSubmit={onSave}>
-          <label className="mb-6 block text-sm font-semibold">
-            {a.fieldSlug}
-            <input
-              className="field mt-2 font-normal"
-              value={current.slug}
-              onChange={(e) => setCurrent({ ...current, slug: e.target.value })}
-              required
-            />
-          </label>
+          <div className="mb-6">
+            <p className="mb-2 text-sm font-semibold">{a.fieldAboutKind}</p>
+            <div className="about-kind-picks" role="radiogroup" aria-label={a.fieldAboutKind}>
+              {ABOUT_KIND_ORDER.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  role="radio"
+                  aria-checked={current.kind === kind}
+                  className={current.kind === kind ? "is-active" : undefined}
+                  onClick={() => changeKind(kind)}
+                >
+                  {kindLabel(dict, kind)}
+                </button>
+              ))}
+            </div>
+            <p className="about-kind-blurb">{kindBlurb(dict, current.kind)}</p>
+          </div>
           <div className="mb-6 grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
-              {a.fieldAboutKind}
-              <select
+              {a.fieldSlug}
+              <input
                 className="field mt-2 font-normal"
-                value={current.kind}
-                onChange={(e) =>
-                  setCurrent({
-                    ...current,
-                    kind: e.target.value as AboutKind,
-                  })
-                }
-              >
-                {KINDS.map((kind) => (
-                  <option key={kind} value={kind}>
-                    {kindLabel(dict, kind)}
-                  </option>
-                ))}
-              </select>
+                value={current.slug}
+                onChange={(e) => setCurrent({ ...current, slug: e.target.value })}
+                required
+              />
             </label>
             <label className="block text-sm font-semibold">
               {a.fieldStatus}
@@ -291,21 +380,7 @@ export function AboutEditor({ dict }: Props) {
                 <option value="published">{a.statusPublished}</option>
               </select>
             </label>
-            <label className="block text-sm font-semibold">
-              {a.fieldOrder}
-              <input
-                type="number"
-                className="field mt-2 font-normal"
-                value={current.order}
-                onChange={(e) =>
-                  setCurrent({ ...current, order: Number(e.target.value) || 0 })
-                }
-              />
-            </label>
           </div>
-          <p className="mb-3 text-xs text-[var(--text-muted)]">
-            {a.aboutKindHint}
-          </p>
           <div className="about-image-row">
             <button
               type="button"

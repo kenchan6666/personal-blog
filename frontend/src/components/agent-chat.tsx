@@ -653,11 +653,6 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
             <h2 className="display-font font-bold">
               {context ? `协助编辑 · ${context.label}` : "Portfolio Agent"}
             </h2>
-            <p>
-              {context
-                ? "可询问、改写或生成内容，再逐字写入指定语言。"
-                : "会话与消息已持久保存，并会检索右侧个人资料辅助回答。"}
-            </p>
           </div>
           {awaitingTurn && (livePhase || toolActivity) ? (
             <div
@@ -688,15 +683,6 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           aria-live="polite"
         >
           {loading ? <div className="agent-empty">正在读取对话…</div> : null}
-          {!loading && messages.length === 0 ? (
-            <div className="agent-empty">
-              <p>
-                {context
-                  ? "例如：把这段写得更自然，并给我一个简短版本。"
-                  : "问我站内任何内容，或让我创建文章和项目。你也可以在右侧整理个人经历。"}
-              </p>
-            </div>
-          ) : null}
           {messages.map((message) => (
             <article
               key={message.id}
@@ -920,7 +906,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           <div className="agent-knowledge-list" ref={knowledgeListRef}>
             {knowledge.length === 0 && editingKnowledgeId === null ? (
               <div className="agent-empty">
-                还没有个人资料。添加后，Agent 会按问题检索相关内容。
+                还没有个人资料。
               </div>
             ) : null}
             {knowledge.map((record) => {
