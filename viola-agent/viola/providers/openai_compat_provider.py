@@ -21,6 +21,7 @@ from openai import AsyncOpenAI
 
 from viola.providers.base import LLMProvider, LLMResponse, ToolCallRequest
 from viola.utils.helpers import looks_like_html_response
+from viola.utils.transport import await_with_one_retry
 
 if TYPE_CHECKING:
     from viola.providers.registry import ProviderSpec
@@ -982,7 +983,11 @@ class OpenAICompatProvider(LLMProvider):
                 messages, tools, model, max_tokens, temperature,
                 reasoning_effort, tool_choice,
             )
-            return self._parse(await self._client.chat.completions.create(**kwargs))
+            return self._parse(
+                await await_with_one_retry(
+                    lambda: self._client.chat.completions.create(**kwargs)
+                )
+            )
         except Exception as e:
             return self._handle_error(e, spec=self._spec, api_base=self.api_base)
 
@@ -1005,7 +1010,9 @@ class OpenAICompatProvider(LLMProvider):
             )
             kwargs["stream"] = True
             kwargs["stream_options"] = {"include_usage": True}
-            stream = await self._client.chat.completions.create(**kwargs)
+            stream = await await_with_one_retry(
+                lambda: self._client.chat.completions.create(**kwargs)
+            )
             chunks: list[Any] = []
             stream_iter = stream.__aiter__()
             while True:

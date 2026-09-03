@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.agent_activity import rewrite_owner_sse_block
 from app.agent_budget import owner_chat_max_tokens, strip_tool_noise
+from app.agent_limits import owner_turn_available
 from app.agent_rag import AgentRag, knowledge_context
 from app.models import AgentConversation, AgentMessage, KnowledgeRecord, utc_now
 from app.store import current_store, new_document
@@ -344,6 +345,11 @@ def register_agent_routes(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="agent_turn_in_progress",
+            )
+        if not owner_turn_available(turns, settings.owner_agent_max_concurrent):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="agent_too_many_turns",
             )
 
         display_message = message or "请分析这些文件。"

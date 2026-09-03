@@ -434,8 +434,19 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       }
       const busy =
         reason instanceof Error &&
-        reason.message.includes("agent_turn_in_progress");
+        (reason.message.includes("agent_turn_in_progress") ||
+          reason.message.includes("agent_too_many_turns"));
       if (busy) {
+        if (reason.message.includes("agent_too_many_turns")) {
+          setThinking(false);
+          setError("同时进行的对话过多，请稍后再试。");
+          setMessages((current) =>
+            current.filter(
+              (item) => item.id !== assistantId || item.content.trim().length > 0,
+            ),
+          );
+          return;
+        }
         setThinking(true);
         try {
           const latest = await getAgentConversation(token, activeId);
@@ -656,11 +667,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           </div>
           {awaitingTurn && (livePhase || toolActivity) ? (
             <div
-              className={`agent-live-activity is-${livePhase || "thinking"}${
-                toolActivity ? " has-label" : ""
-              }`}
+              className={`agent-live-activity is-${livePhase || "thinking"} has-label`}
               aria-live="polite"
-              aria-label={toolActivity || (isStreaming ? "正在输出" : "正在思考")}
+              aria-label={
+                toolActivity ||
+                (isStreaming ? "正在输出" : isToolWait ? "等待工具" : "等待模型")
+              }
             >
               <span className="agent-status-bars" aria-hidden="true">
                 <i />
@@ -668,7 +680,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 <i />
                 <i />
               </span>
-              {toolActivity ? <span>{toolActivity}</span> : null}
+              <span>
+                {toolActivity ||
+                  (isStreaming ? "正在输出" : isToolWait ? "等待工具" : "等待模型")}
+              </span>
             </div>
           ) : agentActivity ? (
             <div className="agent-live-activity" aria-live="polite">
@@ -703,7 +718,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                     <MarkdownBody source={message.content} />
                     {awaitingTurn && message.id === liveAssistant?.id ? (
                       isToolWait ? (
-                        <span className="agent-thinking" aria-label="正在思考">
+                        <span className="agent-thinking" aria-label="等待工具">
                           <i />
                           <i />
                           <i />
@@ -715,7 +730,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                     ) : null}
                   </>
                 ) : awaitingTurn && message.id === liveAssistant?.id ? (
-                  <span className="agent-thinking" aria-label="正在思考">
+                  <span className="agent-thinking" aria-label="等待模型">
                     <i />
                     <i />
                     <i />

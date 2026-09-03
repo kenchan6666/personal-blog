@@ -17,6 +17,8 @@ from pydantic import BaseModel, Field
 from app.github import GitHubBrowseError, GitHubClient
 from app.models import AboutModule, Article, Journal, Project, SiteProfile
 from app.store import current_store
+from app.agent_limits import acquire_public_inflight, release_public_inflight
+from app.transport import is_retryable_transport_error
 
 _VISITOR_RE = re.compile(r"^[a-zA-Z0-9_-]{8,80}$")
 _TOPIC_HINTS = {
@@ -516,6 +518,16 @@ def register_public_agent_routes(app: FastAPI) -> None:
                 detail="public_agent_daily_budget_reached",
             )
 
+        if not await acquire_public_inflight(
+            redis,
+            settings.public_agent_max_concurrent,
+        ):
+            await redis.delete(lock_key)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="public_agent_busy",
+            )
+
         messages: list[dict[str, str]] = [
             {"role": "system", "content": _system_prompt(body.locale, context)}
         ]
@@ -556,45 +568,57 @@ def register_public_agent_routes(app: FastAPI) -> None:
                             ]
                         streamed = False
                         for request_body in bodies:
-                            async with client.stream(
-                                "POST",
-                                target,
-                                headers=headers,
-                                json=request_body,
-                            ) as upstream:
-                                if upstream.status_code >= 400:
-                                    continue
-                                payload_template = {
-                                    key: value
-                                    for key, value in request_body.items()
-                                    if key != "messages"
-                                }
-                                streamed = True
-                                buffer = ""
-                                decoder = codecs.getincrementaldecoder("utf-8")()
-                                async for chunk in upstream.aiter_bytes():
-                                    buffer += decoder.decode(chunk)
-                                    blocks = re.split(r"\r?\n\r?\n", buffer)
-                                    buffer = blocks.pop()
-                                    for block in blocks:
-                                        delta, reason = parse_guide_sse_block(
-                                            block
-                                        )
-                                        if delta:
-                                            assembled += delta
-                                            yield _guide_content_chunk(delta)
-                                        if reason and reason != "done":
-                                            finish = reason
-                                buffer += decoder.decode(b"", final=True)
-                                if buffer.strip():
-                                    delta, reason = parse_guide_sse_block(
-                                        buffer
-                                    )
-                                    if delta:
-                                        assembled += delta
-                                        yield _guide_content_chunk(delta)
-                                    if reason and reason != "done":
-                                        finish = reason
+                            for transport_try in range(2):
+                                try:
+                                    async with client.stream(
+                                        "POST",
+                                        target,
+                                        headers=headers,
+                                        json=request_body,
+                                    ) as upstream:
+                                        if upstream.status_code >= 400:
+                                            break
+                                        payload_template = {
+                                            key: value
+                                            for key, value in request_body.items()
+                                            if key != "messages"
+                                        }
+                                        streamed = True
+                                        buffer = ""
+                                        decoder = codecs.getincrementaldecoder("utf-8")()
+                                        async for chunk in upstream.aiter_bytes():
+                                            buffer += decoder.decode(chunk)
+                                            blocks = re.split(r"\r?\n\r?\n", buffer)
+                                            buffer = blocks.pop()
+                                            for block in blocks:
+                                                delta, reason = parse_guide_sse_block(
+                                                    block
+                                                )
+                                                if delta:
+                                                    assembled += delta
+                                                    yield _guide_content_chunk(delta)
+                                                if reason and reason != "done":
+                                                    finish = reason
+                                        buffer += decoder.decode(b"", final=True)
+                                        if buffer.strip():
+                                            delta, reason = parse_guide_sse_block(
+                                                buffer
+                                            )
+                                            if delta:
+                                                assembled += delta
+                                                yield _guide_content_chunk(delta)
+                                            if reason and reason != "done":
+                                                finish = reason
+                                    break
+                                except httpx.HTTPError as exc:
+                                    if (
+                                        transport_try == 0
+                                        and not streamed
+                                        and not assembled
+                                        and is_retryable_transport_error(exc)
+                                    ):
+                                        continue
+                                    raise
                             if streamed:
                                 break
                         if not streamed:
@@ -621,6 +645,7 @@ def register_public_agent_routes(app: FastAPI) -> None:
                     b'data: {"message":"public_agent_unavailable"}\n\n'
                 )
             finally:
+                await release_public_inflight(redis)
                 await redis.delete(lock_key)
 
         return StreamingResponse(

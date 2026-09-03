@@ -60,6 +60,8 @@ class Settings(BaseSettings):
     public_agent_rate_hour: int = 20
     public_agent_rate_day: int = 40
     public_agent_daily_budget: int = 500
+    public_agent_max_concurrent: int = 4
+    owner_agent_max_concurrent: int = 3
 
     github_client_id: str = ""
     github_client_secret: str = ""

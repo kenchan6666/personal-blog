@@ -49,6 +49,11 @@ class MemoryRedis:
         self._values[key] = str(next_value)
         return next_value
 
+    async def decr(self, key: str) -> int:
+        next_value = int(self._values.get(key, "0")) - 1
+        self._values[key] = str(next_value)
+        return next_value
+
     async def expire(self, key: str, ttl: int) -> bool:
         if key not in self._values:
             return False

@@ -19,6 +19,9 @@ type Props = {
 type DisplayMessage = PublicGuideMessage & { id: string };
 
 function errorText(code: string, dict: Dictionary["guide"]): string {
+  if (code === "public_agent_busy") {
+    return dict.busy;
+  }
   if (
     code === "public_agent_rate_limited" ||
     code === "public_agent_request_in_progress"
@@ -162,7 +165,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
             aria-label={dict.close}
             onClick={onClose}
           >
-            Ã—
+            ×
           </button>
         </header>
 
@@ -216,7 +219,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
                     ) : null}
                   </>
                 ) : (
-                  <span className="agent-thinking" aria-label={dict.thinking}>
+                  <span className="agent-thinking" aria-label={dict.waitingModel}>
                     <i />
                     <i />
                     <i />
@@ -260,7 +263,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
               disabled={sending || !input.trim()}
               aria-label={dict.send}
             >
-              {sending ? "â€¢â€¢â€¢" : "â†‘"}
+              {sending ? "•••" : "?"}
             </button>
           </div>
           <p>{dict.privacy}</p>
