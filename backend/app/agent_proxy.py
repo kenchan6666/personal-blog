@@ -370,7 +370,7 @@ def register_agent_routes(
                 for row in knowledge
             }
             last_knowledge_check = 0.0
-            timeout = httpx.Timeout(180.0, connect=10.0)
+            timeout = httpx.Timeout(620.0, connect=10.0)
 
             async def knowledge_update_event(
                 *,

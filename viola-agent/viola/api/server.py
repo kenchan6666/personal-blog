@@ -235,6 +235,15 @@ def _sse_chunk(delta: str, model: str, chunk_id: str, finish_reason: str | None 
 
 
 _SSE_DONE = b"data: [DONE]\n\n"
+_SSE_KEEPALIVE = b": keepalive\n\n"
+_STREAM_HEARTBEAT_S = 15
+
+
+def _timeout_notice(timeout_s: float) -> str:
+    return (
+        f"这一轮超过 {int(timeout_s)} 秒仍未完成，已停止。"
+        "请再发一次，或把任务拆短。"
+    )
 
 # ---------------------------------------------------------------------------
 # Upload helpers
@@ -362,7 +371,7 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
         content_type = ""
 
     agent_loop = request.app["agent_loop"]
-    timeout_s: float = request.app.get("request_timeout", 120.0)
+    timeout_s: float = request.app.get("request_timeout", 600.0)
     model_name: str = request.app.get("model_name", "viola")
 
     stream = False
@@ -473,12 +482,28 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                         response_text = _response_text(response)
                         if response_text.strip():
                             await queue.put(("delta", response_text))
+            except TimeoutError:
+                logger.warning(
+                    "Streaming timed out after {}s for session {}",
+                    timeout_s,
+                    session_key,
+                )
+                await queue.put(("delta", _timeout_notice(timeout_s)))
             except Exception:
                 stream_failed = True
                 logger.exception("Streaming error for session {}", session_key)
             finally:
                 await queue.put(None)
 
+        async def _heartbeat() -> None:
+            try:
+                while True:
+                    await asyncio.sleep(_STREAM_HEARTBEAT_S)
+                    await queue.put(("heartbeat", None))
+            except asyncio.CancelledError:
+                return
+
+        beat = asyncio.create_task(_heartbeat())
         task = asyncio.create_task(_run())
         try:
             while True:
@@ -486,12 +511,18 @@ async def handle_chat_completions(request: web.Request) -> web.Response:
                 if item is None:
                     break
                 kind, payload = item
+                if kind == "heartbeat":
+                    await resp.write(_SSE_KEEPALIVE)
+                    continue
                 if kind == "tool_activity" and isinstance(payload, list):
                     await resp.write(_sse_tool_activity(payload))
                     continue
                 if kind == "delta" and isinstance(payload, str):
                     await resp.write(_sse_chunk(payload, model_name, chunk_id))
         finally:
+            beat.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await beat
             if not task.done():
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -706,7 +737,7 @@ async def handle_media(request: web.Request) -> web.Response:
 
 
 def create_app(
-    agent_loop, model_name: str = "viola", request_timeout: float = 120.0
+    agent_loop, model_name: str = "viola", request_timeout: float = 600.0
 ) -> web.Application:
     """Create the aiohttp application.
 

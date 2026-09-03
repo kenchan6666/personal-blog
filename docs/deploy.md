@@ -3,7 +3,10 @@
 One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, the internal
 **Portfolio Agent**, **MongoDB**, **Qdrant**, and **Redis**. Browsers talk only to nginx:
 `/` → frontend, `/api/` → API. The Agent has no public port; Owner login and
-the API proxy protect every chat and upload.
+the API proxy protect every chat and upload. A chat turn may run up to 600s
+(Viola `--timeout 600`); nginx and the API proxy match that window. The stream
+sends SSE keepalives so a silent Gemini thinking pass is not cut as a network
+error.
 
 Local Mongo/Redis on host ports (`docker compose up -d`) is unchanged. This file is the **production/demo** stack.
 

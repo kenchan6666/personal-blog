@@ -61,7 +61,7 @@ services:
       VIOLA_TOOLS__PERSISTENCE_VIA_MCP_ONLY: "true"
       VIOLA_CUSTOMER_SERVICE_ONLY: "false"
     command:
-      ["serve", "--host", "0.0.0.0", "-w", "/home/viola/.viola/portfolio", "--verbose"]
+      ["serve", "--host", "0.0.0.0", "-w", "/home/viola/.viola/portfolio", "--timeout", "600", "--verbose"]
     volumes:
       - agent_data:/home/viola/.viola
     depends_on:

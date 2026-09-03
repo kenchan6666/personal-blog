@@ -80,3 +80,8 @@ def test_service_actor_cannot_publish() -> None:
         assert force_draft_if_service("published") == "published"
     finally:
         owner_actor.reset(token)
+
+
+def test_owner_sse_forwards_keepalive_comments() -> None:
+    forwarded = rewrite_owner_sse_block(": keepalive")
+    assert forwarded == b": keepalive\n\n"
