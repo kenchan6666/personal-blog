@@ -6,7 +6,7 @@ import re
 import shutil
 import urllib.parse
 from contextlib import AsyncExitStack, suppress
-from typing import Any
+from typing import Any, Mapping
 from weakref import WeakKeyDictionary
 
 import httpx
