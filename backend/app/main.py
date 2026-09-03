@@ -28,7 +28,13 @@ from app.avatar import (
     content_public_url,
 )
 from app.config import Settings
-from app.github import GitHubBrowseError, GitHubClient, GitHubOAuthError, HttpGitHub
+from app.github import (
+    GitHubBrowseError,
+    GitHubClient,
+    GitHubOAuthError,
+    HttpGitHub,
+    match_authorized_repo,
+)
 from app.mailer import (
     ConsoleMailer,
     Mailer,
@@ -667,7 +673,6 @@ def create_app(
         ref: str,
     ) -> dict[str, Any]:
         github_client: GitHubClient = app.state.github
-        branch = ref or repo.default_branch or "main"
         branches = await cached_github(
             kind="branches",
             full_name=repo.full_name,
@@ -679,6 +684,13 @@ def create_app(
                 name=repo.name,
             ),
         )
+        branch = ref or repo.default_branch or "main"
+        if branches and branch not in branches:
+            branch = (
+                repo.default_branch
+                if repo.default_branch in branches
+                else branches[0]
+            )
         try:
             readme = await cached_github(
                 kind="readme",
@@ -1015,15 +1027,12 @@ def create_app(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="github_not_connected",
             ) from None
-        full_name = parse_github_full_name(owner, name)
-        match = next(
-            (item for item in repos if item.get("fullName") == full_name),
-            None,
-        )
+        parse_github_full_name(owner, name)
+        match = match_authorized_repo(repos, "", owner=owner, name=name)
         if match is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="not_found",
+                detail="unknown_repo",
             )
         return SourceRepo.from_github(match), access
 

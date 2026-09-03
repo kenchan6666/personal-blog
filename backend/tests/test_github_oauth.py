@@ -197,8 +197,17 @@ async def test_owner_can_read_unbound_private_github_repo(
     anonymous = await client.get("/api/owner/github/repos/kenchan6666/secret-lab")
     assert anonymous.status_code == 401
 
+    mixed = await client.get(
+        "/api/owner/github/repos/KENCHAN6666/SECRET-LAB/blob",
+        headers=headers,
+        params={"path": "readme.md"},
+    )
+    assert mixed.status_code == 200
+    assert mixed.json()["content"] == "do-not-leak\n"
+
     unknown = await client.get(
         "/api/owner/github/repos/someone/else",
         headers=headers,
     )
     assert unknown.status_code == 404
+    assert unknown.json()["detail"] == "unknown_repo"

@@ -20,6 +20,58 @@ def is_readme_filename(name: str) -> bool:
     return lower == "readme" or lower.startswith("readme.")
 
 
+def match_authorized_repo(
+    repos: list[dict[str, object]],
+    query: str,
+    *,
+    owner: str = "",
+    name: str = "",
+) -> dict[str, object] | None:
+    wanted = query.strip().strip("/").casefold()
+    owner_part = owner.strip().casefold()
+    name_part = name.strip().casefold()
+    if owner_part and name_part:
+        wanted = f"{owner_part}/{name_part}"
+    if not wanted:
+        return None
+    full_matches = [
+        item
+        for item in repos
+        if str(item.get("fullName") or "").casefold() == wanted
+    ]
+    if len(full_matches) == 1:
+        return full_matches[0]
+    short = wanted.rsplit("/", 1)[-1]
+    name_matches = [
+        item
+        for item in repos
+        if str(item.get("name") or str(item.get("fullName") or "").rsplit("/", 1)[-1]).casefold()
+        == short
+    ]
+    if len(name_matches) == 1:
+        return name_matches[0]
+    return None
+
+
+def match_blob_path(paths: list[str], path: str) -> str | None:
+    wanted = path.strip("/")
+    if not wanted:
+        return None
+    if wanted in paths:
+        return wanted
+    folded = {item.casefold(): item for item in paths}
+    exact = folded.get(wanted.casefold())
+    if exact:
+        return exact
+    if is_readme_filename(wanted.rsplit("/", 1)[-1]):
+        root_readmes = [
+            item for item in paths if "/" not in item and is_readme_filename(item)
+        ]
+        if root_readmes:
+            return root_readmes[0]
+    return None
+
+
 class GitHubClient(Protocol):
     def authorization_url(self, *, state: str) -> str: ...
 
@@ -211,10 +263,10 @@ class RecordingGitHub:
         path: str,
     ) -> dict[str, str]:
         files = self._files(owner, name, ref)
-        content = files.get(path.strip("/"))
-        if content is None:
+        resolved = match_blob_path(list(files), path)
+        if resolved is None:
             raise GitHubBrowseError("not_found")
-        return {"path": path.strip("/"), "content": content}
+        return {"path": resolved, "content": files[resolved]}
 
 
 class HttpGitHub:
@@ -393,7 +445,32 @@ class HttpGitHub:
         ref: str,
         path: str,
     ) -> dict[str, str]:
-        payload = await self._contents(access_token, owner, name, ref, path)
+        try:
+            payload = await self._contents(access_token, owner, name, ref, path)
+        except GitHubBrowseError:
+            if is_readme_filename(path.rsplit("/", 1)[-1]):
+                return await self.get_readme(
+                    access_token=access_token,
+                    owner=owner,
+                    name=name,
+                    ref=ref,
+                )
+            parent = path.strip("/").rsplit("/", 1)
+            directory = parent[0] if len(parent) == 2 else ""
+            listing = await self._contents(
+                access_token, owner, name, ref, directory
+            )
+            if not isinstance(listing, list):
+                raise
+            resolved = match_blob_path(
+                [str(item.get("path") or item.get("name") or "") for item in listing],
+                path,
+            )
+            if resolved is None:
+                raise GitHubBrowseError("not_found") from None
+            payload = await self._contents(
+                access_token, owner, name, ref, resolved
+            )
         if isinstance(payload, list) or payload.get("type") != "file":
             raise GitHubBrowseError("not_a_file")
         raw = base64.b64decode(payload.get("content") or "")

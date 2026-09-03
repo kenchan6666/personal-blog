@@ -16,7 +16,7 @@ export default async function AdminPage({
   const dict = getDictionary(locale);
 
   return (
-    <section className="flex min-h-screen items-start justify-center px-4 pt-16 pb-12 sm:px-8 sm:py-12 lg:px-12">
+    <section className="admin-page">
       <AdminDashboard locale={locale} dict={dict} />
     </section>
   );

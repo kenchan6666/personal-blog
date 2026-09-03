@@ -89,9 +89,40 @@ def _find(items: list[dict[str, Any]], identifier: str) -> dict[str, Any]:
 
 def _repo_parts(full_name: str) -> tuple[str, str]:
     parts = [part for part in full_name.strip().strip("/").split("/") if part]
-    if len(parts) != 2:
-        raise RuntimeError("full_name must be owner/name")
-    return parts[0], parts[1]
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    if len(parts) == 1:
+        return "", parts[0]
+    raise RuntimeError("full_name must be owner/name or a repository name")
+
+
+def _resolve_repo(api: PortfolioApi, full_name: str) -> tuple[str, str]:
+    owner, name = _repo_parts(full_name)
+    snapshot = _github_snapshot(api)
+    if not snapshot.get("connected"):
+        raise RuntimeError(
+            snapshot.get("hint") or "GitHub is not connected. Open the admin GitHub tab."
+        )
+    wanted = f"{owner}/{name}".strip("/") if owner else name
+    full_hits: list[str] = []
+    name_hits: list[str] = []
+    for item in snapshot.get("repos") or []:
+        item_full = str(item.get("fullName") or "")
+        item_name = item_full.rsplit("/", 1)[-1]
+        if item_full.casefold() == wanted.casefold():
+            full_hits.append(item_full)
+        if item_name.casefold() == name.casefold():
+            name_hits.append(item_full)
+    unique = list(dict.fromkeys(full_hits or name_hits))
+    if len(unique) != 1:
+        known = ", ".join(
+            str(item.get("fullName")) for item in (snapshot.get("repos") or [])[:12]
+        )
+        raise RuntimeError(
+            f"Repository not found: {full_name}. Authorized repos: {known or '(none)'}"
+        )
+    owner_name, repo_name = unique[0].split("/", 1)
+    return owner_name, repo_name
 
 
 def _github_snapshot(api: PortfolioApi) -> dict[str, Any]:
@@ -111,6 +142,9 @@ def _github_snapshot(api: PortfolioApi) -> dict[str, Any]:
         "repos": [
             {
                 "fullName": item.get("fullName"),
+                "owner": item.get("owner") or str(item.get("fullName") or "").split("/", 1)[0],
+                "name": item.get("name")
+                or str(item.get("fullName") or "").rsplit("/", 1)[-1],
                 "private": item.get("private"),
                 "description": item.get("description"),
                 "htmlUrl": item.get("htmlUrl"),
@@ -315,8 +349,8 @@ def create_server() -> FastMCP:
         ref: str = "",
         path: str = "",
     ) -> dict[str, Any]:
-        """Read README/tree for any authorized GitHub repo by owner/name. Binding a Project is not required."""
-        owner, name = _repo_parts(full_name)
+        """Read README and file tree. Accepts owner/name or a unique repo name such as taiko_bot_qq."""
+        owner, name = _resolve_repo(api, full_name)
         suffix = "/tree" if path else ""
         params = httpx.QueryParams({"ref": ref, "path": path})
         return api.request(
@@ -330,8 +364,8 @@ def create_server() -> FastMCP:
         path: str,
         ref: str = "",
     ) -> dict[str, Any]:
-        """Read one file from any authorized GitHub repo, including private repositories."""
-        owner, name = _repo_parts(full_name)
+        """Read one file. Prefer this for README.md; the name is matched case-insensitively."""
+        owner, name = _resolve_repo(api, full_name)
         params = httpx.QueryParams({"ref": ref, "path": path})
         return api.request(
             "GET",
@@ -344,16 +378,21 @@ def create_server() -> FastMCP:
         ref: str = "",
         path: str = "",
     ) -> dict[str, Any]:
-        """Read a bound SourceRepo overview or directory. Private repos are allowed here."""
+        """Read a bound Project SourceRepo. If the slug is actually a GitHub repo name, that repo is used."""
         suffix = "/source"
         if path:
             suffix += "/tree"
         params = httpx.QueryParams({"ref": ref, "path": path})
         slug = quote(project_slug.strip(), safe="")
-        return api.request(
-            "GET",
-            f"/api/owner/projects/{slug}{suffix}?{params}",
-        )
+        try:
+            return api.request(
+                "GET",
+                f"/api/owner/projects/{slug}{suffix}?{params}",
+            )
+        except RuntimeError as exc:
+            if "404" not in str(exc) and "not_found" not in str(exc):
+                raise
+            return portfolio_get_github_source(project_slug, ref, path)
 
     @server.tool()
     def portfolio_get_source_file(
@@ -361,13 +400,18 @@ def create_server() -> FastMCP:
         path: str,
         ref: str = "",
     ) -> dict[str, Any]:
-        """Read one file from a bound SourceRepo, including private repositories."""
+        """Read one file from a bound Project, or from a GitHub repo if the slug is a repo name."""
         params = httpx.QueryParams({"ref": ref, "path": path})
         slug = quote(project_slug.strip(), safe="")
-        return api.request(
-            "GET",
-            f"/api/owner/projects/{slug}/source/blob?{params}",
-        )
+        try:
+            return api.request(
+                "GET",
+                f"/api/owner/projects/{slug}/source/blob?{params}",
+            )
+        except RuntimeError as exc:
+            if "404" not in str(exc) and "not_found" not in str(exc):
+                raise
+            return portfolio_get_github_file(project_slug, path, ref)
 
     @server.tool()
     def portfolio_comment_action(

@@ -31,6 +31,7 @@ type Props = {
 };
 
 type DisplayMessage = AgentMessage & { id: string };
+type MobilePane = "conversations" | "chat" | "knowledge";
 
 const ACTIVE_CONVERSATION_KEY = "portfolio_agent_active_conversation";
 const EMPTY_KNOWLEDGE: AgentKnowledgeInput = {
@@ -102,6 +103,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     new Set(),
   );
   const [error, setError] = useState("");
+  const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const activityTimerRef = useRef<number | null>(null);
@@ -190,6 +192,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       const row = await createAgentConversation(token);
       await refreshConversations(token);
       await openConversation(token, row.id);
+      setMobilePane("chat");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法新建对话。");
     }
@@ -201,6 +204,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     try {
       setLoading(true);
       await openConversation(token, id);
+      setMobilePane("chat");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法打开对话。");
     } finally {
@@ -404,7 +408,29 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   }
 
   return (
-    <section className={`agent-workspace${compact ? " is-compact" : ""}`}>
+    <section
+      className={`agent-workspace${compact ? " is-compact" : ""} is-${mobilePane}`}
+    >
+      {!compact ? (
+        <nav className="agent-mobile-nav" aria-label="Agent 面板">
+          {(
+            [
+              ["conversations", "会话"],
+              ["chat", "对话"],
+              ["knowledge", "关于我"],
+            ] as const
+          ).map(([pane, label]) => (
+            <button
+              key={pane}
+              type="button"
+              className={mobilePane === pane ? "is-active" : ""}
+              onClick={() => setMobilePane(pane)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       {!compact ? (
         <aside className="agent-conversations">
           <div className="agent-panel-heading">
