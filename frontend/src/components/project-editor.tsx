@@ -401,9 +401,6 @@ export function ProjectEditor({ locale, dict }: Props) {
                 />
               </label>
             </div>
-            <p className="mb-4 text-xs text-[var(--text-muted)]">
-              {a.localeFallbackHint} {a.translateHint}
-            </p>
             <BilingualField
               label={a.fieldProjectTitle}
               value={current.title}

@@ -390,9 +390,6 @@ export function AboutEditor({ dict }: Props) {
               {a.applyAboutTemplate}
             </button>
           </div>
-          <p className="mb-4 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint} {a.translateHint}
-          </p>
           <BilingualField
             label={a.fieldAboutTitle}
             value={current.title}

@@ -252,9 +252,6 @@ export function SiteEditor({ dict }: Props) {
         }
       >
         <form id="site-form" onSubmit={onSave}>
-          <p className="mb-6 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint} {a.translateHint}
-          </p>
           <div className="mb-8">
             <p className="mb-3 text-sm font-semibold">{a.fieldAvatar}</p>
             <div className="flex flex-wrap items-center gap-5">

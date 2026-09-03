@@ -421,9 +421,6 @@ export function ArticleEditor({ dict }: Props) {
               ))}
             </select>
           </label>
-          <p className="mb-4 text-xs text-[var(--text-muted)]">
-            {a.localeFallbackHint} {a.translateHint}
-          </p>
           <BilingualField
             label={a.fieldArticleTitle}
             value={current.title}
