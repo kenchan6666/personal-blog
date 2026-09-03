@@ -165,7 +165,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
             aria-label={dict.close}
             onClick={onClose}
           >
-            ×
+            {'\u00d7'}
           </button>
         </header>
 
@@ -263,7 +263,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
               disabled={sending || !input.trim()}
               aria-label={dict.send}
             >
-              {sending ? "•••" : "?"}
+              {sending ? "..." : dict.send}
             </button>
           </div>
           <p>{dict.privacy}</p>
