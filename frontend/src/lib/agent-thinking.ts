@@ -11,7 +11,7 @@ export function messageRows(messages: AgentMessage[]): ChatMessage[] {
 
 export function messagesWithThinking(
   messages: AgentMessage[],
-  thinking: boolean,
+  thinking?: boolean,
 ): ChatMessage[] {
   const rows = messageRows(messages);
   if (!thinking) return rows;
