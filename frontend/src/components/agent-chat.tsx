@@ -186,6 +186,14 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const latestAssistant = [...messages]
     .reverse()
     .find((item) => item.role === "assistant" && item.content.trim());
+  const liveAssistant = [...messages]
+    .reverse()
+    .find((item) => item.role === "assistant");
+  const isThinking =
+    sending && Boolean(liveAssistant) && !liveAssistant?.content.trim();
+  const isStreaming =
+    sending && Boolean(liveAssistant?.content.trim());
+  const livePhase = isStreaming ? "streaming" : isThinking ? "thinking" : "";
 
   function handleStreamEvent(event: AgentStreamEvent) {
     if (event.type !== "knowledge_updated") return;
@@ -501,7 +509,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
 
       <div className="agent-chat">
         <div className="agent-chat-intro">
-          <span className="agent-orb" aria-hidden="true">
+          <span
+            className={`agent-orb${livePhase ? ` is-${livePhase}` : ""}`}
+            aria-hidden="true"
+          >
             <span className="agent-orb-core" />
             <i className="particle p1" />
             <i className="particle p2" />
@@ -520,10 +531,23 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 : "会话与消息已持久保存，并会检索右侧个人资料辅助回答。"}
             </p>
           </div>
-          {agentActivity || sending ? (
+          {agentActivity ? (
             <div className="agent-live-activity" aria-live="polite">
               <i aria-hidden="true" />
-              <span>{agentActivity || "正在处理并同步数据…"}</span>
+              <span>{agentActivity}</span>
+            </div>
+          ) : livePhase ? (
+            <div
+              className={`agent-live-activity is-${livePhase}`}
+              aria-live="polite"
+              aria-label={isStreaming ? "正在输出" : "正在思考"}
+            >
+              <span className="agent-status-bars" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+              </span>
             </div>
           ) : null}
         </div>
@@ -545,16 +569,32 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           {messages.map((message) => (
             <article
               key={message.id}
-              className={`agent-message is-${message.role}`}
+              className={`agent-message is-${message.role}${
+                sending && message.id === liveAssistant?.id
+                  ? isStreaming
+                    ? " is-streaming"
+                    : " is-thinking"
+                  : ""
+              }`}
             >
               {message.files?.length ? (
                 <p className="agent-files">{message.files.join(" · ")}</p>
               ) : null}
               {message.role === "assistant" ? (
                 message.content ? (
-                  <MarkdownBody source={message.content} />
+                  <>
+                    <MarkdownBody source={message.content} />
+                    {sending && message.id === liveAssistant?.id ? (
+                      <span className="agent-stream-caret" aria-hidden="true" />
+                    ) : null}
+                  </>
                 ) : (
-                  <span className="agent-thinking">正在思考</span>
+                  <span className="agent-thinking" aria-label="正在思考">
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
                 )
               ) : (
                 <p className="whitespace-pre-wrap">{message.content}</p>

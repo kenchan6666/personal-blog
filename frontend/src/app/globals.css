@@ -636,6 +636,23 @@ a:visited {
   height: 0.22rem;
 }
 
+.guide-orb.is-thinking {
+  box-shadow: 0 0 18px rgb(255 138 101 / 28%);
+}
+
+.guide-orb.is-thinking i {
+  animation-duration: 1.6s;
+}
+
+.guide-orb.is-streaming {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent-link) 28%, transparent);
+}
+
+.guide-orb.is-streaming i {
+  background: var(--accent-link);
+  animation-duration: 1.2s;
+}
+
 .public-guide-messages {
   display: flex;
   min-height: 0;
@@ -701,6 +718,14 @@ a:visited {
   align-self: flex-start;
   border-bottom-left-radius: 5px;
   background: var(--panel-fill-strong);
+}
+
+.public-guide-message.is-thinking {
+  border-color: color-mix(in srgb, #ff8a65 24%, var(--hairline));
+}
+
+.public-guide-message.is-streaming {
+  border-color: color-mix(in srgb, var(--accent-link) 22%, var(--hairline));
 }
 
 .public-guide-message.is-assistant > :first-child {
@@ -3910,6 +3935,46 @@ html[data-theme="dark"] .ambient-orb {
   background: #ffb09a;
 }
 
+.agent-orb.is-thinking {
+  border-color: color-mix(in srgb, #ff8a65 42%, var(--glass-border));
+  box-shadow:
+    inset 0 0 18px rgb(255 138 101 / 22%),
+    0 0 22px rgb(255 122 89 / 26%);
+}
+
+.agent-orb.is-thinking::after {
+  animation-duration: 1.15s;
+  border-color: color-mix(in srgb, #ff8a65 40%, transparent);
+}
+
+.agent-orb.is-thinking .agent-orb-core {
+  animation: agent-core-think 0.9s ease-in-out infinite;
+}
+
+.agent-orb.is-thinking .particle {
+  animation-duration: 1.8s;
+}
+
+.agent-orb.is-streaming {
+  border-color: color-mix(in srgb, var(--accent-link) 38%, var(--glass-border));
+  box-shadow:
+    inset 0 0 16px color-mix(in srgb, var(--accent-link) 18%, transparent),
+    0 0 20px color-mix(in srgb, var(--accent-link) 22%, transparent);
+}
+
+.agent-orb.is-streaming::after {
+  animation: agent-orb-spin 2.4s linear infinite;
+  border-color: color-mix(in srgb, var(--accent-link) 36%, transparent);
+}
+
+.agent-orb.is-streaming .agent-orb-core {
+  background: var(--accent-link);
+  box-shadow:
+    0 0 10px color-mix(in srgb, var(--accent-link) 80%, transparent),
+    0 0 20px color-mix(in srgb, var(--accent-cta-end) 35%, transparent);
+  animation: agent-core-stream 0.7s ease-in-out infinite;
+}
+
 .agent-messages {
   display: flex;
   flex: 1 1 0;
@@ -3955,6 +4020,14 @@ html[data-theme="dark"] .ambient-orb {
   align-self: flex-start;
   border-bottom-left-radius: 5px;
   background: var(--panel-fill-strong);
+}
+
+.agent-message.is-thinking {
+  border-color: color-mix(in srgb, #ff8a65 24%, var(--hairline));
+}
+
+.agent-message.is-streaming {
+  border-color: color-mix(in srgb, var(--accent-link) 22%, var(--hairline));
 }
 
 .agent-message .markdown-body.typeset-reading,
@@ -4010,11 +4083,75 @@ html[data-theme="dark"] .ambient-orb {
   opacity: 0.75;
 }
 
-.agent-thinking::after {
-  content: "…";
+.agent-live-activity.is-thinking,
+.agent-live-activity.is-streaming {
+  min-width: 2.6rem;
+  justify-content: center;
+  padding: 0.4rem 0.72rem;
+}
+
+.agent-status-bars,
+.agent-thinking {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.18rem;
+}
+
+.agent-status-bars {
+  height: 0.82rem;
+}
+
+.agent-thinking {
+  min-height: 1.15rem;
+  gap: 0.22rem;
+}
+
+.agent-status-bars i,
+.agent-thinking i {
+  display: block;
+  width: 0.18rem;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ff8a65, var(--accent-link));
+  transform-origin: center bottom;
+  animation: agent-bar 0.9s ease-in-out infinite;
+}
+
+.agent-thinking i {
+  width: 0.22rem;
+  height: 1.05rem;
+}
+
+.agent-status-bars i:nth-child(2),
+.agent-thinking i:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.agent-status-bars i:nth-child(3),
+.agent-thinking i:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.agent-status-bars i:nth-child(4),
+.agent-thinking i:nth-child(4) {
+  animation-delay: 0.36s;
+}
+
+.agent-live-activity.is-streaming .agent-status-bars i {
+  animation-duration: 0.62s;
+  background: linear-gradient(180deg, var(--accent-link), #ff8a65);
+}
+
+.agent-stream-caret {
   display: inline-block;
-  width: 1rem;
-  animation: agent-pulse 1.2s ease-in-out infinite;
+  width: 0.16rem;
+  height: 0.95em;
+  margin-left: 0.18rem;
+  vertical-align: text-bottom;
+  border-radius: 999px;
+  background: #ff8a65;
+  box-shadow: 0 0 8px rgb(255 138 101 / 70%);
+  animation: agent-caret 0.85s ease-in-out infinite;
 }
 
 .agent-insert-row,
@@ -4119,6 +4256,30 @@ html[data-theme="dark"] .ambient-orb {
   50% { opacity: 0.9; transform: scale(1.08); }
 }
 
+@keyframes agent-orb-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes agent-core-think {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.85); opacity: 0.7; }
+  50% { transform: translate(-50%, -50%) scale(1.25); opacity: 1; }
+}
+
+@keyframes agent-core-stream {
+  0%, 100% { transform: translate(-50%, -50%) scale(0.9); }
+  50% { transform: translate(-50%, -50%) scale(1.18); }
+}
+
+@keyframes agent-bar {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+@keyframes agent-caret {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
 @keyframes agent-status-enter {
   from { opacity: 0; transform: translateY(3px); }
   to { opacity: 1; transform: translateY(0); }
@@ -4155,8 +4316,13 @@ html[data-theme="dark"] .ambient-orb {
 
   .agent-orb::after,
   .agent-orb .particle,
+  .agent-orb.is-thinking .agent-orb-core,
+  .agent-orb.is-streaming .agent-orb-core,
   .agent-live-activity,
   .agent-live-activity i,
+  .agent-status-bars i,
+  .agent-thinking i,
+  .agent-stream-caret,
   .agent-knowledge-card.is-live,
   .sidebar-guide-orb i,
   .guide-orb i,

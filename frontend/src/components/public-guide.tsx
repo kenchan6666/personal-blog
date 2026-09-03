@@ -38,6 +38,13 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const liveAssistant = [...messages]
+    .reverse()
+    .find((item) => item.role === "assistant");
+  const isThinking =
+    sending && Boolean(liveAssistant) && !liveAssistant?.content.trim();
+  const isStreaming = sending && Boolean(liveAssistant?.content.trim());
+  const livePhase = isStreaming ? "streaming" : isThinking ? "thinking" : "";
 
   useEffect(() => {
     if (!open) return;
@@ -119,7 +126,10 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
         aria-labelledby="public-guide-title"
       >
         <header className="public-guide-header">
-          <span className="guide-orb" aria-hidden="true">
+          <span
+            className={`guide-orb${livePhase ? ` is-${livePhase}` : ""}`}
+            aria-hidden="true"
+          >
             <i />
             <i />
             <i />
@@ -161,13 +171,29 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
           {messages.map((message) => (
             <article
               key={message.id}
-              className={`public-guide-message is-${message.role}`}
+              className={`public-guide-message is-${message.role}${
+                sending && message.id === liveAssistant?.id
+                  ? isStreaming
+                    ? " is-streaming"
+                    : " is-thinking"
+                  : ""
+              }`}
             >
               {message.role === "assistant" ? (
                 message.content ? (
-                  <MarkdownBody source={message.content} />
+                  <>
+                    <MarkdownBody source={message.content} />
+                    {sending && message.id === liveAssistant?.id ? (
+                      <span className="agent-stream-caret" aria-hidden="true" />
+                    ) : null}
+                  </>
                 ) : (
-                  <span className="public-guide-thinking">{dict.thinking}</span>
+                  <span className="agent-thinking" aria-label={dict.thinking}>
+                    <i />
+                    <i />
+                    <i />
+                    <i />
+                  </span>
                 )
               ) : (
                 <p>{message.content}</p>
