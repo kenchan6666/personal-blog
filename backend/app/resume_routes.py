@@ -9,7 +9,14 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.github import GitHubBrowseError, match_authorized_repo
+from app.github import (
+    GitHubBrowseError,
+    GitHubOAuthError,
+    GitHubWriteError,
+    cv_repo_payload,
+    ensure_owned_cv_repo,
+    match_authorized_repo,
+)
 from app.models import Resume, ResumeTemplate, empty_localized
 from app.resume import (
     apply_resume_body,
@@ -18,6 +25,7 @@ from app.resume import (
     ensure_resume_dir,
     parse_resume_import,
     render_resume_pdf,
+    resume_vault_json,
     save_resume_pdf_bytes,
     validate_slug,
 )
@@ -257,6 +265,70 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         resume.status = "published"
         await current_store().save(resume)
         return resume.to_owner_dict()
+
+    @app.post("/api/owner/resumes/{resume_id}/push-github")
+    async def owner_push_resume_github(
+        resume_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        access = await owner_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="github_not_connected"
+            )
+        resume = await current_store().get(Resume, resume_id)
+        if resume is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+        if not resume.pdf_filename:
+            resume = await generate_pdf(resume)
+        directory = ensure_resume_dir(app.state.settings.resume_dir)
+        pdf_path = directory / Path(resume.pdf_filename).name
+        if not pdf_path.is_file():
+            resume = await generate_pdf(resume)
+            pdf_path = directory / Path(resume.pdf_filename).name
+        try:
+            repo, created = await ensure_owned_cv_repo(
+                app.state.github, access_token=access
+            )
+            json_name = f"{resume.slug}.json"
+            pdf_name = f"{resume.slug}.pdf"
+            branch = str(repo.get("defaultBranch") or "main")
+            json_put = await app.state.github.put_file(
+                access_token=access,
+                owner=str(repo["owner"]),
+                name=str(repo["name"]),
+                path=json_name,
+                content=resume_vault_json(resume),
+                message=f"Update {resume.slug} resume JSON",
+                branch=branch,
+            )
+            pdf_put = await app.state.github.put_file(
+                access_token=access,
+                owner=str(repo["owner"]),
+                name=str(repo["name"]),
+                path=pdf_name,
+                content=pdf_path.read_bytes(),
+                message=f"Update {resume.slug} resume PDF",
+                branch=branch,
+            )
+        except GitHubOAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="github_not_connected"
+            ) from None
+        except GitHubWriteError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail="github_write_failed"
+            ) from None
+        resume.github_repo = str(repo["fullName"])
+        resume.github_json_path = json_name
+        resume.github_pdf_path = pdf_name
+        await current_store().save(resume)
+        return {
+            "created": created,
+            "repo": cv_repo_payload(repo, [], created=created),
+            "files": [json_put, pdf_put],
+            "resume": resume.to_owner_dict(),
+        }
 
     @app.get("/api/owner/resumes/{resume_id}/pdf")
     async def owner_resume_pdf(

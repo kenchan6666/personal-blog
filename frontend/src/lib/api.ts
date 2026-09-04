@@ -577,6 +577,28 @@ export async function startGitHubOAuth(
   return (await res.json()) as { authorizationUrl: string };
 }
 
+export type CvRepo = SourceRepo & {
+  files: { name: string; path: string; type: string }[];
+  created: boolean;
+};
+
+export type GitHubAccount = {
+  connected: boolean;
+  login?: string;
+  name?: string;
+  htmlUrl?: string;
+  avatarUrl?: string;
+  repoCount?: number;
+  cvRepo?: CvRepo | null;
+};
+
+export type ResumeGithubPush = {
+  created: boolean;
+  repo: CvRepo;
+  files: { path: string; htmlUrl: string }[];
+  resume: OwnerResume;
+};
+
 export async function fetchOwnerGitHubRepos(
   token: string,
 ): Promise<SourceRepo[] | null> {
@@ -587,6 +609,26 @@ export async function fetchOwnerGitHubRepos(
   if (res.status === 409) return null;
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as SourceRepo[];
+}
+
+export async function fetchOwnerGitHubAccount(
+  token: string,
+): Promise<GitHubAccount> {
+  const res = await fetch(`${API_BASE}/api/owner/github/account`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as GitHubAccount;
+}
+
+export async function ensureOwnerCvRepo(token: string): Promise<CvRepo> {
+  const res = await fetch(`${API_BASE}/api/owner/github/cv-repo`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as CvRepo;
 }
 
 export async function attachOwnerSourceRepo(
@@ -1175,6 +1217,9 @@ export type OwnerResume = {
   skills: string[];
   languages: ResumeLanguage[];
   pdfUrl: string;
+  githubRepo?: string;
+  githubJsonPath?: string;
+  githubPdfPath?: string;
 };
 
 export type PublicResumeCard = {
@@ -1290,8 +1335,20 @@ export async function fetchOwnerResumes(token: string): Promise<OwnerResume[]> {
   return (await res.json()) as OwnerResume[];
 }
 
-function resumePayload(resume: OwnerResume): Omit<OwnerResume, "id" | "pdfUrl"> {
-  const { id: _id, pdfUrl: _pdf, ...rest } = resume;
+function resumePayload(
+  resume: OwnerResume,
+): Omit<
+  OwnerResume,
+  "id" | "pdfUrl" | "githubRepo" | "githubJsonPath" | "githubPdfPath"
+> {
+  const {
+    id: _id,
+    pdfUrl: _pdf,
+    githubRepo: _repo,
+    githubJsonPath: _json,
+    githubPdfPath: _pdfPath,
+    ...rest
+  } = resume;
   return rest;
 }
 
@@ -1361,6 +1418,18 @@ export async function publishOwnerResume(
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerResume;
+}
+
+export async function pushOwnerResumeToGithub(
+  token: string,
+  id: string,
+): Promise<ResumeGithubPush> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/push-github`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as ResumeGithubPush;
 }
 
 export async function importOwnerResumeFromGithub(

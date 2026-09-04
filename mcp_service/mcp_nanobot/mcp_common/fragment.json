@@ -38,6 +38,8 @@
       "portfolio_generate_resume",
       "portfolio_publish_resume",
       "portfolio_import_resume_from_github",
+      "portfolio_push_resume_to_github",
+      "portfolio_ensure_cv_repo",
       "portfolio_comment_action"
     ]
   }

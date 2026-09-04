@@ -444,6 +444,9 @@ class Resume(Document):
     skills: list[str] = Field(default_factory=list)
     languages: list[ResumeLanguage] = Field(default_factory=list)
     pdf_filename: str = ""
+    github_repo: str = ""
+    github_json_path: str = ""
+    github_pdf_path: str = ""
 
     class Settings:
         name = "resumes"
@@ -470,12 +473,18 @@ class Resume(Document):
             "skills": list(self.skills),
             "languages": [item.model_dump() for item in self.languages],
             "pdfUrl": self.pdf_url() if self.pdf_filename else "",
+            "githubRepo": self.github_repo,
+            "githubJsonPath": self.github_json_path,
+            "githubPdfPath": self.github_pdf_path,
         }
 
     def to_public_dict(self) -> dict[str, Any]:
         payload = self.to_owner_dict()
         payload.pop("id", None)
         payload.pop("status", None)
+        payload.pop("githubRepo", None)
+        payload.pop("githubJsonPath", None)
+        payload.pop("githubPdfPath", None)
         return payload
 
 

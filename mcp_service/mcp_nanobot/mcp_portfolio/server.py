@@ -242,7 +242,7 @@ def _resolve_repo(api: PortfolioApi, full_name: str) -> tuple[str, str]:
 
 def _github_snapshot(api: PortfolioApi) -> dict[str, Any]:
     try:
-        items = api.request("GET", "/api/owner/github/repos")
+        account = api.request("GET", "/api/owner/github/account")
     except RuntimeError as exc:
         detail = str(exc)
         if "409" in detail or "github_not_connected" in detail:
@@ -252,8 +252,22 @@ def _github_snapshot(api: PortfolioApi) -> dict[str, Any]:
                 "hint": "Connect GitHub in the admin GitHub tab, then ask again.",
             }
         return {"connected": False, "repos": [], "error": detail[:200]}
+    if not account.get("connected"):
+        return {
+            "connected": False,
+            "repos": [],
+            "hint": "Connect GitHub in the admin GitHub tab, then ask again.",
+        }
+    try:
+        items = api.request("GET", "/api/owner/github/repos")
+    except RuntimeError:
+        items = []
     return {
         "connected": True,
+        "login": account.get("login"),
+        "htmlUrl": account.get("htmlUrl"),
+        "repoCount": account.get("repoCount"),
+        "cvRepo": account.get("cvRepo"),
         "repos": [
             {
                 "fullName": item.get("fullName"),
@@ -308,10 +322,13 @@ def create_server() -> FastMCP:
                         "portfolio_create_resume",
                         "portfolio_generate_resume",
                         "portfolio_publish_resume",
+                        "portfolio_push_resume_to_github",
+                        "portfolio_ensure_cv_repo",
                     ],
                     "note": (
                         "Resume is a one-language CV document plus a ResumeTemplate. "
-                        "It is not About and not a SiteProfile link."
+                        "It is not About and not a SiteProfile link. "
+                        "Push writes JSON and PDF to the private cv repo."
                     ),
                 },
             },
@@ -749,6 +766,21 @@ def create_server() -> FastMCP:
                 "title": title,
                 "templateSlug": template_slug,
             },
+        )
+
+    @server.tool()
+    def portfolio_ensure_cv_repo() -> dict[str, Any]:
+        """Create the private `cv` GitHub repo if missing; return it if it already exists."""
+        api.require_write()
+        return api.request("POST", "/api/owner/github/cv-repo")
+
+    @server.tool()
+    def portfolio_push_resume_to_github(identifier: str) -> dict[str, Any]:
+        """Push a Resume JSON and PDF to the private `cv` repo. Creates that repo if missing."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        return api.request(
+            "POST", f"/api/owner/resumes/{current['id']}/push-github"
         )
 
     @server.tool()

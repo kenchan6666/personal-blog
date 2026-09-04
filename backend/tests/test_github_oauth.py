@@ -119,6 +119,9 @@ async def test_oauth_failure_fails_closed(client, mailer, settings):
 
     repos = await client.get("/api/owner/github/repos", headers=headers)
     assert repos.status_code == 409
+    account = await client.get("/api/owner/github/account", headers=headers)
+    assert account.status_code == 200
+    assert account.json() == {"connected": False}
 
 
 @pytest.mark.asyncio

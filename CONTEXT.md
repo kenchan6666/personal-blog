@@ -49,8 +49,12 @@ _Avoid_: clone, mirror（本站不镜像整仓）
 _Avoid_: SuperCV 模板（作实体名时）, theme, skin
 
 **Resume**:
-按某一 ResumeTemplate 填好的单语履历文档。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。
+按某一 ResumeTemplate 填好的单语履历文档。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。可推送到 Owner 名下的 CvRepo（JSON + PDF），与是否 Published 无关。
 _Avoid_: CV（作实体名时）, 履历（作实体名时）, About 模块堆叠当履历
+
+**CvRepo**:
+Owner GitHub 账号下名为 `cv` 的履历仓（默认私有）。没有则创建，有则覆盖写入 `{slug}.json` 与 `{slug}.pdf`。这是履历备份/投递工件仓，不是 SourceRepo，也不对访客代理 tree/blob。
+_Avoid_: SourceRepo, clone, 把履历仓当公开 Project
 
 **Draft**:
 尚未对访客公开的内容状态。Journal / Article / Project 均支持 Draft → Published；Draft 对访客不可见。

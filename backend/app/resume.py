@@ -230,6 +230,13 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
     ]
 
 
+def resume_vault_json(resume: Resume) -> bytes:
+    payload = resume.to_owner_dict()
+    for key in ("id", "pdfUrl", "githubRepo", "githubJsonPath", "githubPdfPath"):
+        payload.pop(key, None)
+    return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+
+
 def parse_resume_import(payload: Any) -> dict[str, Any]:
     if isinstance(payload, str):
         payload = json.loads(payload)

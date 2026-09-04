@@ -164,6 +164,64 @@ async def test_import_resume_from_github_uses_authorized_file(
     assert body["projects"][0]["name"] == "Pantry pal"
 
 
+@pytest.mark.asyncio
+async def test_push_resume_creates_cv_repo_then_updates(
+    client, mailer, settings, github, app
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(),
+        headers=headers,
+    )
+    resume_id = created.json()["id"]
+
+    blocked = await client.post(
+        f"/api/owner/resumes/{resume_id}/push-github",
+        headers=headers,
+    )
+    assert blocked.status_code == 409
+
+    await app.state.redis.set("github:owner_token", "gho_test")
+    account = await client.get("/api/owner/github/account", headers=headers)
+    assert account.status_code == 200
+    assert account.json()["connected"] is True
+    assert account.json()["login"] == "kenchan6666"
+    assert account.json()["cvRepo"] is None
+
+    first = await client.post(
+        f"/api/owner/resumes/{resume_id}/push-github",
+        headers=headers,
+    )
+    assert first.status_code == 200
+    body = first.json()
+    assert body["created"] is True
+    assert body["repo"]["fullName"] == "kenchan6666/cv"
+    assert body["repo"]["private"] is True
+    assert body["resume"]["githubRepo"] == "kenchan6666/cv"
+    assert body["resume"]["githubJsonPath"] == "intern-en.json"
+    assert body["resume"]["githubPdfPath"] == "intern-en.pdf"
+    assert github.created_repos == ["kenchan6666/cv"]
+    assert "kenchan6666/cv:intern-en.json" in github.puts
+    assert "kenchan6666/cv:intern-en.pdf" in github.puts
+
+    vault = await client.post("/api/owner/github/cv-repo", headers=headers)
+    assert vault.status_code == 200
+    assert vault.json()["created"] is False
+    names = [item["name"] for item in vault.json()["files"]]
+    assert "intern-en.json" in names
+    assert "intern-en.pdf" in names
+
+    second = await client.post(
+        f"/api/owner/resumes/{resume_id}/push-github",
+        headers=headers,
+    )
+    assert second.status_code == 200
+    assert second.json()["created"] is False
+    assert github.created_repos == ["kenchan6666/cv"]
+
+
 def io_bytes(data: bytes):
     from io import BytesIO
 

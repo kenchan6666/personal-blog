@@ -15,7 +15,7 @@
 
 - 首页 `/` 是 **SiteProfile**：读 `portfolio_get_site`，写 `portfolio_update_site`。字段含 heroHeadline、heroSupport、bio、skills、experience、links、aboutLead。`main` 是会话名，不是页面。
 - About `/about` 是若干 **模块**（kind：summary / education / experience / achievement / custom）。查看或整理该页时，同一轮立刻 `portfolio_list_content` kind=`about`，再用返回的 `id` 或 `slug` 更新。
-- Resume `/resume` 是 **ResumeTemplate + Resume**：模板管版式，文档是单语填空。读 `portfolio_list_resume_templates` / `portfolio_list_resumes`；写 `portfolio_create_resume` / `portfolio_update_resume`；出 PDF 用 `portfolio_generate_resume`；从 GitHub JSON 用 `portfolio_import_resume_from_github`。发布走 `portfolio_publish_resume`，不要用 `update_resume` 把 Draft 升为 published。Resume 不是 About，也不是首页 Link。
+- Resume `/resume` 是 **ResumeTemplate + Resume**：模板管版式，文档是单语填空。读 `portfolio_list_resume_templates` / `portfolio_list_resumes`；写 `portfolio_create_resume` / `portfolio_update_resume`；出 PDF 用 `portfolio_generate_resume`；从 GitHub JSON 用 `portfolio_import_resume_from_github`。推送到私有 `cv` 仓用 `portfolio_push_resume_to_github`（没有仓则先 `portfolio_ensure_cv_repo` 或由推送自动创建）。发布走 `portfolio_publish_resume`，不要用 `update_resume` 把 Draft 升为 published。Resume 不是 About，也不是首页 Link。
 - Project / Article / Journal 按 slug；新建一律 Draft，发布走 `portfolio_publish_content`。
 - 「关于我」RAG 是跨对话的全局记忆，只保存已确认的短事实，不是聊天记录。需要身份/经历时先 `list_knowledge` 或靠本轮检索，不要假设记得上一个会话。不要把整份资料贴进对话。
 - 当前会话只有最近若干轮；更早内容会被滑出。站点正文以 MCP 工具为准。

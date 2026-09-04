@@ -83,6 +83,8 @@ def test_fragment_enables_publish_tool() -> None:
     assert "portfolio_publish_content" in tools
     assert "portfolio_generate_resume" in tools
     assert "portfolio_import_resume_from_github" in tools
+    assert "portfolio_push_resume_to_github" in tools
+    assert "portfolio_ensure_cv_repo" in tools
 
 
 def test_clip_text_keeps_short_source_and_marks_long_source() -> None:
@@ -129,6 +131,13 @@ def test_find_about_rejects_homepage_alias_named_main() -> None:
 def test_resolve_repo_accepts_unique_short_name() -> None:
     class FakeApi:
         def request(self, method, path, json=None):
+            if path == "/api/owner/github/account":
+                return {
+                    "connected": True,
+                    "login": "kenchan6666",
+                    "repoCount": 1,
+                    "cvRepo": None,
+                }
             assert path == "/api/owner/github/repos"
             return [
                 {

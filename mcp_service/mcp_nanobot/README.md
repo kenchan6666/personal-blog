@@ -15,6 +15,7 @@
 - `portfolio_list_content` / `portfolio_get_content`
 - `portfolio_create_content` / `portfolio_update_content` / `portfolio_publish_content`
 - `portfolio_list_github_repos` / `portfolio_get_github_source` / `portfolio_get_github_file`
+- `portfolio_ensure_cv_repo` / `portfolio_push_resume_to_github`（私有 `cv` 仓；没有则创建）
 - `portfolio_get_project_source` / `portfolio_get_source_file`
 - `portfolio_list_comments` / `portfolio_comment_action`
 - `portfolio_list_knowledge` / `portfolio_remember_knowledge` / `portfolio_update_knowledge`

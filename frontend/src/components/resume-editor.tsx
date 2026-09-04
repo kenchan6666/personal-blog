@@ -14,6 +14,7 @@ import {
   generateOwnerResume,
   getSessionToken,
   importOwnerResumeFromGithub,
+  pushOwnerResumeToGithub,
   localizedText,
   publishOwnerResume,
   saveOwnerResume,
@@ -233,6 +234,11 @@ export function ResumeEditor({ dict }: Props) {
                     />
                   </span>
                   <span>{item.slug}</span>
+                  {item.githubRepo ? (
+                    <span className="font-mono text-xs text-[var(--text-muted)]">
+                      {item.githubRepo}
+                    </span>
+                  ) : null}
                 </button>
               </li>
             ))}
@@ -353,6 +359,35 @@ export function ResumeEditor({ dict }: Props) {
               }}
             >
               {saving ? a.generatingPdf : a.generatePdf}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              disabled={saving || !current.id}
+              onClick={async () => {
+                const token = getSessionToken();
+                if (!token || !current.id) return;
+                setSaving(true);
+                try {
+                  const pushed = await pushOwnerResumeToGithub(token, current.id);
+                  setCurrent(pushed.resume);
+                  await reload(token);
+                  setMessage(
+                    a.pushedCv.replace("{repo}", pushed.repo.fullName),
+                  );
+                } catch (err) {
+                  const text = err instanceof Error ? err.message : "";
+                  setError(
+                    text === "github_not_connected"
+                      ? a.githubNotConnected
+                      : a.errorGeneric,
+                  );
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              {saving ? a.pushingCv : a.pushCv}
             </button>
             <button
               type="button"

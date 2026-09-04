@@ -15,6 +15,13 @@ class GitHubBrowseError(Exception):
     pass
 
 
+class GitHubWriteError(Exception):
+    pass
+
+
+CV_REPO_NAME = "cv"
+
+
 def is_readme_filename(name: str) -> bool:
     lower = name.lower()
     return lower == "readme" or lower.startswith("readme.")
@@ -111,6 +118,29 @@ class GitHubClient(Protocol):
         path: str,
     ) -> dict[str, str]: ...
 
+    async def get_user(self, *, access_token: str) -> dict[str, str]: ...
+
+    async def create_repo(
+        self,
+        *,
+        access_token: str,
+        name: str,
+        private: bool,
+        description: str,
+    ) -> dict[str, object]: ...
+
+    async def put_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        content: bytes,
+        message: str,
+        branch: str = "",
+    ) -> dict[str, str]: ...
+
 
 class RecordingGitHub:
     """In-memory GitHub for HTTP-seam tests. Never talks to api.github.com."""
@@ -118,6 +148,10 @@ class RecordingGitHub:
     def __init__(self, *, client_id: str = "test-client") -> None:
         self.client_id = client_id
         self.exchanged: list[str] = []
+        self.created_repos: list[str] = []
+        self.puts: list[str] = []
+        self.extra_repos: list[dict[str, object]] = []
+        self.extra_files: dict[str, dict[str, dict[str, str]]] = {}
 
     def authorization_url(self, *, state: str) -> str:
         query = urlencode(
@@ -166,6 +200,7 @@ class RecordingGitHub:
                 "defaultBranch": "main",
                 "description": "",
             },
+            *self.extra_repos,
         ]
 
     FILES = {
@@ -212,6 +247,9 @@ class RecordingGitHub:
         self, *, access_token: str, owner: str, name: str
     ) -> bool:
         full_name = f"{owner}/{name}"
+        for item in self.extra_repos:
+            if item.get("fullName") == full_name:
+                return bool(item.get("private"))
         if full_name == "kenchan6666/secret-lab":
             return True
         if full_name in self.FILES:
@@ -219,15 +257,86 @@ class RecordingGitHub:
         raise GitHubBrowseError("not_found")
 
     def _files(self, owner: str, name: str, ref: str) -> dict[str, str]:
-        repo = self.FILES.get(f"{owner}/{name}")
+        full = f"{owner}/{name}"
+        extra = self.extra_files.get(full)
+        if extra is not None:
+            if ref not in extra:
+                raise GitHubBrowseError("not_found")
+            return extra[ref]
+        repo = self.FILES.get(full)
         if repo is None or ref not in repo:
             raise GitHubBrowseError("not_found")
         return repo[ref]
 
+    async def get_user(self, *, access_token: str) -> dict[str, str]:
+        if access_token != "gho_test":
+            raise GitHubOAuthError("bad_token")
+        return {
+            "login": "kenchan6666",
+            "name": "Ken",
+            "htmlUrl": "https://github.com/kenchan6666",
+            "avatarUrl": "https://github.com/kenchan6666.png",
+        }
+
+    async def create_repo(
+        self,
+        *,
+        access_token: str,
+        name: str,
+        private: bool,
+        description: str,
+    ) -> dict[str, object]:
+        if access_token != "gho_test":
+            raise GitHubOAuthError("bad_token")
+        full = f"kenchan6666/{name}"
+        for item in self.extra_repos:
+            if item.get("fullName") == full:
+                return item
+        repo = {
+            "fullName": full,
+            "owner": "kenchan6666",
+            "name": name,
+            "private": private,
+            "htmlUrl": f"https://github.com/{full}",
+            "defaultBranch": "main",
+            "description": description,
+        }
+        self.extra_repos.append(repo)
+        self.extra_files[full] = {"main": {"README.md": f"# {name}\n"}}
+        self.created_repos.append(full)
+        return repo
+
+    async def put_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        content: bytes,
+        message: str,
+        branch: str = "",
+    ) -> dict[str, str]:
+        if access_token != "gho_test":
+            raise GitHubOAuthError("bad_token")
+        full = f"{owner}/{name}"
+        ref = branch or "main"
+        store = self.extra_files.setdefault(full, {}).setdefault(ref, {})
+        store[path] = content.decode("utf-8", errors="replace")
+        self.puts.append(f"{full}:{path}")
+        return {
+            "path": path,
+            "htmlUrl": f"https://github.com/{full}/blob/{ref}/{path}",
+        }
+
     async def list_branches(
         self, *, access_token: str, owner: str, name: str
     ) -> list[str]:
-        repo = self.FILES.get(f"{owner}/{name}")
+        full = f"{owner}/{name}"
+        extra = self.extra_files.get(full)
+        if extra is not None:
+            return sorted(extra)
+        repo = self.FILES.get(full)
         if repo is None:
             raise GitHubBrowseError("not_found")
         return sorted(repo)
@@ -516,3 +625,171 @@ class HttpGitHub:
         if response.status_code >= 400:
             raise GitHubBrowseError("not_found")
         return response.json()
+
+    async def get_user(self, *, access_token: str) -> dict[str, str]:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(
+                "https://api.github.com/user",
+                headers=self._headers(access_token),
+            )
+        if response.status_code >= 400:
+            raise GitHubOAuthError("user_failed")
+        payload = response.json()
+        return {
+            "login": str(payload.get("login") or ""),
+            "name": str(payload.get("name") or payload.get("login") or ""),
+            "htmlUrl": str(payload.get("html_url") or ""),
+            "avatarUrl": str(payload.get("avatar_url") or ""),
+        }
+
+    async def create_repo(
+        self,
+        *,
+        access_token: str,
+        name: str,
+        private: bool,
+        description: str,
+    ) -> dict[str, object]:
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.post(
+                "https://api.github.com/user/repos",
+                headers=self._headers(access_token),
+                json={
+                    "name": name,
+                    "private": private,
+                    "description": description,
+                    "auto_init": True,
+                },
+            )
+            if response.status_code == 422:
+                user = await self.get_user(access_token=access_token)
+                existing = await client.get(
+                    f"https://api.github.com/repos/{user['login']}/{name}",
+                    headers=self._headers(access_token),
+                )
+                if existing.status_code >= 400:
+                    raise GitHubWriteError("create_failed")
+                item = existing.json()
+            elif response.status_code >= 400:
+                raise GitHubWriteError("create_failed")
+            else:
+                item = response.json()
+        return {
+            "fullName": item["full_name"],
+            "owner": item["owner"]["login"],
+            "name": item["name"],
+            "private": bool(item["private"]),
+            "htmlUrl": item["html_url"],
+            "defaultBranch": item.get("default_branch") or "main",
+            "description": item.get("description") or "",
+        }
+
+    async def put_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        content: bytes,
+        message: str,
+        branch: str = "",
+    ) -> dict[str, str]:
+        encoded = base64.b64encode(content).decode("ascii")
+        suffix = quote(path.strip("/"))
+        url = f"https://api.github.com/repos/{owner}/{name}/contents/{suffix}"
+        payload: dict[str, object] = {
+            "message": message,
+            "content": encoded,
+        }
+        if branch:
+            payload["branch"] = branch
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            current = await client.get(
+                url,
+                headers=self._headers(access_token),
+                params={"ref": branch} if branch else None,
+            )
+            if current.status_code < 400:
+                sha = current.json().get("sha")
+                if sha:
+                    payload["sha"] = sha
+            response = await client.put(
+                url,
+                headers=self._headers(access_token),
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise GitHubWriteError("put_failed")
+        content_info = response.json().get("content") or {}
+        return {
+            "path": str(content_info.get("path") or path),
+            "htmlUrl": str(content_info.get("html_url") or ""),
+        }
+
+
+def find_owned_cv_repo(
+    repos: list[dict[str, object]], login: str
+) -> dict[str, object] | None:
+    wanted = login.casefold()
+    for item in repos:
+        name = str(item.get("name") or "").casefold()
+        owner = str(item.get("owner") or "").casefold()
+        if name == CV_REPO_NAME and owner == wanted:
+            return item
+    return None
+
+
+async def ensure_owned_cv_repo(
+    github: GitHubClient, *, access_token: str
+) -> tuple[dict[str, object], bool]:
+    user = await github.get_user(access_token=access_token)
+    login = user["login"]
+    repos = await github.list_repos(access_token=access_token)
+    existing = find_owned_cv_repo(repos, login)
+    if existing is not None:
+        return existing, False
+    created = await github.create_repo(
+        access_token=access_token,
+        name=CV_REPO_NAME,
+        private=True,
+        description="Private resume vault",
+    )
+    return created, True
+
+
+async def list_cv_repo_files(
+    github: GitHubClient,
+    *,
+    access_token: str,
+    repo: dict[str, object],
+) -> list[dict[str, str]]:
+    try:
+        return await github.list_tree(
+            access_token=access_token,
+            owner=str(repo["owner"]),
+            name=str(repo["name"]),
+            ref=str(repo.get("defaultBranch") or "main"),
+            path="",
+        )
+    except GitHubBrowseError:
+        return []
+
+
+def cv_repo_payload(
+    repo: dict[str, object],
+    files: list[dict[str, str]],
+    *,
+    created: bool,
+) -> dict[str, object]:
+    return {
+        "fullName": repo.get("fullName"),
+        "owner": repo.get("owner"),
+        "name": repo.get("name"),
+        "private": bool(repo.get("private")),
+        "htmlUrl": repo.get("htmlUrl"),
+        "defaultBranch": repo.get("defaultBranch") or "main",
+        "description": repo.get("description") or "",
+        "files": files,
+        "created": created,
+    }

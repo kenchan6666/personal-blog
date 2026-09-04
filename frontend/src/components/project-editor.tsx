@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 import {
@@ -70,6 +71,8 @@ function projectFromRepo(
 
 export function ProjectEditor({ locale, dict }: Props) {
   const a = dict.admin;
+  const router = useRouter();
+  const params = useSearchParams();
   const [projects, setProjects] = useState<OwnerProject[]>([]);
   const [current, setCurrent] = useState<OwnerProject>(emptyOwnerProject());
   const [pickedRepo, setPickedRepo] = useState<SourceRepo | null>(null);
@@ -89,16 +92,38 @@ export function ProjectEditor({ locale, dict }: Props) {
     const githubRepos = await fetchOwnerGitHubRepos(token);
     setGithubReady(githubRepos !== null);
     setRepos(githubRepos ?? []);
-    return list;
+    return { projects: list, repos: githubRepos ?? [] };
   }
+
+  function startFromRepo(repo: SourceRepo, existing: OwnerProject[]) {
+    const taken = existing.map((item) => item.slug);
+    const nextOrder =
+      existing.reduce((max, item) => Math.max(max, item.order), 0) + 1;
+    setPickedRepo(repo);
+    setCurrent(projectFromRepo(repo, taken, nextOrder));
+    setStep("form");
+    setMessage(null);
+    setError(null);
+    setOpen(true);
+  }
+
+  const attach = params.get("attach");
 
   useEffect(() => {
     const token = getSessionToken();
     if (!token) return;
     reload(token)
+      .then(({ projects: nextProjects, repos: nextRepos }) => {
+        if (!attach) return;
+        const repo = nextRepos.find((item) => item.fullName === attach);
+        if (repo) startFromRepo(repo, nextProjects);
+        const next = new URLSearchParams(params.toString());
+        next.delete("attach");
+        router.replace(`/${locale}/admin?${next.toString()}`);
+      })
       .catch(() => setError(a.errorGeneric))
       .finally(() => setLoading(false));
-  }, [a.errorGeneric]);
+  }, [a.errorGeneric, attach, locale, params, router]);
 
   const filteredRepos = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -137,14 +162,7 @@ export function ProjectEditor({ locale, dict }: Props) {
   }
 
   function chooseRepo(repo: SourceRepo) {
-    const taken = projects.map((item) => item.slug);
-    const nextOrder =
-      projects.reduce((max, item) => Math.max(max, item.order), 0) + 1;
-    setPickedRepo(repo);
-    setCurrent(projectFromRepo(repo, taken, nextOrder));
-    setStep("form");
-    setMessage(null);
-    setError(null);
+    startFromRepo(repo, projects);
   }
 
   async function onSave(e: React.FormEvent) {

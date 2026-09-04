@@ -35,7 +35,12 @@ from app.github import (
     GitHubBrowseError,
     GitHubClient,
     GitHubOAuthError,
+    GitHubWriteError,
     HttpGitHub,
+    cv_repo_payload,
+    ensure_owned_cv_repo,
+    find_owned_cv_repo,
+    list_cv_repo_files,
     match_authorized_repo,
 )
 from app.mailer import (
@@ -1099,6 +1104,66 @@ def create_app(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="github_not_connected",
             ) from None
+
+    @app.get("/api/owner/github/account")
+    async def owner_github_account(
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        access = await github_access_token()
+        if not access:
+            return {"connected": False}
+        github_client: GitHubClient = app.state.github
+        try:
+            user = await github_client.get_user(access_token=access)
+            repos = await github_client.list_repos(access_token=access)
+        except GitHubOAuthError:
+            return {"connected": False}
+        match = find_owned_cv_repo(repos, user["login"])
+        cv_repo = None
+        if match is not None:
+            files = await list_cv_repo_files(
+                github_client, access_token=access, repo=match
+            )
+            cv_repo = cv_repo_payload(match, files, created=False)
+        return {
+            "connected": True,
+            "login": user.get("login") or "",
+            "name": user.get("name") or "",
+            "htmlUrl": user.get("htmlUrl") or "",
+            "avatarUrl": user.get("avatarUrl") or "",
+            "repoCount": len(repos),
+            "cvRepo": cv_repo,
+        }
+
+    @app.post("/api/owner/github/cv-repo")
+    async def owner_ensure_cv_repo(
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        access = await github_access_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            )
+        github_client: GitHubClient = app.state.github
+        try:
+            repo, created = await ensure_owned_cv_repo(
+                github_client, access_token=access
+            )
+            files = await list_cv_repo_files(
+                github_client, access_token=access, repo=repo
+            )
+        except GitHubOAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
+        except GitHubWriteError:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="github_write_failed",
+            ) from None
+        return cv_repo_payload(repo, files, created=created)
 
     @app.get("/api/owner/github/repos/{owner}/{name}")
     async def owner_github_repo_source(
