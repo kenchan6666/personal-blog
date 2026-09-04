@@ -78,7 +78,6 @@ def test_public_prompt_stays_source_bound_without_lecturing() -> None:
     assert "You have no tools" in prompt
     assert "Use only PUBLIC_CONTEXT" in prompt
     assert "Do not mention being a guide" in prompt
-    assert "hiring visitor" in prompt
     assert "Finish every sentence" in prompt or "finish every sentence" in prompt
     assert "220 Chinese" not in prompt
     assert "read-only public portfolio guide" not in prompt
@@ -88,10 +87,10 @@ def test_public_prompt_stays_source_bound_without_lecturing() -> None:
 def test_public_prompt_is_hiring_aware_without_pitching() -> None:
     prompt = _system_prompt("en", '{"projects":[]}')
 
-    assert "hiring visitor" in prompt
-    assert "not a salesperson" in prompt
-    assert "Never volunteer weaknesses" in prompt
-    assert "Do not deflect" in prompt
+    assert "Do not sell" in prompt
+    assert "Do not change the subject" in prompt
+    assert "Stop when the question is answered" in prompt
+    assert "2–5 named facts" not in prompt
     assert "redirect to evidenced strengths" not in prompt
     assert "credible candidate" not in prompt
     assert "Journals only when asked" in prompt
