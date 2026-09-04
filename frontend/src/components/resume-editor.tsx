@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { Dictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 import {
   createOwnerResume,
   createOwnerResumeTemplate,
@@ -14,21 +16,23 @@ import {
   generateOwnerResume,
   getSessionToken,
   importOwnerResumeFromGithub,
-  pushOwnerResumeToGithub,
   localizedText,
   publishOwnerResume,
+  pushOwnerResumeToGithub,
   saveOwnerResume,
   saveOwnerResumeTemplate,
   type OwnerResume,
   type OwnerResumeTemplate,
   type ResumeSectionId,
 } from "@/lib/api";
+import { AgentField } from "./agent-field";
 import { CmsCard, StatusPill } from "./cms-card";
 import { CmsConfirm } from "./cms-confirm";
 import { CmsModal } from "./cms-modal";
 import { ResumePaper } from "./resume-paper";
 
 type Props = {
+  locale: Locale;
   dict: Dictionary;
 };
 
@@ -50,16 +54,29 @@ function slugify(value: string) {
     .slice(0, 40);
 }
 
-export function ResumeEditor({ dict }: Props) {
+function linesOf(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function commasOf(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+export function ResumeEditor({ locale, dict }: Props) {
   const a = dict.admin;
   const r = dict.resume;
   const [templates, setTemplates] = useState<OwnerResumeTemplate[]>([]);
   const [resumes, setResumes] = useState<OwnerResume[]>([]);
-  const [current, setCurrent] = useState<OwnerResume>(emptyOwnerResume());
+  const [current, setCurrent] = useState<OwnerResume | null>(null);
   const [templateDraft, setTemplateDraft] = useState<OwnerResumeTemplate>(
     emptyOwnerResumeTemplate(),
   );
-  const [openResume, setOpenResume] = useState(false);
   const [openTemplate, setOpenTemplate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,7 +85,7 @@ export function ResumeEditor({ dict }: Props) {
   const [confirmResume, setConfirmResume] = useState(false);
   const [confirmTemplate, setConfirmTemplate] = useState(false);
   const [githubRepo, setGithubRepo] = useState("");
-  const [githubPath, setGithubPath] = useState("cv/classic.format.json");
+  const [githubPath, setGithubPath] = useState("");
   const [githubRef, setGithubRef] = useState("");
 
   async function reload(token: string) {
@@ -78,6 +95,7 @@ export function ResumeEditor({ dict }: Props) {
     ]);
     setTemplates(nextTemplates);
     setResumes(nextResumes);
+    return { nextTemplates, nextResumes };
   }
 
   useEffect(() => {
@@ -99,6 +117,19 @@ export function ResumeEditor({ dict }: Props) {
     };
     return map[id];
   }
+
+  const layout = useMemo(
+    () =>
+      templates.find((item) => item.slug === current?.templateSlug) ??
+      templates[0],
+    [templates, current?.templateSlug],
+  );
+  const sections = layout?.sections ?? [
+    "summary",
+    "education",
+    "projects",
+    "skillsOthers",
+  ];
 
   async function persistResume(next: OwnerResume) {
     const token = getSessionToken();
@@ -129,13 +160,15 @@ export function ResumeEditor({ dict }: Props) {
     setError(null);
     try {
       const body = {
-        slug: next.slug || slugify(localizedText(next.name)) || "template",
+        slug: next.slug || slugify(localizedText(next.name)) || "layout",
         name: next.name,
         sections: next.sections,
       };
-      if (next.id) await saveOwnerResumeTemplate(token, next.id, body);
-      else await createOwnerResumeTemplate(token, body);
+      const saved = next.id
+        ? await saveOwnerResumeTemplate(token, next.id, body)
+        : await createOwnerResumeTemplate(token, body);
       await reload(token);
+      if (current) setCurrent({ ...current, templateSlug: saved.slug });
       setOpenTemplate(false);
       setMessage(a.saved);
     } catch {
@@ -145,66 +178,25 @@ export function ResumeEditor({ dict }: Props) {
     }
   }
 
+  function startNew() {
+    setCurrent({
+      ...emptyOwnerResume(),
+      templateSlug: templates[0]?.slug || "classic-a4",
+    });
+    setMessage(null);
+    setError(null);
+  }
+
   if (loading) {
     return <p className="text-[var(--text-muted)]">{a.loadingResumes}</p>;
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <CmsCard
-        title={a.resumeTemplates}
-        action={
-          <button
-            type="button"
-            className="btn-ghost"
-            onClick={() => {
-              setTemplateDraft(emptyOwnerResumeTemplate());
-              setOpenTemplate(true);
-            }}
-          >
-            {a.newTemplate}
-          </button>
-        }
-      >
-        {templates.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">{a.emptyTemplates}</p>
-        ) : (
-          <ul className="grid gap-3">
-            {templates.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="tile w-full text-left"
-                  onClick={() => {
-                    setTemplateDraft(item);
-                    setOpenTemplate(true);
-                  }}
-                >
-                  <strong>{localizedText(item.name) || item.slug}</strong>
-                  <span>{item.sections.map(sectionLabel).join(" · ")}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CmsCard>
-
+    <div className="resume-workspace">
       <CmsCard
         title={a.resumeDocuments}
         action={
-          <button
-            type="button"
-            className="btn-cta"
-            onClick={() => {
-              setCurrent({
-                ...emptyOwnerResume(),
-                templateSlug: templates[0]?.slug || "classic-a4",
-              });
-              setOpenResume(true);
-              setMessage(null);
-              setError(null);
-            }}
-          >
+          <button type="button" className="btn-cta" onClick={startNew}>
             {a.newResume}
           </button>
         }
@@ -212,208 +204,101 @@ export function ResumeEditor({ dict }: Props) {
         {resumes.length === 0 ? (
           <p className="text-sm text-[var(--text-muted)]">{a.emptyResumes}</p>
         ) : (
-          <ul className="grid gap-3">
-            {resumes.map((item) => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  className="tile w-full text-left"
-                  onClick={() => {
-                    setCurrent(item);
-                    setOpenResume(true);
-                    setMessage(null);
-                    setError(null);
-                  }}
-                >
-                  <span className="flex items-center justify-between gap-3">
-                    <strong>{item.title || item.header.name || a.untitledResume}</strong>
-                    <StatusPill
-                      published={item.status === "published"}
-                      publishedLabel={a.statusPublished}
-                      draftLabel={a.statusDraft}
-                    />
-                  </span>
-                  <span>{item.slug}</span>
-                  {item.githubRepo ? (
-                    <span className="font-mono text-xs text-[var(--text-muted)]">
-                      {item.githubRepo}
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {resumes.map((item) => {
+              const itemLayout = templates.find(
+                (template) => template.slug === item.templateSlug,
+              );
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={`tile resume-pick w-full text-left${
+                      current?.id === item.id ? " tile-active" : ""
+                    }`}
+                    onClick={() => {
+                      setCurrent(item);
+                      setMessage(null);
+                      setError(null);
+                    }}
+                  >
+                    <span className="flex items-center justify-between gap-3">
+                      <strong>
+                        {item.title || item.header.name || a.untitledResume}
+                      </strong>
+                      <StatusPill
+                        published={item.status === "published"}
+                        publishedLabel={a.statusPublished}
+                        draftLabel={a.statusDraft}
+                      />
                     </span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
+                    <span className="resume-layout-mini">
+                      {(itemLayout?.sections ?? sections).map((id) => (
+                        <i key={id} title={sectionLabel(id)} />
+                      ))}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
       </CmsCard>
 
-      <CmsModal
-        open={openTemplate}
-        title={templateDraft.id ? localizedText(templateDraft.name) : a.newTemplate}
-        closeLabel={a.close}
-        onClose={() => setOpenTemplate(false)}
-        footer={
-          <>
-            {templateDraft.id && !templateDraft.builtin ? (
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => setConfirmTemplate(true)}
-              >
-                {a.deleteTemplate}
-              </button>
+      {current ? (
+        <div className="resume-edit-grid">
+          <CmsCard title={current.title || current.header.name || a.newResume}>
+            {message ? (
+              <p className="mb-3 text-sm text-[var(--success)]">{message}</p>
             ) : null}
-            <button
-              type="button"
-              className="btn-cta"
-              disabled={saving || templateDraft.builtin}
-              onClick={() => persistTemplate(templateDraft)}
-            >
-              {saving ? a.saving : a.save}
-            </button>
-          </>
-        }
-      >
-        <label className="mb-3 block text-xs text-[var(--text-muted)]">
-          {a.fieldResumeSlug}
-          <input
-            className="field"
-            value={templateDraft.slug}
-            disabled={templateDraft.builtin}
-            onChange={(event) =>
-              setTemplateDraft({ ...templateDraft, slug: event.target.value })
-            }
-          />
-        </label>
-        <label className="mb-3 block text-xs text-[var(--text-muted)]">
-          {a.fieldResumeTitle}
-          <input
-            className="field"
-            value={templateDraft.name.en}
-            disabled={templateDraft.builtin}
-            onChange={(event) =>
-              setTemplateDraft({
-                ...templateDraft,
-                name: {
-                  ...templateDraft.name,
-                  en: event.target.value,
-                  "zh-Hant": event.target.value,
-                  "zh-Hans": event.target.value,
-                },
-              })
-            }
-          />
-        </label>
-        <div className="grid gap-2">
-          {SECTION_IDS.map((id) => (
-            <label key={id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                disabled={templateDraft.builtin}
-                checked={templateDraft.sections.includes(id)}
-                onChange={(event) => {
-                  const sections = event.target.checked
-                    ? [...templateDraft.sections, id]
-                    : templateDraft.sections.filter((item) => item !== id);
-                  setTemplateDraft({ ...templateDraft, sections });
-                }}
-              />
-              {sectionLabel(id)}
-            </label>
-          ))}
-        </div>
-      </CmsModal>
+            {error ? (
+              <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
+            ) : null}
 
-      <CmsModal
-        open={openResume}
-        title={current.title || current.header.name || a.newResume}
-        closeLabel={a.close}
-        onClose={() => setOpenResume(false)}
-        footer={
-          <>
-            {current.id ? (
+            <p className="mb-2 text-sm font-semibold">{a.fieldResumeLayout}</p>
+            <div className="resume-layout-row mb-4">
+              {templates.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={`resume-layout-card${
+                    current.templateSlug === item.slug ? " is-active" : ""
+                  }`}
+                  onClick={() => {
+                    if (current.templateSlug === item.slug && !item.builtin) {
+                      setTemplateDraft(item);
+                      setOpenTemplate(true);
+                      return;
+                    }
+                    setCurrent({ ...current, templateSlug: item.slug });
+                  }}
+                >
+                  <strong>{localizedText(item.name) || item.slug}</strong>
+                  <span className="resume-layout-bars">
+                    {item.sections.map((id) => (
+                      <span key={id}>{sectionLabel(id)}</span>
+                    ))}
+                  </span>
+                </button>
+              ))}
               <button
                 type="button"
-                className="btn-ghost"
-                onClick={() => setConfirmResume(true)}
+                className="resume-layout-card is-new"
+                onClick={() => {
+                  setTemplateDraft(emptyOwnerResumeTemplate());
+                  setOpenTemplate(true);
+                }}
               >
-                {a.deleteResume}
+                {a.newLayout}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className="btn-ghost"
-              disabled={saving || !current.id}
-              onClick={async () => {
-                const token = getSessionToken();
-                if (!token || !current.id) return;
-                setSaving(true);
-                try {
-                  const next = await generateOwnerResume(token, current.id);
-                  setCurrent(next);
-                  setMessage(a.generatedPdf);
-                } catch {
-                  setError(a.errorGeneric);
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              {saving ? a.generatingPdf : a.generatePdf}
-            </button>
-            <button
-              type="button"
-              className="btn-ghost"
-              disabled={saving || !current.id}
-              onClick={async () => {
-                const token = getSessionToken();
-                if (!token || !current.id) return;
-                setSaving(true);
-                try {
-                  const pushed = await pushOwnerResumeToGithub(token, current.id);
-                  setCurrent(pushed.resume);
-                  await reload(token);
-                  setMessage(
-                    a.pushedCv.replace("{repo}", pushed.repo.fullName),
-                  );
-                } catch (err) {
-                  const text = err instanceof Error ? err.message : "";
-                  setError(
-                    text === "github_not_connected"
-                      ? a.githubNotConnected
-                      : a.errorGeneric,
-                  );
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              {saving ? a.pushingCv : a.pushCv}
-            </button>
-            <button
-              type="button"
-              className="btn-cta"
-              disabled={saving}
-              onClick={() => persistResume(current)}
-            >
-              {saving ? a.saving : a.save}
-            </button>
-          </>
-        }
-      >
-        {message ? <p className="text-sm text-[var(--success)]">{message}</p> : null}
-        {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-3">
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeTitle}
-              <input
-                className="field"
-                value={current.title}
-                onChange={(event) =>
-                  setCurrent({ ...current, title: event.target.value })
-                }
-              />
-            </label>
+            </div>
+
+            <AgentField
+              label={a.fieldResumeTitle}
+              value={current.title}
+              closeLabel={a.close}
+              onChange={(title) => setCurrent({ ...current, title })}
+            />
             <label className="mb-3 block text-xs text-[var(--text-muted)]">
               {a.fieldResumeSlug}
               <input
@@ -425,287 +310,455 @@ export function ResumeEditor({ dict }: Props) {
               />
             </label>
             <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeTemplate}
+              {a.fieldResumeLocale}
               <select
                 className="field"
-                value={current.templateSlug}
+                value={current.locale}
                 onChange={(event) =>
-                  setCurrent({ ...current, templateSlug: event.target.value })
+                  setCurrent({
+                    ...current,
+                    locale: event.target.value as OwnerResume["locale"],
+                  })
                 }
               >
-                {templates.map((item) => (
-                  <option key={item.id} value={item.slug}>
-                    {localizedText(item.name) || item.slug}
-                  </option>
-                ))}
+                <option value="zh-Hant">繁中</option>
+                <option value="zh-Hans">简中</option>
+                <option value="en">English</option>
               </select>
             </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeName}
-              <input
-                className="field"
-                value={current.header.name}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    header: { ...current.header, name: event.target.value },
-                  })
-                }
-              />
-            </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumePhone}
-              <input
-                className="field"
-                value={current.header.phone}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    header: { ...current.header, phone: event.target.value },
-                  })
-                }
-              />
-            </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeEmail}
-              <input
-                className="field"
-                value={current.header.email}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    header: { ...current.header, email: event.target.value },
-                  })
-                }
-              />
-            </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeCity}
-              <input
-                className="field"
-                value={current.header.city}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    header: { ...current.header, city: event.target.value },
-                  })
-                }
-              />
-            </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeSummary}
-              <textarea
-                className="field"
-                rows={4}
+            <AgentField
+              label={a.fieldResumeName}
+              value={current.header.name}
+              closeLabel={a.close}
+              onChange={(name) =>
+                setCurrent({
+                  ...current,
+                  header: { ...current.header, name },
+                })
+              }
+            />
+            <AgentField
+              label={a.fieldResumePhone}
+              value={current.header.phone}
+              closeLabel={a.close}
+              onChange={(phone) =>
+                setCurrent({
+                  ...current,
+                  header: { ...current.header, phone },
+                })
+              }
+            />
+            <AgentField
+              label={a.fieldResumeEmail}
+              value={current.header.email}
+              closeLabel={a.close}
+              onChange={(email) =>
+                setCurrent({
+                  ...current,
+                  header: { ...current.header, email },
+                })
+              }
+            />
+            <AgentField
+              label={a.fieldResumeCity}
+              value={current.header.city}
+              closeLabel={a.close}
+              onChange={(city) =>
+                setCurrent({
+                  ...current,
+                  header: { ...current.header, city },
+                })
+              }
+            />
+
+            {sections.includes("summary") ? (
+              <AgentField
+                label={a.fieldResumeSummary}
                 value={current.summary.join("\n")}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    summary: event.target.value.split("\n").filter(Boolean),
-                  })
+                multiline
+                closeLabel={a.close}
+                onChange={(value) =>
+                  setCurrent({ ...current, summary: linesOf(value) })
                 }
               />
-            </label>
-            <label className="mb-3 block text-xs text-[var(--text-muted)]">
-              {a.fieldResumeSkills}
-              <input
-                className="field"
-                value={current.skills.join(", ")}
-                onChange={(event) =>
-                  setCurrent({
-                    ...current,
-                    skills: event.target.value
-                      .split(",")
-                      .map((item) => item.trim())
-                      .filter(Boolean),
-                  })
-                }
-              />
-            </label>
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() =>
-                setCurrent({
-                  ...current,
-                  education: [
-                    ...current.education,
-                    {
-                      institution: "",
-                      field: "",
-                      degree: "",
-                      start: "",
-                      end: "",
-                      city: "",
-                      honor: "",
-                      related_courses: [],
-                    },
-                  ],
-                })
-              }
-            >
-              {a.addEducation}
-            </button>
-            {current.education.map((item, index) => (
-              <div key={`edu-${index}`} className="grid gap-2 rounded-[var(--radius-card)] border border-[var(--hairline)] p-3">
-                <input
-                  className="field"
-                  placeholder="Institution"
-                  value={item.institution}
-                  onChange={(event) => {
-                    const education = [...current.education];
-                    education[index] = { ...item, institution: event.target.value };
-                    setCurrent({ ...current, education });
-                  }}
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    className="field"
-                    placeholder="YYYY-MM"
-                    value={item.start}
-                    onChange={(event) => {
-                      const education = [...current.education];
-                      education[index] = { ...item, start: event.target.value };
-                      setCurrent({ ...current, education });
-                    }}
-                  />
-                  <input
-                    className="field"
-                    placeholder="YYYY-MM"
-                    value={item.end}
-                    onChange={(event) => {
-                      const education = [...current.education];
-                      education[index] = { ...item, end: event.target.value };
-                      setCurrent({ ...current, education });
-                    }}
-                  />
+            ) : null}
+
+            {sections.includes("education") ? (
+              <section className="resume-block">
+                <div className="resume-block-head">
+                  <p className="text-sm font-semibold">{r.sectionEducation}</p>
+                  <button
+                    type="button"
+                    className="btn-ghost text-sm"
+                    onClick={() =>
+                      setCurrent({
+                        ...current,
+                        education: [
+                          ...current.education,
+                          {
+                            institution: "",
+                            field: "",
+                            degree: "",
+                            start: "",
+                            end: "",
+                            city: "",
+                            honor: "",
+                            related_courses: [],
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    {a.addEducation}
+                  </button>
                 </div>
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() =>
-                setCurrent({
-                  ...current,
-                  internships: [
-                    ...current.internships,
-                    {
-                      organization: "",
-                      role: "",
-                      start: "",
-                      end: "",
-                      city: "",
-                      description: [],
-                    },
-                  ],
-                })
-              }
-            >
-              {a.addInternship}
-            </button>
-            {current.internships.map((item, index) => (
-              <div key={`intern-${index}`} className="grid gap-2 rounded-[var(--radius-card)] border border-[var(--hairline)] p-3">
-                <input
-                  className="field"
-                  placeholder="Company"
-                  value={item.organization}
-                  onChange={(event) => {
-                    const internships = [...current.internships];
-                    internships[index] = { ...item, organization: event.target.value };
-                    setCurrent({ ...current, internships });
-                  }}
+                {current.education.map((item, index) => (
+                  <div key={`edu-${index}`} className="resume-entry-form">
+                    <AgentField
+                      label={a.fieldInstitution}
+                      value={item.institution}
+                      closeLabel={a.close}
+                      onChange={(institution) => {
+                        const education = [...current.education];
+                        education[index] = { ...item, institution };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldMajor}
+                      value={item.field}
+                      closeLabel={a.close}
+                      onChange={(field) => {
+                        const education = [...current.education];
+                        education[index] = { ...item, field };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldDegree}
+                      value={item.degree}
+                      closeLabel={a.close}
+                      onChange={(degree) => {
+                        const education = [...current.education];
+                        education[index] = { ...item, degree };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                        {a.fieldStart}
+                        <input
+                          className="field"
+                          placeholder="YYYY-MM"
+                          value={item.start}
+                          onChange={(event) => {
+                            const education = [...current.education];
+                            education[index] = {
+                              ...item,
+                              start: event.target.value,
+                            };
+                            setCurrent({ ...current, education });
+                          }}
+                        />
+                      </label>
+                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                        {a.fieldEnd}
+                        <input
+                          className="field"
+                          placeholder="YYYY-MM"
+                          value={item.end}
+                          onChange={(event) => {
+                            const education = [...current.education];
+                            education[index] = {
+                              ...item,
+                              end: event.target.value,
+                            };
+                            setCurrent({ ...current, education });
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <AgentField
+                      label={a.fieldResumeCity}
+                      value={item.city}
+                      closeLabel={a.close}
+                      onChange={(city) => {
+                        const education = [...current.education];
+                        education[index] = { ...item, city };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldHonor}
+                      value={item.honor}
+                      closeLabel={a.close}
+                      onChange={(honor) => {
+                        const education = [...current.education];
+                        education[index] = { ...item, honor };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldCourses}
+                      value={item.related_courses.join(", ")}
+                      closeLabel={a.close}
+                      onChange={(value) => {
+                        const education = [...current.education];
+                        education[index] = {
+                          ...item,
+                          related_courses: commasOf(value),
+                        };
+                        setCurrent({ ...current, education });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      onClick={() =>
+                        setCurrent({
+                          ...current,
+                          education: current.education.filter(
+                            (_, itemIndex) => itemIndex !== index,
+                          ),
+                        })
+                      }
+                    >
+                      {a.removeEntry}
+                    </button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            {sections.includes("internship") ? (
+              <ExperienceList
+                label={r.sectionInternship}
+                items={current.internships}
+                addLabel={a.addInternship}
+                dict={dict}
+                onAdd={() =>
+                  setCurrent({
+                    ...current,
+                    internships: [
+                      ...current.internships,
+                      {
+                        organization: "",
+                        role: "",
+                        start: "",
+                        end: "",
+                        city: "",
+                        description: [],
+                      },
+                    ],
+                  })
+                }
+                onChange={(internships) => setCurrent({ ...current, internships })}
+              />
+            ) : null}
+
+            {sections.includes("projects") ? (
+              <section className="resume-block">
+                <div className="resume-block-head">
+                  <p className="text-sm font-semibold">{r.sectionProjects}</p>
+                  <button
+                    type="button"
+                    className="btn-ghost text-sm"
+                    onClick={() =>
+                      setCurrent({
+                        ...current,
+                        projects: [
+                          ...current.projects,
+                          {
+                            name: "",
+                            start: "",
+                            end: "",
+                            tech_stack: [],
+                            description: [],
+                          },
+                        ],
+                      })
+                    }
+                  >
+                    {a.addProject}
+                  </button>
+                </div>
+                {current.projects.map((item, index) => (
+                  <div key={`proj-${index}`} className="resume-entry-form">
+                    <AgentField
+                      label={a.fieldProjectName}
+                      value={item.name}
+                      closeLabel={a.close}
+                      onChange={(name) => {
+                        const projects = [...current.projects];
+                        projects[index] = { ...item, name };
+                        setCurrent({ ...current, projects });
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                        {a.fieldStart}
+                        <input
+                          className="field"
+                          placeholder="YYYY-MM"
+                          value={item.start}
+                          onChange={(event) => {
+                            const projects = [...current.projects];
+                            projects[index] = {
+                              ...item,
+                              start: event.target.value,
+                            };
+                            setCurrent({ ...current, projects });
+                          }}
+                        />
+                      </label>
+                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                        {a.fieldEnd}
+                        <input
+                          className="field"
+                          placeholder="YYYY-MM"
+                          value={item.end}
+                          onChange={(event) => {
+                            const projects = [...current.projects];
+                            projects[index] = {
+                              ...item,
+                              end: event.target.value,
+                            };
+                            setCurrent({ ...current, projects });
+                          }}
+                        />
+                      </label>
+                    </div>
+                    <AgentField
+                      label={a.fieldTech}
+                      value={item.tech_stack.join(", ")}
+                      closeLabel={a.close}
+                      onChange={(value) => {
+                        const projects = [...current.projects];
+                        projects[index] = {
+                          ...item,
+                          tech_stack: commasOf(value),
+                        };
+                        setCurrent({ ...current, projects });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldBulletLines}
+                      value={item.description.join("\n")}
+                      multiline
+                      closeLabel={a.close}
+                      onChange={(value) => {
+                        const projects = [...current.projects];
+                        projects[index] = {
+                          ...item,
+                          description: linesOf(value),
+                        };
+                        setCurrent({ ...current, projects });
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      onClick={() =>
+                        setCurrent({
+                          ...current,
+                          projects: current.projects.filter(
+                            (_, itemIndex) => itemIndex !== index,
+                          ),
+                        })
+                      }
+                    >
+                      {a.removeEntry}
+                    </button>
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            {sections.includes("activities") ? (
+              <ExperienceList
+                label={r.sectionActivities}
+                items={current.activities}
+                addLabel={a.addActivity}
+                dict={dict}
+                onAdd={() =>
+                  setCurrent({
+                    ...current,
+                    activities: [
+                      ...current.activities,
+                      {
+                        organization: "",
+                        role: "",
+                        start: "",
+                        end: "",
+                        city: "",
+                        description: [],
+                      },
+                    ],
+                  })
+                }
+                onChange={(activities) => setCurrent({ ...current, activities })}
+              />
+            ) : null}
+
+            {sections.includes("skillsOthers") ? (
+              <section className="resume-block">
+                <AgentField
+                  label={a.fieldResumeSkills}
+                  value={current.skills.join(", ")}
+                  closeLabel={a.close}
+                  onChange={(value) =>
+                    setCurrent({ ...current, skills: commasOf(value) })
+                  }
                 />
-                <input
-                  className="field"
-                  placeholder="Role"
-                  value={item.role}
-                  onChange={(event) => {
-                    const internships = [...current.internships];
-                    internships[index] = { ...item, role: event.target.value };
-                    setCurrent({ ...current, internships });
-                  }}
-                />
-                <textarea
-                  className="field"
-                  rows={3}
-                  value={item.description.join("\n")}
-                  onChange={(event) => {
-                    const internships = [...current.internships];
-                    internships[index] = {
-                      ...item,
-                      description: event.target.value.split("\n").filter(Boolean),
-                    };
-                    setCurrent({ ...current, internships });
-                  }}
-                />
-              </div>
-            ))}
-            <button
-              type="button"
-              className="btn-ghost"
-              onClick={() =>
-                setCurrent({
-                  ...current,
-                  projects: [
-                    ...current.projects,
-                    {
-                      name: "",
-                      start: "",
-                      end: "",
-                      tech_stack: [],
-                      description: [],
-                    },
-                  ],
-                })
-              }
-            >
-              {a.addProject}
-            </button>
-            {current.projects.map((item, index) => (
-              <div key={`proj-${index}`} className="grid gap-2 rounded-[var(--radius-card)] border border-[var(--hairline)] p-3">
-                <input
-                  className="field"
-                  placeholder="Project"
-                  value={item.name}
-                  onChange={(event) => {
-                    const projects = [...current.projects];
-                    projects[index] = { ...item, name: event.target.value };
-                    setCurrent({ ...current, projects });
-                  }}
-                />
-                <input
-                  className="field"
-                  placeholder="Python, Flask"
-                  value={item.tech_stack.join(", ")}
-                  onChange={(event) => {
-                    const projects = [...current.projects];
-                    projects[index] = {
-                      ...item,
-                      tech_stack: event.target.value
-                        .split(",")
-                        .map((part) => part.trim())
-                        .filter(Boolean),
-                    };
-                    setCurrent({ ...current, projects });
-                  }}
-                />
-                <textarea
-                  className="field"
-                  rows={3}
-                  value={item.description.join("\n")}
-                  onChange={(event) => {
-                    const projects = [...current.projects];
-                    projects[index] = {
-                      ...item,
-                      description: event.target.value.split("\n").filter(Boolean),
-                    };
-                    setCurrent({ ...current, projects });
-                  }}
-                />
-              </div>
-            ))}
-            <div className="grid gap-2 rounded-[var(--radius-card)] border border-[var(--hairline)] p-3">
+                <div className="resume-block-head">
+                  <p className="text-sm font-semibold">{a.fieldLanguages}</p>
+                  <button
+                    type="button"
+                    className="btn-ghost text-sm"
+                    onClick={() =>
+                      setCurrent({
+                        ...current,
+                        languages: [
+                          ...current.languages,
+                          { name: "", level: "" },
+                        ],
+                      })
+                    }
+                  >
+                    {a.addLanguage}
+                  </button>
+                </div>
+                {current.languages.map((item, index) => (
+                  <div
+                    key={`lang-${index}`}
+                    className="grid grid-cols-2 gap-2"
+                  >
+                    <AgentField
+                      label={a.fieldLanguageName}
+                      value={item.name}
+                      closeLabel={a.close}
+                      onChange={(name) => {
+                        const languages = [...current.languages];
+                        languages[index] = { ...item, name };
+                        setCurrent({ ...current, languages });
+                      }}
+                    />
+                    <AgentField
+                      label={a.fieldLanguageLevel}
+                      value={item.level}
+                      closeLabel={a.close}
+                      onChange={(level) => {
+                        const languages = [...current.languages];
+                        languages[index] = { ...item, level };
+                        setCurrent({ ...current, languages });
+                      }}
+                    />
+                  </div>
+                ))}
+              </section>
+            ) : null}
+
+            <div className="resume-import">
               <p className="text-sm font-semibold">{a.importGithub}</p>
               <input
                 className="field"
@@ -738,7 +791,10 @@ export function ResumeEditor({ dict }: Props) {
                       fullName: githubRepo,
                       path: githubPath,
                       ref: githubRef,
-                      slug: current.slug || slugify(current.title) || "imported-resume",
+                      slug:
+                        current.slug ||
+                        slugify(current.title) ||
+                        "imported-resume",
                     });
                     setCurrent(imported);
                     await reload(token);
@@ -753,35 +809,198 @@ export function ResumeEditor({ dict }: Props) {
                 {saving ? a.importing : a.importNow}
               </button>
             </div>
-            {current.id ? (
+          </CmsCard>
+
+          <div className="resume-preview-col">
+            <CmsCard
+              title={a.visualCv}
+              action={
+                <div className="flex flex-wrap gap-2">
+                  {current.id ? (
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      onClick={() => setConfirmResume(true)}
+                    >
+                      {a.deleteResume}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="btn-cta"
+                    disabled={saving}
+                    onClick={() => void persistResume(current)}
+                  >
+                    {saving ? a.saving : a.save}
+                  </button>
+                </div>
+              }
+            >
+              <ResumePaper
+                resume={current}
+                dict={dict}
+                sections={sections}
+                showEmpty
+              />
+              <div className="resume-actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={saving || !current.id}
+                  onClick={async () => {
+                    const token = getSessionToken();
+                    if (!token || !current.id) return;
+                    setSaving(true);
+                    try {
+                      const next = await generateOwnerResume(token, current.id);
+                      setCurrent(next);
+                      setMessage(a.generatedPdf);
+                    } catch {
+                      setError(a.errorGeneric);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {saving ? a.generatingPdf : a.generatePdf}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={saving || !current.id}
+                  onClick={async () => {
+                    const token = getSessionToken();
+                    if (!token || !current.id) return;
+                    setSaving(true);
+                    try {
+                      const pushed = await pushOwnerResumeToGithub(
+                        token,
+                        current.id,
+                      );
+                      setCurrent(pushed.resume);
+                      await reload(token);
+                      setMessage(
+                        a.pushedCv.replace("{repo}", pushed.repo.fullName),
+                      );
+                    } catch (err) {
+                      const text = err instanceof Error ? err.message : "";
+                      setError(
+                        text === "github_not_connected"
+                          ? a.githubNotConnected
+                          : a.errorGeneric,
+                      );
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {saving ? a.pushingCv : a.pushCv}
+                </button>
+                {current.id ? (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={saving}
+                    onClick={async () => {
+                      const token = getSessionToken();
+                      if (!token) return;
+                      setSaving(true);
+                      try {
+                        const next = await publishOwnerResume(token, current.id);
+                        setCurrent(next);
+                        await reload(token);
+                        setMessage(a.saved);
+                      } catch {
+                        setError(a.errorGeneric);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    {a.publishToSite}
+                  </button>
+                ) : null}
+                {current.status === "published" && current.slug ? (
+                  <Link
+                    href={`/${locale}/resume/${current.slug}`}
+                    className="btn-ghost"
+                  >
+                    {a.viewPublic}
+                  </Link>
+                ) : null}
+              </div>
+            </CmsCard>
+          </div>
+        </div>
+      ) : null}
+
+      <CmsModal
+        open={openTemplate}
+        title={
+          templateDraft.id
+            ? localizedText(templateDraft.name)
+            : a.newLayout
+        }
+        closeLabel={a.close}
+        onClose={() => setOpenTemplate(false)}
+        footer={
+          <>
+            {templateDraft.id && !templateDraft.builtin ? (
               <button
                 type="button"
-                className="btn-cta"
-                disabled={saving}
-                onClick={async () => {
-                  const token = getSessionToken();
-                  if (!token) return;
-                  setSaving(true);
-                  try {
-                    const next = await publishOwnerResume(token, current.id);
-                    setCurrent(next);
-                    await reload(token);
-                    setMessage(a.saved);
-                  } catch {
-                    setError(a.errorGeneric);
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
+                className="btn-ghost"
+                onClick={() => setConfirmTemplate(true)}
               >
-                {a.statusPublished}
+                {a.deleteLayout}
               </button>
             ) : null}
-          </div>
-          <div>
-            <p className="mb-2 text-sm text-[var(--text-muted)]">{a.preview}</p>
-            <ResumePaper resume={current} dict={dict} />
-          </div>
+            <button
+              type="button"
+              className="btn-cta"
+              disabled={saving || templateDraft.builtin}
+              onClick={() => persistTemplate(templateDraft)}
+            >
+              {saving ? a.saving : a.save}
+            </button>
+          </>
+        }
+      >
+        <label className="mb-3 block text-xs text-[var(--text-muted)]">
+          {a.fieldLayoutName}
+          <input
+            className="field"
+            value={localizedText(templateDraft.name)}
+            disabled={templateDraft.builtin}
+            onChange={(event) =>
+              setTemplateDraft({
+                ...templateDraft,
+                name: {
+                  ...templateDraft.name,
+                  en: event.target.value,
+                  "zh-Hant": event.target.value,
+                  "zh-Hans": event.target.value,
+                },
+              })
+            }
+          />
+        </label>
+        <div className="grid gap-2">
+          {SECTION_IDS.map((id) => (
+            <label key={id} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                disabled={templateDraft.builtin}
+                checked={templateDraft.sections.includes(id)}
+                onChange={(event) => {
+                  const next = event.target.checked
+                    ? [...templateDraft.sections, id]
+                    : templateDraft.sections.filter((item) => item !== id);
+                  setTemplateDraft({ ...templateDraft, sections: next });
+                }}
+              />
+              {sectionLabel(id)}
+            </label>
+          ))}
         </div>
       </CmsModal>
 
@@ -794,16 +1013,16 @@ export function ResumeEditor({ dict }: Props) {
         onClose={() => setConfirmResume(false)}
         onConfirm={async () => {
           const token = getSessionToken();
-          if (!token || !current.id) return;
+          if (!token || !current?.id) return;
           await deleteOwnerResume(token, current.id);
           setConfirmResume(false);
-          setOpenResume(false);
+          setCurrent(null);
           await reload(token);
         }}
       />
       <CmsConfirm
         open={confirmTemplate}
-        title={a.deleteTemplate}
+        title={a.deleteLayout}
         hint={a.confirmDeleteHint}
         confirmLabel={a.confirmDelete}
         closeLabel={a.close}
@@ -818,5 +1037,115 @@ export function ResumeEditor({ dict }: Props) {
         }}
       />
     </div>
+  );
+}
+
+function ExperienceList({
+  label,
+  items,
+  addLabel,
+  dict,
+  onAdd,
+  onChange,
+}: {
+  label: string;
+  items: OwnerResume["internships"];
+  addLabel: string;
+  dict: Dictionary;
+  onAdd: () => void;
+  onChange: (next: OwnerResume["internships"]) => void;
+}) {
+  const a = dict.admin;
+  return (
+    <section className="resume-block">
+      <div className="resume-block-head">
+        <p className="text-sm font-semibold">{label}</p>
+        <button type="button" className="btn-ghost text-sm" onClick={onAdd}>
+          {addLabel}
+        </button>
+      </div>
+      {items.map((item, index) => (
+        <div key={`${label}-${index}`} className="resume-entry-form">
+          <AgentField
+            label={a.fieldOrganization}
+            value={item.organization}
+            closeLabel={a.close}
+            onChange={(organization) => {
+              const next = [...items];
+              next[index] = { ...item, organization };
+              onChange(next);
+            }}
+          />
+          <AgentField
+            label={a.fieldRole}
+            value={item.role}
+            closeLabel={a.close}
+            onChange={(role) => {
+              const next = [...items];
+              next[index] = { ...item, role };
+              onChange(next);
+            }}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="mb-3 block text-xs text-[var(--text-muted)]">
+              {a.fieldStart}
+              <input
+                className="field"
+                placeholder="YYYY-MM"
+                value={item.start}
+                onChange={(event) => {
+                  const next = [...items];
+                  next[index] = { ...item, start: event.target.value };
+                  onChange(next);
+                }}
+              />
+            </label>
+            <label className="mb-3 block text-xs text-[var(--text-muted)]">
+              {a.fieldEnd}
+              <input
+                className="field"
+                placeholder="YYYY-MM"
+                value={item.end}
+                onChange={(event) => {
+                  const next = [...items];
+                  next[index] = { ...item, end: event.target.value };
+                  onChange(next);
+                }}
+              />
+            </label>
+          </div>
+          <AgentField
+            label={a.fieldResumeCity}
+            value={item.city}
+            closeLabel={a.close}
+            onChange={(city) => {
+              const next = [...items];
+              next[index] = { ...item, city };
+              onChange(next);
+            }}
+          />
+          <AgentField
+            label={a.fieldBulletLines}
+            value={item.description.join("\n")}
+            multiline
+            closeLabel={a.close}
+            onChange={(value) => {
+              const next = [...items];
+              next[index] = { ...item, description: linesOf(value) };
+              onChange(next);
+            }}
+          />
+          <button
+            type="button"
+            className="btn-ghost text-sm"
+            onClick={() =>
+              onChange(items.filter((_, itemIndex) => itemIndex !== index))
+            }
+          >
+            {a.removeEntry}
+          </button>
+        </div>
+      ))}
+    </section>
   );
 }

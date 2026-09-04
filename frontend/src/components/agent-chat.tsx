@@ -24,10 +24,12 @@ import { messagesWithThinking, type ChatMessage } from "@/lib/agent-thinking";
 import { CmsModal } from "./cms-modal";
 import { MarkdownBody } from "./markdown-body";
 
+export type AgentInsertTarget = keyof Localized | "text";
+
 type Props = {
   compact?: boolean;
-  context?: { label: string; value: Localized };
-  onInsert?: (locale: keyof Localized, text: string) => void;
+  context?: { label: string; value: Localized | string };
+  onInsert?: (locale: AgentInsertTarget, text: string) => void;
 };
 
 type MobilePane = "conversations" | "chat" | "knowledge";
@@ -391,7 +393,9 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     const editorContext = context
       ? [
           `正在编辑：${context.label}`,
-          `当前三语内容：${JSON.stringify(context.value)}`,
+          typeof context.value === "string"
+            ? `当前内容：${context.value}`
+            : `当前三语内容：${JSON.stringify(context.value)}`,
           "除非明确要求写入网站，否则只给建议或可插入正文。",
         ].join("\n")
       : "";
@@ -748,21 +752,32 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         {onInsert && latestAssistant ? (
           <div className="agent-insert-row">
             <span>逐字写入：</span>
-            {(["zh-Hant", "zh-Hans", "en"] as const).map((locale) => (
+            {typeof context?.value === "string" ? (
               <button
-                key={locale}
                 type="button"
                 className="btn-ghost text-xs"
                 disabled={sending}
-                onClick={() => onInsert(locale, latestAssistant.content)}
+                onClick={() => onInsert("text", latestAssistant.content)}
               >
-                {locale === "zh-Hant"
-                  ? "繁中"
-                  : locale === "zh-Hans"
-                    ? "简中"
-                    : "English"}
+                写入此栏
               </button>
-            ))}
+            ) : (
+              (["zh-Hant", "zh-Hans", "en"] as const).map((locale) => (
+                <button
+                  key={locale}
+                  type="button"
+                  className="btn-ghost text-xs"
+                  disabled={sending}
+                  onClick={() => onInsert(locale, latestAssistant.content)}
+                >
+                  {locale === "zh-Hant"
+                    ? "繁中"
+                    : locale === "zh-Hans"
+                      ? "简中"
+                      : "English"}
+                </button>
+              ))
+            )}
           </div>
         ) : null}
 

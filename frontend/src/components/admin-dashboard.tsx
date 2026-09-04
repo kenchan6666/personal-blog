@@ -111,7 +111,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
         ) : null}
         {tab === "resume" ? (
           <div className="lg:col-span-2">
-            <ResumeEditor dict={dict} />
+            <ResumeEditor locale={locale} dict={dict} />
           </div>
         ) : null}
         {tab === "site" ? (

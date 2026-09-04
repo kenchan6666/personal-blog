@@ -1,26 +1,30 @@
 import type { Dictionary } from "@/i18n/dictionaries";
-import type { OwnerResume, PublicResume } from "@/lib/api";
+import type { OwnerResume, PublicResume, ResumeSectionId } from "@/lib/api";
 
 type Props = {
   resume: PublicResume | OwnerResume;
   dict: Dictionary;
+  sections?: ResumeSectionId[];
+  showEmpty?: boolean;
 };
 
 function range(start: string, end: string) {
   return [start, end].filter(Boolean).join(" – ");
 }
 
-export function ResumePaper({ resume, dict }: Props) {
+export function ResumePaper({ resume, dict, sections, showEmpty }: Props) {
   const r = dict.resume;
   const header = resume.header;
+  const visible = (id: ResumeSectionId, filled: boolean) =>
+    showEmpty ? !sections || sections.includes(id) : filled;
   return (
     <article className="resume-paper">
       <header className="resume-paper-head">
-        <h2>{header.name || resume.title}</h2>
+        <h2>{header.name || resume.title || " "}</h2>
         <p>{[header.phone, header.email].filter(Boolean).join(" · ")}</p>
         {header.city ? <p>{header.city}</p> : null}
       </header>
-      {resume.summary.length > 0 ? (
+      {visible("summary", resume.summary.length > 0) ? (
         <section>
           <h3>{r.sectionSummary}</h3>
           {resume.summary.map((line) => (
@@ -28,7 +32,7 @@ export function ResumePaper({ resume, dict }: Props) {
           ))}
         </section>
       ) : null}
-      {resume.education.length > 0 ? (
+      {visible("education", resume.education.length > 0) ? (
         <section>
           <h3>{r.sectionEducation}</h3>
           {resume.education.map((item) => (
@@ -51,7 +55,7 @@ export function ResumePaper({ resume, dict }: Props) {
           ))}
         </section>
       ) : null}
-      {resume.internships.length > 0 ? (
+      {visible("internship", resume.internships.length > 0) ? (
         <section>
           <h3>{r.sectionInternship}</h3>
           {resume.internships.map((item) => (
@@ -71,7 +75,7 @@ export function ResumePaper({ resume, dict }: Props) {
           ))}
         </section>
       ) : null}
-      {resume.projects.length > 0 ? (
+      {visible("projects", resume.projects.length > 0) ? (
         <section>
           <h3>{r.sectionProjects}</h3>
           {resume.projects.map((item) => (
@@ -90,7 +94,7 @@ export function ResumePaper({ resume, dict }: Props) {
           ))}
         </section>
       ) : null}
-      {resume.activities.length > 0 ? (
+      {visible("activities", resume.activities.length > 0) ? (
         <section>
           <h3>{r.sectionActivities}</h3>
           {resume.activities.map((item) => (
@@ -106,7 +110,10 @@ export function ResumePaper({ resume, dict }: Props) {
           ))}
         </section>
       ) : null}
-      {resume.skills.length > 0 || resume.languages.length > 0 ? (
+      {visible(
+        "skillsOthers",
+        resume.skills.length > 0 || resume.languages.length > 0,
+      ) ? (
         <section>
           <h3>{r.sectionSkills}</h3>
           {resume.skills.length > 0 ? (

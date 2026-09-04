@@ -104,48 +104,38 @@ export function GitHubConnect({ locale, dict }: Props) {
 
   const connected = account.connected;
   const login = account.login || "";
-  const hint = loading
-    ? a.verifying
-    : connected
-      ? a.githubConnectedHint
-          .replace("{login}", login)
-          .replace("{count}", String(account.repoCount ?? repos.length))
-      : a.githubDisconnectedHint;
 
   return (
     <div className="grid gap-5">
-      <CmsCard
-        title={a.githubTitle}
-        action={
-          connected ? (
-            <span className="status-pill status-pill-live">{a.githubConnected}</span>
-          ) : (
+      {!connected ? (
+        <CmsCard
+          title={a.githubTitle}
+          action={
             <button type="button" className="btn-cta" onClick={() => void onConnect()}>
-              {a.connectGitHub}
+              {loading ? a.verifying : a.connectGitHub}
             </button>
-          )
-        }
-      >
-        <p className="text-sm text-[var(--text-muted)]">{hint}</p>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">{a.githubWorkspaceHint}</p>
-        {flash === "ok" ? (
-          <p className="mt-3 text-sm text-[var(--text-muted)]">{a.githubConnected}</p>
-        ) : null}
-        {flash === "err" ? (
-          <p className="mt-3 text-sm text-[var(--danger)]">{a.errorGeneric}</p>
-        ) : null}
-        {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
-      </CmsCard>
+          }
+        >
+          {flash === "err" ? (
+            <p className="text-sm text-[var(--danger)]">{a.errorGeneric}</p>
+          ) : null}
+          {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+        </CmsCard>
+      ) : null}
 
       {connected ? (
         <CmsCard
           title={a.githubAccount}
           action={
-            <button type="button" className="btn-ghost text-sm" onClick={() => void onConnect()}>
-              {a.githubReconnect}
-            </button>
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="status-pill status-pill-live">{a.githubConnected}</span>
+              <button type="button" className="btn-ghost text-sm" onClick={() => void onConnect()}>
+                {a.githubReconnect}
+              </button>
+            </span>
           }
         >
+          {error ? <p className="mb-3 text-sm text-[var(--danger)]">{error}</p> : null}
           <div className="flex flex-wrap items-center gap-4">
             {account.avatarUrl ? (
               <img
@@ -196,9 +186,6 @@ export function GitHubConnect({ locale, dict }: Props) {
         >
           {account.cvRepo ? (
             <div className="grid gap-3">
-              {flash === "vault" ? (
-                <p className="text-sm text-[var(--text-muted)]">{a.githubCvReady}</p>
-              ) : null}
               <p className="font-mono text-sm">{account.cvRepo.fullName}</p>
               <div className="flex flex-wrap gap-2">
                 <a
@@ -223,9 +210,7 @@ export function GitHubConnect({ locale, dict }: Props) {
                 </ul>
               ) : null}
             </div>
-          ) : (
-            <p className="text-sm text-[var(--text-muted)]">{a.githubCvMissing}</p>
-          )}
+          ) : null}
         </CmsCard>
       ) : null}
 

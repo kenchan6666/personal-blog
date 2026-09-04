@@ -1586,6 +1586,131 @@ html.is-locale-hold .article-page {
   color: var(--text-primary);
 }
 
+.resume-workspace {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.resume-edit-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1080px) {
+  .resume-edit-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.9fr);
+    align-items: start;
+  }
+
+  .resume-preview-col {
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.resume-pick {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.resume-layout-mini {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.resume-layout-mini i {
+  display: block;
+  height: 0.35rem;
+  flex: 1;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-link) 28%, var(--hairline));
+}
+
+.resume-layout-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  gap: 0.65rem;
+}
+
+.resume-layout-card {
+  display: grid;
+  gap: 0.45rem;
+  min-height: 6.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--panel-fill);
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.resume-layout-card strong {
+  font-size: 0.85rem;
+}
+
+.resume-layout-bars {
+  display: grid;
+  gap: 0.28rem;
+}
+
+.resume-layout-bars span {
+  display: block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-link) 16%, var(--hairline));
+  padding: 0.15rem 0.45rem;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.resume-layout-card.is-active {
+  border-color: color-mix(in srgb, var(--accent-link) 40%, var(--hairline));
+  background: var(--panel-fill-strong);
+}
+
+.resume-layout-card.is-new {
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.resume-block {
+  margin: 1rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.resume-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.resume-entry-form {
+  margin-bottom: 0.85rem;
+  padding: 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+}
+
+.resume-import {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--hairline);
+}
+
+.resume-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
 .tile:hover {
   background: var(--panel-fill-strong);
 }

@@ -241,7 +241,10 @@ export function BilingualField({
         <AgentChat
           compact
           context={{ label, value }}
-          onInsert={(locale, text) => void insertAgentText(locale, text)}
+          onInsert={(locale, text) => {
+            if (locale === "text") return;
+            void insertAgentText(locale, text);
+          }}
         />
       </CmsModal>
     </div>
