@@ -76,13 +76,66 @@ async def test_builtin_template_is_seeded_and_cannot_be_deleted(
     listed = await client.get("/api/owner/resume-templates", headers=headers)
     assert listed.status_code == 200
     slugs = [item["slug"] for item in listed.json()]
-    assert "classic-a4" in slugs
+    assert slugs[:6] == [
+        "classic-a4",
+        "campus-a4",
+        "intern-a4",
+        "full-a4",
+        "work-a4",
+        "certs-a4",
+    ]
     classic = next(item for item in listed.json() if item["slug"] == "classic-a4")
+    intern = next(item for item in listed.json() if item["slug"] == "intern-a4")
+    assert classic["name"]["en"] == "Student projects"
+    assert intern["sections"] == [
+        "summary",
+        "education",
+        "internship",
+        "projects",
+        "skillsOthers",
+    ]
     deleted = await client.delete(
         f"/api/owner/resume-templates/{classic['id']}",
         headers=headers,
     )
     assert deleted.status_code == 400
+    edited = await client.put(
+        f"/api/owner/resume-templates/{classic['id']}",
+        json={"slug": "classic-a4", "name": classic["name"], "sections": ["summary"]},
+        headers=headers,
+    )
+    assert edited.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_duplicate_custom_layout_is_folded_into_builtin(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    clone = await client.post(
+        "/api/owner/resume-templates",
+        json={
+            "slug": "clone-classic",
+            "name": {"zh-Hant": "複本", "zh-Hans": "复本", "en": "Clone"},
+            "sections": ["summary", "education", "projects", "skillsOthers"],
+        },
+        headers=headers,
+    )
+    assert clone.status_code == 200
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(slug="clone-en", templateSlug="clone-classic"),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    listed = await client.get("/api/owner/resume-templates", headers=headers)
+    slugs = [item["slug"] for item in listed.json()]
+    assert "clone-classic" not in slugs
+    assert slugs.count("classic-a4") == 1
+    resumes = await client.get("/api/owner/resumes", headers=headers)
+    row = next(item for item in resumes.json() if item["id"] == created.json()["id"])
+    assert row["templateSlug"] == "classic-a4"
 
 
 @pytest.mark.asyncio

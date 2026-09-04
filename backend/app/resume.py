@@ -87,28 +87,166 @@ def save_resume_pdf_bytes(
     return filename
 
 
-def builtin_classic_template() -> dict[str, Any]:
-    return {
-        "slug": CLASSIC_RESUME_TEMPLATE_SLUG,
-        "name": {
-            "zh-Hant": "經典 A4 單欄",
-            "zh-Hans": "经典 A4 单栏",
-            "en": "Classic A4 single column",
+def builtin_resume_templates() -> list[dict[str, Any]]:
+    return [
+        {
+            "slug": CLASSIC_RESUME_TEMPLATE_SLUG,
+            "name": {
+                "zh-Hant": "學生項目向",
+                "zh-Hans": "学生项目向",
+                "en": "Student projects",
+            },
+            "sections": ["summary", "education", "projects", "skillsOthers"],
+            "extras": [],
+            "builtin": True,
         },
-        "sections": ["summary", "education", "projects", "skillsOthers"],
-        "builtin": True,
+        {
+            "slug": "campus-a4",
+            "name": {
+                "zh-Hant": "學歷先行",
+                "zh-Hans": "学历先行",
+                "en": "Education first",
+            },
+            "sections": ["education", "internship", "projects", "skillsOthers"],
+            "extras": [],
+            "builtin": True,
+        },
+        {
+            "slug": "intern-a4",
+            "name": {
+                "zh-Hant": "實習投遞",
+                "zh-Hans": "实习投递",
+                "en": "Internship application",
+            },
+            "sections": [
+                "summary",
+                "education",
+                "internship",
+                "projects",
+                "skillsOthers",
+            ],
+            "extras": [],
+            "builtin": True,
+        },
+        {
+            "slug": "full-a4",
+            "name": {
+                "zh-Hant": "校園完整",
+                "zh-Hans": "校园完整",
+                "en": "Full campus",
+            },
+            "sections": [
+                "summary",
+                "education",
+                "internship",
+                "projects",
+                "activities",
+                "skillsOthers",
+            ],
+            "extras": [],
+            "builtin": True,
+        },
+        {
+            "slug": "work-a4",
+            "name": {
+                "zh-Hant": "經歷優先",
+                "zh-Hans": "经历优先",
+                "en": "Experience first",
+            },
+            "sections": [
+                "summary",
+                "internship",
+                "projects",
+                "education",
+                "skillsOthers",
+            ],
+            "extras": [],
+            "builtin": True,
+        },
+        {
+            "slug": "certs-a4",
+            "name": {
+                "zh-Hant": "證書加持",
+                "zh-Hans": "证书加持",
+                "en": "With certifications",
+            },
+            "sections": [
+                "summary",
+                "education",
+                "internship",
+                "projects",
+                "skillsOthers",
+                "certs",
+            ],
+            "extras": [{"slug": "certs", "title": "Certifications"}],
+            "builtin": True,
+        },
+    ]
+
+
+def builtin_classic_template() -> dict[str, Any]:
+    return builtin_resume_templates()[0]
+
+
+def builtin_template_slugs() -> set[str]:
+    return {item["slug"] for item in builtin_resume_templates()}
+
+
+def _layout_signature(template: ResumeTemplate) -> tuple[Any, ...]:
+    extras = tuple((item.slug, item.title) for item in template.extras)
+    return (tuple(template.sections), extras)
+
+
+def _spec_signature(spec: dict[str, Any]) -> tuple[Any, ...]:
+    extras = tuple(
+        (str(item.get("slug") or ""), str(item.get("title") or ""))
+        for item in spec.get("extras") or []
+    )
+    return (tuple(spec["sections"]), extras)
+
+
+def _apply_builtin_spec(template: ResumeTemplate, spec: dict[str, Any]) -> None:
+    template.slug = spec["slug"]
+    template.name = spec["name"]
+    template.extras = parse_extra_defs(spec.get("extras") or [])
+    template.sections = list(spec["sections"])
+    template.builtin = True
+
+
+async def _prune_duplicate_custom_templates() -> None:
+    store = current_store()
+    rows = await store.find_all(ResumeTemplate)
+    target_by_sig = {
+        _spec_signature(spec): spec["slug"] for spec in builtin_resume_templates()
     }
+    for item in rows:
+        if item.builtin:
+            continue
+        target = target_by_sig.get(_layout_signature(item))
+        if not target or target == item.slug:
+            continue
+        for resume in await store.find(Resume, template_slug=item.slug):
+            resume.template_slug = target
+            await store.save(resume)
+        await store.delete(item)
 
 
 async def ensure_builtin_templates() -> None:
     store = current_store()
-    existing = await store.find_one(
-        ResumeTemplate, slug=CLASSIC_RESUME_TEMPLATE_SLUG
-    )
-    if existing is not None:
-        return
-    template = new_document(ResumeTemplate, **builtin_classic_template())
-    await store.insert(template)
+    for spec in builtin_resume_templates():
+        existing = await store.find_one(ResumeTemplate, slug=spec["slug"])
+        if existing is None:
+            template = new_document(ResumeTemplate)
+            _apply_builtin_spec(template, spec)
+            await store.insert(template)
+            continue
+        _apply_builtin_spec(existing, spec)
+        await store.save(existing)
+
+
+async def fold_duplicate_custom_templates() -> None:
+    await ensure_builtin_templates()
+    await _prune_duplicate_custom_templates()
 
 
 def validate_slug(slug: str) -> str:

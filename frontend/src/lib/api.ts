@@ -1271,7 +1271,14 @@ export function emptyOwnerResumeTemplate(): OwnerResumeTemplate {
     id: "",
     slug: "",
     name: emptyLocalized(),
-    sections: ["summary", "education", "projects", "skillsOthers"],
+    sections: [
+      "summary",
+      "education",
+      "internship",
+      "projects",
+      "activities",
+      "skillsOthers",
+    ],
     extras: [],
     builtin: false,
   };

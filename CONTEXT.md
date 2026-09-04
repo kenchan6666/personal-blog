@@ -45,8 +45,8 @@ _Avoid_: Admin（指人时）, user（泛称）
 _Avoid_: clone, mirror（本站不镜像整仓）
 
 **ResumeTemplate**:
-一份一页 CV 的版式契约：栏目顺序与字段骨架，可含自订栏目（标题）。Owner 可新建多套；生成 PDF 时按该契约排版。默认契约是 A4 单栏、日期靠右。
-_Avoid_: SuperCV 模板（作实体名时）, theme, skin
+一份一页 CV 的版式契约：栏目顺序与字段骨架，可含自订栏目（标题）。内置多套栏目顺序（学生项目向、学历先行、实习投递、校园完整、经历优先、证书加持）；与内置栏目完全相同的自订版式会被收回。Owner 仍可新建不同的自订套。生成 PDF 时按该契约排版。视觉仍是 A4 单栏、日期靠右，不是换皮肤。
+_Avoid_: SuperCV 模板（作实体名时）, theme, skin, 把栏目顺序当视觉主题
 
 **Resume**:
 按某一 ResumeTemplate 填好的单语履历文档。纸上姓名是 `header.name`。`title` 是后台列表标签，保存时等于姓名，不是第二行大标题。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。可推送到 Owner 名下的 CvRepo（JSON + PDF），与是否 Published 无关。可加自订栏目（标题 + 要点 / 条目指），不是 About 模块。写栏目正文走 Owner Agent skill `skills/write-resume/SKILL.md`。

@@ -611,7 +611,7 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_list_resume_templates() -> dict[str, Any]:
-        """List ResumeTemplate layouts. classic-a4 is the built-in A4 single-column contract."""
+        """List ResumeTemplate layouts. Built-ins are classic-a4, campus-a4, intern-a4, full-a4, work-a4, certs-a4 (section order, not a visual theme)."""
         items = api.request("GET", "/api/owner/resume-templates")
         return {"items": items, "total": len(items)}
 
@@ -644,7 +644,7 @@ def create_server() -> FastMCP:
         identifier: str,
         changes: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update a ResumeTemplate. Built-in classic-a4 should not be deleted."""
+        """Update a custom ResumeTemplate. Built-in layouts cannot be edited or deleted."""
         api.require_write()
         current = _template_by_id(identifier)
         payload = _merge(current, changes)

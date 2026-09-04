@@ -21,7 +21,10 @@ from app.models import Resume, ResumeTemplate, empty_localized
 from app.resume import (
     apply_resume_body,
     apply_template_body,
+    builtin_resume_templates,
+    builtin_template_slugs,
     ensure_builtin_templates,
+    fold_duplicate_custom_templates,
     ensure_resume_dir,
     parse_resume_import,
     render_resume_pdf,
@@ -138,9 +141,18 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
 
     @app.get("/api/owner/resume-templates")
     async def owner_list_templates(_: str = Depends(require_owner)) -> list[dict[str, Any]]:
-        await ensure_builtin_templates()
+        await fold_duplicate_custom_templates()
         rows = await current_store().find_all(ResumeTemplate)
-        rows.sort(key=lambda item: (not item.builtin, item.slug))
+        order = {
+            spec["slug"]: index
+            for index, spec in enumerate(builtin_resume_templates())
+        }
+        rows.sort(
+            key=lambda item: (
+                order.get(item.slug, 100) if item.builtin else 200,
+                item.slug,
+            )
+        )
         return [item.to_owner_dict() for item in rows]
 
     @app.post("/api/owner/resume-templates")
@@ -150,6 +162,11 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
     ) -> dict[str, Any]:
         template = new_document(ResumeTemplate)
         apply_template_body(template, body.model_dump())
+        if template.slug in builtin_template_slugs():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="reserved_template",
+            )
         await unique_template_slug(template.slug)
         await current_store().insert(template)
         return template.to_owner_dict()
@@ -163,6 +180,10 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         template = await current_store().get(ResumeTemplate, template_id)
         if template is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+        if template.builtin:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="builtin_template"
+            )
         apply_template_body(template, body.model_dump())
         await unique_template_slug(template.slug, exclude_id=str(template.id))
         await current_store().save(template)
