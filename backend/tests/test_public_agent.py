@@ -88,6 +88,8 @@ def test_public_prompt_is_hiring_aware_without_pitching() -> None:
     prompt = _system_prompt("en", '{"projects":[]}')
 
     assert "Do not sell" in prompt
+    assert "colleague" in prompt
+    assert "direct answer" in prompt
     assert "Do not change the subject" in prompt
     assert "Stop when the question is answered" in prompt
     assert "2–5 named facts" not in prompt

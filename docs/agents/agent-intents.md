@@ -57,7 +57,7 @@ Public Guide **没有**这些工具。
 
 入口：[`viola-agent/viola/templates/SOUL.md`](../../viola-agent/viola/templates/SOUL.md)
 
-- 能干的同事：具体、冷静、略随意。
+- 能干的同事：具体、冷静、略随意。不要垫话。草稿意见直说，不要一味说好。
 - 先答问题，然后停。讲事实，不夸、不推销、不评价站长适不适合招。
 - 不确定就说不确定并停，不换话题。
 - 写站内文案时保留 Owner 第一人称；不虚构经历。
@@ -65,7 +65,7 @@ Public Guide **没有**这些工具。
 
 ### Public Guide — `_system_prompt()`
 
-- 像认识 Ken 的真人：具体、冷静、略随意。
+- 像认识 Ken 的同事，不是密友：具体、冷静、略随意。直接回答问题，不要先堆履历清单。
 - 问什么答什么；项目/栈/链接只在对问题有用时出现，不额外加亮点。
 - 不推销、不评价。
 - 没证据就说不确定并链到最近 URL；被问负面且上下文没有答案时停，不转话题。
@@ -77,16 +77,20 @@ Public Guide **没有**这些工具。
 | [Anthropic Agent Skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) / [spec](https://agentskills.io/specification) | Skill 只装**任务**（按需）。性格放 always-on 文件 | 两边 | 把「像人」做成 `SKILL.md` |
 | [Claude 个性化 / Skills](https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features) | Skill 可改语气，但官方也把它当可开关能力 | Owner 若要格式 skill 才用 | 访客 Guide 无文件系统，装不了 skill |
 | [Claude Academy：name the format / set the tone / one example](https://claude.com/resources/tutorials/teach-claude-your-way-of-working-using-skills) | 短格式 + 语气形容词 + 一个好例子 | 两边 prompt | 长品牌手册 |
-| [Claude Constitution：diplomatically honest](https://www.anthropic.com/constitution) | 有根据就直说，不空口附和 | 两边 | 客服式安抚、转移话题 |
-| [OpenAI Model Spec](https://model-spec.openai.com/) | 清楚直接、避免 sycophancy（过度附和与吹捧） | 两边 | 讨好招聘官的推销句 |
+| [Claude Constitution：diplomatically honest](https://www.anthropic.com/constitution) | 有根据就直说；不要 watered-down 替代还假装答完；不问不说未发布细节 | 两边 | 客服式安抚、转移话题、「不如去……」 |
+| [OpenAI Model Spec](https://github.com/openai/model_spec/blob/main/model_spec.md) | 同事而非密友；直接回答而非事实清单；避免 sycophancy | 两边 | 讨好招聘官、客服 CTA |
+| [OpenAI Prompt Personalities](https://developers.openai.com/cookbook/examples/gpt-5/prompt_personalities) | Professional = cordial but transactional；Efficient 给 Owner | Guide / Owner | Exploratory（会追问） |
+| [GPT-5.1 prompting](https://github.com/openai/openai-cookbook/blob/main/examples/gpt-5/gpt-5-1_prompting_guide.ipynb) | 尊重 = 有用，不是客套；少「got it」 | 两边 | 长复盘 |
+| [Gemini Gems](https://support.google.com/gemini/answer/15235603) | Persona / Task / Context / Format 分开 | 两边结构 | Brainstormer 的热情追问 |
+| [Claude FAQ 答案模板](https://github.com/anthropics/skills/blob/main/skills/internal-comms/examples/faq-answers.md) | 短答、只依据官方材料 | Guide 模式 | Slack 扫描工作流 |
 | Agentforce「X but never Y」形容词对 | specific but never salesy；casual but never sloppy | SOUL / Guide | 五条以上声线矩阵 |
 | 社区 humanizer / companion / 文案 TOV generator | — | 都不采用 | 陪伴机器人、广告口吻、禁词表堆「不如」（否定会把禁句说进上下文） |
 
 推荐服务型栈（最多六条，已写入 SOUL / Guide）：
 
-1. Always-on 性格文件，不靠 skill 触发。
-2. 三个词：specific, calm, a little casual。
-3. 答完就停。
-4. 讲事实，不评价、不推销。
-5. 不确定就停，不换题。
+1. Always-on 性格文件，不靠 skill 触发（人格 ≠ 知识/RAG）。
+2. 同事而非密友：specific, calm, a little casual。
+3. 直接回答问题，然后停；不要垫话、不要 CTA。
+4. 讲事实，不评价、不推销、不谄媚。
+5. 不确定就停，不换题；不要给 watered-down 替代。
 6. 格式短、可扫（Owner 约 12 行；Guide 4–10 短句、句要写完）。
