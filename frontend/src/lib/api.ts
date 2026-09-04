@@ -1152,11 +1152,24 @@ export type ResumeSectionId =
   | "activities"
   | "skillsOthers";
 
+export type ResumeExtraDef = {
+  slug: string;
+  title: string;
+};
+
+export type ResumeExtra = {
+  slug: string;
+  title: string;
+  lines: string[];
+  entries: ResumeExperience[];
+};
+
 export type OwnerResumeTemplate = {
   id: string;
   slug: string;
   name: Localized;
-  sections: ResumeSectionId[];
+  sections: string[];
+  extras: ResumeExtraDef[];
   builtin: boolean;
 };
 
@@ -1216,6 +1229,7 @@ export type OwnerResume = {
   activities: ResumeExperience[];
   skills: string[];
   languages: ResumeLanguage[];
+  extras: ResumeExtra[];
   pdfUrl: string;
   githubRepo?: string;
   githubJsonPath?: string;
@@ -1247,6 +1261,7 @@ export function emptyOwnerResume(): OwnerResume {
     activities: [],
     skills: [],
     languages: [],
+    extras: [],
     pdfUrl: "",
   };
 }
@@ -1257,6 +1272,7 @@ export function emptyOwnerResumeTemplate(): OwnerResumeTemplate {
     slug: "",
     name: emptyLocalized(),
     sections: ["summary", "education", "projects", "skillsOthers"],
+    extras: [],
     builtin: false,
   };
 }

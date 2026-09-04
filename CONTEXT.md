@@ -45,11 +45,11 @@ _Avoid_: Admin（指人时）, user（泛称）
 _Avoid_: clone, mirror（本站不镜像整仓）
 
 **ResumeTemplate**:
-一份一页 CV 的版式契约：模块顺序与字段骨架。Owner 可新建多套；生成 PDF 时按该契约排版。默认契约是 A4 单栏、日期靠右。
+一份一页 CV 的版式契约：栏目顺序与字段骨架，可含自订栏目（标题）。Owner 可新建多套；生成 PDF 时按该契约排版。默认契约是 A4 单栏、日期靠右。
 _Avoid_: SuperCV 模板（作实体名时）, theme, skin
 
 **Resume**:
-按某一 ResumeTemplate 填好的单语履历文档。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。可推送到 Owner 名下的 CvRepo（JSON + PDF），与是否 Published 无关。
+按某一 ResumeTemplate 填好的单语履历文档。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。可推送到 Owner 名下的 CvRepo（JSON + PDF），与是否 Published 无关。可加自订栏目（标题 + 要点 / 条目指），不是 About 模块。
 _Avoid_: CV（作实体名时）, 履历（作实体名时）, About 模块堆叠当履历
 
 **CvRepo**:

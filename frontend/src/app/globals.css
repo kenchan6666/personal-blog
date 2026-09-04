@@ -1711,6 +1711,83 @@ html.is-locale-hold .article-page {
   margin-top: 1rem;
 }
 
+.resume-studio {
+  display: grid;
+  gap: 1rem;
+}
+
+.resume-studio-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.resume-section-card {
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  background: var(--glass);
+  backdrop-filter: blur(24px) saturate(160%);
+}
+
+.resume-section-card.is-on {
+  border-color: color-mix(in srgb, var(--accent-link) 36%, var(--glass-border));
+}
+
+.resume-section-hit {
+  display: grid;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.85rem 0.95rem;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.resume-section-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.resume-section-detail {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0 0.95rem 0.95rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.resume-section-preview {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--panel-fill);
+}
+
+.resume-section-preview strong {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.resume-section-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.resume-studio-add {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
 .tile:hover {
   background: var(--panel-fill-strong);
 }

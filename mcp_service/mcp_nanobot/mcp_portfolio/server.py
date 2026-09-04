@@ -713,7 +713,7 @@ def create_server() -> FastMCP:
         identifier: str,
         changes: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update Resume fields the CMS can edit: title, slug, locale, templateSlug, header (name/phone/email/city/links), summary[], education[], internships[], projects[], activities[], skills[], languages[]. Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
+        """Update Resume fields the CMS can edit: title, slug, locale, templateSlug, header, summary[], education[], internships[], projects[], activities[], skills[], languages[], extras[] (custom sections: slug/title/lines/entries). Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
         api.require_write()
         current = _resume_by_id(identifier)
         payload = _merge(current, changes)

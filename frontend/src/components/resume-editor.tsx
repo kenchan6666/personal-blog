@@ -29,21 +29,13 @@ import { AgentField } from "./agent-field";
 import { CmsCard, StatusPill } from "./cms-card";
 import { CmsConfirm } from "./cms-confirm";
 import { CmsModal } from "./cms-modal";
+import { ResumeLayoutStudio } from "./resume-layout-studio";
 import { ResumePaper } from "./resume-paper";
 
 type Props = {
   locale: Locale;
   dict: Dictionary;
 };
-
-const SECTION_IDS: ResumeSectionId[] = [
-  "summary",
-  "education",
-  "internship",
-  "projects",
-  "activities",
-  "skillsOthers",
-];
 
 function slugify(value: string) {
   return value
@@ -87,6 +79,7 @@ export function ResumeEditor({ locale, dict }: Props) {
   const [githubRepo, setGithubRepo] = useState("");
   const [githubPath, setGithubPath] = useState("");
   const [githubRef, setGithubRef] = useState("");
+  const [extraTitle, setExtraTitle] = useState("");
 
   async function reload(token: string) {
     const [nextTemplates, nextResumes] = await Promise.all([
@@ -106,8 +99,14 @@ export function ResumeEditor({ locale, dict }: Props) {
       .finally(() => setLoading(false));
   }, [a.errorGeneric]);
 
-  function sectionLabel(id: ResumeSectionId) {
-    const map = {
+  function sectionLabel(id: string) {
+    const extra = templates
+      .flatMap((item) => item.extras ?? [])
+      .find((item) => item.slug === id);
+    if (extra) return extra.title || extra.slug;
+    const onResume = current?.extras?.find((item) => item.slug === id);
+    if (onResume) return onResume.title || onResume.slug;
+    const map: Record<ResumeSectionId, string> = {
       summary: r.sectionSummary,
       education: r.sectionEducation,
       internship: r.sectionInternship,
@@ -115,7 +114,7 @@ export function ResumeEditor({ locale, dict }: Props) {
       activities: r.sectionActivities,
       skillsOthers: r.sectionSkills,
     };
-    return map[id];
+    return map[id as ResumeSectionId] || id;
   }
 
   const layout = useMemo(
@@ -163,6 +162,7 @@ export function ResumeEditor({ locale, dict }: Props) {
         slug: next.slug || slugify(localizedText(next.name)) || "layout",
         name: next.name,
         sections: next.sections,
+        extras: next.extras,
       };
       const saved = next.id
         ? await saveOwnerResumeTemplate(token, next.id, body)
@@ -217,7 +217,7 @@ export function ResumeEditor({ locale, dict }: Props) {
                       current?.id === item.id ? " tile-active" : ""
                     }`}
                     onClick={() => {
-                      setCurrent(item);
+                      setCurrent({ ...item, extras: item.extras ?? [] });
                       setMessage(null);
                       setError(null);
                     }}
@@ -266,11 +266,38 @@ export function ResumeEditor({ locale, dict }: Props) {
                   }`}
                   onClick={() => {
                     if (current.templateSlug === item.slug && !item.builtin) {
-                      setTemplateDraft(item);
+                      setTemplateDraft({
+                        ...item,
+                        extras: item.extras ?? [],
+                      });
                       setOpenTemplate(true);
                       return;
                     }
-                    setCurrent({ ...current, templateSlug: item.slug });
+                    setCurrent({
+                      ...current,
+                      templateSlug: item.slug,
+                      extras: [
+                        ...(item.extras ?? []).map((def) => {
+                          const existing = current.extras.find(
+                            (extra) => extra.slug === def.slug,
+                          );
+                          return (
+                            existing ?? {
+                              slug: def.slug,
+                              title: def.title,
+                              lines: [],
+                              entries: [],
+                            }
+                          );
+                        }),
+                        ...current.extras.filter(
+                          (extra) =>
+                            !(item.extras ?? []).some(
+                              (def) => def.slug === extra.slug,
+                            ),
+                        ),
+                      ],
+                    });
                   }}
                 >
                   <strong>{localizedText(item.name) || item.slug}</strong>
@@ -758,6 +785,130 @@ export function ResumeEditor({ locale, dict }: Props) {
               </section>
             ) : null}
 
+            {(current.extras ?? []).map((extra, index) => (
+              <section key={extra.slug} className="resume-block">
+                <AgentField
+                  label={a.fieldLayoutName}
+                  value={extra.title}
+                  closeLabel={a.close}
+                  onChange={(title) => {
+                    const extras = [...(current.extras ?? [])];
+                    extras[index] = { ...extra, title };
+                    setCurrent({ ...current, extras });
+                  }}
+                />
+                <AgentField
+                  label={a.fieldBulletLines}
+                  value={extra.lines.join("\n")}
+                  multiline
+                  closeLabel={a.close}
+                  onChange={(value) => {
+                    const extras = [...(current.extras ?? [])];
+                    extras[index] = { ...extra, lines: linesOf(value) };
+                    setCurrent({ ...current, extras });
+                  }}
+                />
+                <ExperienceList
+                  label={extra.title || a.addSection}
+                  items={extra.entries}
+                  addLabel={a.addActivity}
+                  dict={dict}
+                  onAdd={() => {
+                    const extras = [...(current.extras ?? [])];
+                    extras[index] = {
+                      ...extra,
+                      entries: [
+                        ...extra.entries,
+                        {
+                          organization: "",
+                          role: "",
+                          start: "",
+                          end: "",
+                          city: "",
+                          description: [],
+                        },
+                      ],
+                    };
+                    setCurrent({ ...current, extras });
+                  }}
+                  onChange={(entries) => {
+                    const extras = [...(current.extras ?? [])];
+                    extras[index] = { ...extra, entries };
+                    setCurrent({ ...current, extras });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn-ghost text-sm"
+                  onClick={() =>
+                    setCurrent({
+                      ...current,
+                      extras: (current.extras ?? []).filter(
+                        (_, itemIndex) => itemIndex !== index,
+                      ),
+                    })
+                  }
+                >
+                  {a.removeEntry}
+                </button>
+              </section>
+            ))}
+
+            <div className="resume-studio-add">
+              <input
+                className="field"
+                placeholder={a.addSectionName}
+                value={extraTitle}
+                onChange={(event) => setExtraTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" || !current) return;
+                  event.preventDefault();
+                  const title = extraTitle.trim();
+                  if (!title) return;
+                  const used = new Set((current.extras ?? []).map((item) => item.slug));
+                  let slug = slugify(title) || "extra";
+                  let n = 2;
+                  while (used.has(slug)) {
+                    slug = `${slugify(title) || "extra"}-${n}`;
+                    n += 1;
+                  }
+                  setCurrent({
+                    ...current,
+                    extras: [
+                      ...(current.extras ?? []),
+                      { slug, title, lines: [], entries: [] },
+                    ],
+                  });
+                  setExtraTitle("");
+                }}
+              />
+              <button
+                type="button"
+                className="btn-cta"
+                onClick={() => {
+                  const title = extraTitle.trim();
+                  if (!title || !current) return;
+                  const used = new Set((current.extras ?? []).map((item) => item.slug));
+                  let slug = slugify(title) || "extra";
+                  let n = 2;
+                  while (used.has(slug)) {
+                    slug = `${slugify(title) || "extra"}-${n}`;
+                    n += 1;
+                  }
+                  setCurrent({
+                    ...current,
+                    extras: [
+                      ...(current.extras ?? []),
+                      { slug, title, lines: [], entries: [] },
+                    ],
+                  });
+                  setExtraTitle("");
+                }}
+              >
+                {a.addSection}
+              </button>
+            </div>
+
             <div className="resume-import">
               <p className="text-sm font-semibold">{a.importGithub}</p>
               <input
@@ -965,43 +1116,12 @@ export function ResumeEditor({ locale, dict }: Props) {
           </>
         }
       >
-        <label className="mb-3 block text-xs text-[var(--text-muted)]">
-          {a.fieldLayoutName}
-          <input
-            className="field"
-            value={localizedText(templateDraft.name)}
-            disabled={templateDraft.builtin}
-            onChange={(event) =>
-              setTemplateDraft({
-                ...templateDraft,
-                name: {
-                  ...templateDraft.name,
-                  en: event.target.value,
-                  "zh-Hant": event.target.value,
-                  "zh-Hans": event.target.value,
-                },
-              })
-            }
-          />
-        </label>
-        <div className="grid gap-2">
-          {SECTION_IDS.map((id) => (
-            <label key={id} className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                disabled={templateDraft.builtin}
-                checked={templateDraft.sections.includes(id)}
-                onChange={(event) => {
-                  const next = event.target.checked
-                    ? [...templateDraft.sections, id]
-                    : templateDraft.sections.filter((item) => item !== id);
-                  setTemplateDraft({ ...templateDraft, sections: next });
-                }}
-              />
-              {sectionLabel(id)}
-            </label>
-          ))}
-        </div>
+        <ResumeLayoutStudio
+          draft={templateDraft}
+          dict={dict}
+          disabled={templateDraft.builtin}
+          onChange={setTemplateDraft}
+        />
       </CmsModal>
 
       <CmsConfirm

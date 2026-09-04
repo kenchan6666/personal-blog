@@ -20,6 +20,8 @@ from app.models import (
     Resume,
     ResumeEducation,
     ResumeExperience,
+    ResumeExtra,
+    ResumeExtraDef,
     ResumeHeader,
     ResumeLanguage,
     ResumeProject,
@@ -119,11 +121,37 @@ def validate_slug(slug: str) -> str:
     return cleaned
 
 
-def validate_sections(sections: list[str]) -> list[str]:
+def parse_extra_defs(raw: Any) -> list[ResumeExtraDef]:
+    extras: list[ResumeExtraDef] = []
+    used: set[str] = set()
+    for item in raw or []:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or "").strip()
+        slug_raw = str(item.get("slug") or "").strip()
+        if slug_raw:
+            slug = validate_slug(slug_raw)
+        elif title:
+            ascii_slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+            slug = validate_slug(ascii_slug or "extra")
+        else:
+            continue
+        base = slug
+        n = 2
+        while slug in used:
+            slug = f"{base}-{n}"
+            n += 1
+        used.add(slug)
+        extras.append(ResumeExtraDef(slug=slug, title=title or slug))
+    return extras
+
+
+def validate_sections(sections: list[str], extra_slugs: set[str] | None = None) -> list[str]:
+    allowed = set(RESUME_SECTIONS) | (extra_slugs or set())
     cleaned: list[str] = []
     for item in sections:
         key = str(item).strip()
-        if key not in RESUME_SECTIONS:
+        if key not in allowed:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="invalid_section",
@@ -149,8 +177,15 @@ def apply_template_body(template: ResumeTemplate, body: dict[str, Any]) -> None:
     merged = empty_localized()
     merged.update({key: str(name.get(key) or "") for key in LOCALES})
     template.name = merged
+    extras = (
+        parse_extra_defs(body["extras"])
+        if "extras" in body
+        else list(template.extras)
+    )
+    template.extras = extras
     template.sections = validate_sections(
-        list(body.get("sections") or template.sections)
+        list(body.get("sections") or template.sections),
+        {item.slug for item in extras},
     )
     if body.get("builtin") is True:
         template.builtin = True
@@ -228,6 +263,14 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
             else [item.model_dump() for item in resume.languages]
         )
     ]
+    resume.extras = [
+        ResumeExtra.model_validate(item)
+        for item in (
+            body["extras"]
+            if "extras" in body
+            else [item.model_dump() for item in resume.extras]
+        )
+    ]
 
 
 def resume_vault_json(resume: Resume) -> bytes:
@@ -267,6 +310,7 @@ def parse_resume_import(payload: Any) -> dict[str, Any]:
         "activities": source.get("activities") or [],
         "skills": source.get("skills") or skills_block.get("skills") or [],
         "languages": source.get("languages") or skills_block.get("languages") or [],
+        "extras": source.get("extras") or [],
     }
 
 
@@ -383,6 +427,17 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
     }
     width = _PAGE_WIDTH - _BODY - 40
 
+    def draw_extra(extra: ResumeExtra) -> None:
+        section_title((extra.title or extra.slug).upper())
+        for line in extra.lines:
+            draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        for item in extra.entries:
+            entry_row(item.organization or item.role, format_range(item.start, item.end))
+            if item.role and item.organization:
+                entry_row(item.role, item.city)
+            for line in item.description:
+                draw_wrapped(line, _BODY, _BODY_SIZE, width)
+
     for section in template.sections:
         if section == "summary" and resume.summary:
             section_title(titles[section])
@@ -440,6 +495,28 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                     for item in resume.languages
                 )
                 draw_wrapped("Languages: " + langs, _LEFT, _BODY_SIZE, width)
+        else:
+            extra = next(
+                (item for item in resume.extras if item.slug == section),
+                None,
+            )
+            if extra is None:
+                extra = next(
+                    (
+                        ResumeExtra(slug=item.slug, title=item.title)
+                        for item in template.extras
+                        if item.slug == section
+                    ),
+                    None,
+                )
+            if extra is not None and (extra.lines or extra.entries):
+                draw_extra(extra)
+
+    drawn = set(template.sections)
+    for extra in resume.extras:
+        if extra.slug in drawn or not (extra.lines or extra.entries):
+            continue
+        draw_extra(extra)
 
     page.showPage()
     page.save()

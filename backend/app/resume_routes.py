@@ -40,6 +40,7 @@ class ResumeTemplateBody(BaseModel):
     sections: list[str] = Field(
         default_factory=lambda: ["summary", "education", "projects", "skillsOthers"]
     )
+    extras: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ResumeBody(BaseModel):
@@ -56,6 +57,7 @@ class ResumeBody(BaseModel):
     activities: list[dict[str, Any]] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     languages: list[dict[str, Any]] = Field(default_factory=list)
+    extras: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ResumeGithubImportBody(BaseModel):

@@ -86,6 +86,50 @@ async def test_builtin_template_is_seeded_and_cannot_be_deleted(
 
 
 @pytest.mark.asyncio
+async def test_custom_resume_section_renders_in_pdf(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    layout = await client.post(
+        "/api/owner/resume-templates",
+        json={
+            "slug": "with-certs",
+            "name": {"zh-Hant": "證書版", "zh-Hans": "证书版", "en": "Certs"},
+            "sections": ["summary", "certs"],
+            "extras": [{"slug": "certs", "title": "Certifications"}],
+        },
+        headers=headers,
+    )
+    assert layout.status_code == 200
+    assert layout.json()["extras"][0]["slug"] == "certs"
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            slug="certs-en",
+            templateSlug="with-certs",
+            extras=[
+                {
+                    "slug": "certs",
+                    "title": "Certifications",
+                    "lines": ["AWS Cloud Practitioner"],
+                    "entries": [],
+                }
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert created.json()["extras"][0]["lines"] == ["AWS Cloud Practitioner"]
+    pdf = await client.get(
+        f"/api/owner/resumes/{created.json()['id']}/pdf",
+        headers=headers,
+    )
+    assert pdf.status_code == 200
+    text = PdfReader(io_bytes(pdf.content)).pages[0].extract_text() or ""
+    assert "AWS Cloud Practitioner" in text
+    assert "CERTIFICATIONS" in text
+
+
+@pytest.mark.asyncio
 async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
     client, mailer, settings
 ):

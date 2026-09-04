@@ -408,12 +408,25 @@ class ResumeLanguage(BaseModel):
     level: str = ""
 
 
+class ResumeExtraDef(BaseModel):
+    slug: str = ""
+    title: str = ""
+
+
+class ResumeExtra(BaseModel):
+    slug: str = ""
+    title: str = ""
+    lines: list[str] = Field(default_factory=list)
+    entries: list[ResumeExperience] = Field(default_factory=list)
+
+
 class ResumeTemplate(Document):
     slug: str = ""
     name: dict[str, str] = Field(default_factory=empty_localized)
     sections: list[str] = Field(
         default_factory=lambda: ["summary", "education", "projects", "skillsOthers"]
     )
+    extras: list[ResumeExtraDef] = Field(default_factory=list)
     builtin: bool = False
 
     class Settings:
@@ -425,6 +438,7 @@ class ResumeTemplate(Document):
             "slug": self.slug,
             "name": self.name,
             "sections": list(self.sections),
+            "extras": [item.model_dump() for item in self.extras],
             "builtin": self.builtin,
         }
 
@@ -443,6 +457,7 @@ class Resume(Document):
     activities: list[ResumeExperience] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
     languages: list[ResumeLanguage] = Field(default_factory=list)
+    extras: list[ResumeExtra] = Field(default_factory=list)
     pdf_filename: str = ""
     github_repo: str = ""
     github_json_path: str = ""
@@ -472,6 +487,7 @@ class Resume(Document):
             "activities": [item.model_dump() for item in self.activities],
             "skills": list(self.skills),
             "languages": [item.model_dump() for item in self.languages],
+            "extras": [item.model_dump() for item in self.extras],
             "pdfUrl": self.pdf_url() if self.pdf_filename else "",
             "githubRepo": self.github_repo,
             "githubJsonPath": self.github_json_path,
