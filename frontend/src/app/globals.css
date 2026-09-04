@@ -1483,6 +1483,8 @@ html.is-locale-hold .article-page {
 
 .field {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin-top: 0.25rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-card);
@@ -1838,6 +1840,8 @@ html.is-locale-hold .article-page {
 }
 
 .cms-card {
+  min-width: 0;
+  max-width: 100%;
   min-height: 12rem;
 }
 
@@ -2028,8 +2032,11 @@ html.is-locale-hold .article-page {
 
 .admin-page {
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   min-height: 100dvh;
   justify-content: center;
+  overflow-x: clip;
   padding: max(4.5rem, calc(3.25rem + env(safe-area-inset-top)))
     max(1rem, env(safe-area-inset-right))
     max(1.25rem, env(safe-area-inset-bottom))
@@ -2053,13 +2060,14 @@ html.is-locale-hold .article-page {
 
 .admin-dashboard-shell {
   width: 100%;
-  max-width: 72rem;
+  min-width: 0;
+  max-width: min(72rem, 100%);
   transition: max-width 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .admin-dashboard-shell.is-agent {
   display: flex;
-  max-width: 92rem;
+  max-width: min(92rem, 100%);
   width: 100%;
   min-height: 0;
   flex: 1 1 0;
@@ -2087,6 +2095,8 @@ html.is-locale-hold .article-page {
 }
 
 .admin-tab-panel {
+  min-width: 0;
+  max-width: 100%;
   animation: admin-tab-enter 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
@@ -3933,40 +3943,67 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 @media (max-width: 1023px) {
+  .admin-page {
+    padding-left: max(0.55rem, env(safe-area-inset-left));
+    padding-right: max(0.55rem, env(safe-area-inset-right));
+  }
+
   .admin-page:has(.admin-dashboard-shell.is-agent) {
     padding-top: max(3.25rem, calc(2.6rem + env(safe-area-inset-top)));
     padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
-    padding-left: max(0.6rem, env(safe-area-inset-left));
-    padding-right: max(0.6rem, env(safe-area-inset-right));
+    padding-left: max(0.55rem, env(safe-area-inset-left));
+    padding-right: max(0.55rem, env(safe-area-inset-right));
   }
 
-  .admin-dashboard-shell.is-agent .admin-dash-head {
+  .admin-dashboard-shell .admin-dash-head {
     flex-wrap: nowrap;
     align-items: center;
     margin-bottom: 0.4rem;
-    padding: 0.4rem 0.7rem;
+    padding: 0.45rem 0.7rem;
   }
 
-  .admin-dashboard-shell.is-agent .admin-dash-head h1 {
+  .admin-dashboard-shell .admin-dash-head h1 {
     margin: 0;
     font-size: 1rem;
   }
 
-  .admin-dashboard-shell.is-agent .admin-dash-head p {
+  .admin-dashboard-shell .admin-dash-head p {
     display: none;
   }
 
-  .admin-dashboard-shell.is-agent .admin-tab-bar {
+  .admin-dashboard-shell .admin-tab-bar {
     display: flex;
     width: 100%;
+    min-width: 0;
     margin-bottom: 0.4rem;
   }
 
-  .admin-dashboard-shell.is-agent .admin-tab-bar button {
+  .admin-dashboard-shell .admin-tab-bar button {
     flex: 1 1 0;
     min-width: 0;
-    padding: 0.28rem 0.2rem;
+    overflow: hidden;
+    padding: 0.28rem 0.12rem;
     font-size: 0.68rem;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .admin-page .cms-card {
+    padding: 0.85rem 0.8rem;
+  }
+
+  .admin-page .btn-ghost {
+    padding: 0.42rem 0.7rem;
+  }
+
+  .admin-page .segment:not(.admin-tab-bar) {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .admin-page .grid {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .agent-mobile-nav {
@@ -4331,7 +4368,7 @@ html[data-theme="dark"] .ambient-orb {
 
 .agent-message {
   width: fit-content;
-  max-width: min(100%, 36rem);
+  max-width: 100%;
   min-width: 0;
   padding: 0.7rem 0.85rem;
   border: 1px solid var(--hairline);
@@ -4340,6 +4377,12 @@ html[data-theme="dark"] .ambient-orb {
   line-height: 1.55;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+@media (min-width: 1024px) {
+  .agent-message {
+    max-width: min(100%, 36rem);
+  }
 }
 
 .agent-message .markdown-body,
