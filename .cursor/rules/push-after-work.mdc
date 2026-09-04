@@ -1,0 +1,14 @@
+---
+description: After finishing requested work, commit if needed and always push.
+alwaysApply: true
+---
+
+# Always push when work is done
+
+When a requested task is complete (feature, fix, copy, or layout):
+
+1. Commit the relevant changes if they are not committed yet. Pushing implies commit first.
+2. `git push` to the tracked remote. Do not wait to be asked again in this repo.
+3. Return the remote commit URL when done.
+
+Do not force-push `main`/`master`. Do not commit secrets, `.env`, or unrelated untracked files.

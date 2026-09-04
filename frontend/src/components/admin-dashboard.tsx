@@ -89,10 +89,14 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
 
       <div
         key={tab}
-        className="admin-tab-panel grid gap-5 lg:grid-cols-2"
+        className={
+          tab === "agent"
+            ? "admin-tab-panel"
+            : "admin-tab-panel grid gap-5 lg:grid-cols-2"
+        }
       >
         {tab === "agent" ? (
-          <div className="lg:col-span-2">
+          <div>
             <AgentChat />
           </div>
         ) : null}

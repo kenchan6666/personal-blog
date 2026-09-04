@@ -1186,12 +1186,43 @@ a:visited {
   pointer-events: auto;
 }
 
+.site-root {
+  position: relative;
+  z-index: 10;
+  min-height: 100svh;
+}
+
 .site-main {
   min-width: 0;
   min-height: 100svh;
   transition:
     opacity 280ms ease,
     filter 280ms ease;
+}
+
+html:has(.admin-dashboard-shell.is-agent),
+html:has(.admin-dashboard-shell.is-agent) body {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.site-root:has(.admin-dashboard-shell.is-agent),
+.site-main:has(.admin-dashboard-shell.is-agent),
+.admin-page:has(.admin-dashboard-shell.is-agent) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.site-root:has(.admin-dashboard-shell.is-agent) {
+  height: 100dvh;
+}
+
+.site-main:has(.admin-dashboard-shell.is-agent),
+.admin-page:has(.admin-dashboard-shell.is-agent) {
+  flex: 1 1 0;
+  height: auto;
 }
 
 html.is-route-pending {
@@ -2006,8 +2037,8 @@ html.is-locale-hold .article-page {
 }
 
 .admin-page:has(.admin-dashboard-shell.is-agent) {
-  height: 100dvh;
-  overflow: hidden;
+  justify-content: flex-start;
+  align-items: stretch;
 }
 
 .admin-tab-bar {
@@ -2026,9 +2057,11 @@ html.is-locale-hold .article-page {
 .admin-dashboard-shell.is-agent {
   display: flex;
   max-width: 92rem;
-  height: 100%;
+  width: 100%;
   min-height: 0;
+  flex: 1 1 0;
   flex-direction: column;
+  height: auto;
 }
 
 .admin-dashboard-shell.is-agent .admin-dash-head,
@@ -2045,8 +2078,8 @@ html.is-locale-hold .article-page {
 .admin-dashboard-shell.is-agent .admin-tab-panel > div {
   display: flex;
   min-height: 0;
-  height: 100%;
-  flex: 1;
+  height: auto;
+  flex: 1 1 0;
   flex-direction: column;
 }
 
@@ -3496,7 +3529,9 @@ html[data-theme="dark"] .ambient-orb {
 
 .agent-workspace {
   display: grid;
+  min-width: 0;
   min-height: 0;
+  max-width: 100%;
   height: min(calc(100dvh - 12rem), 52rem);
   grid-template-columns: minmax(12rem, 0.72fr) minmax(24rem, 1.8fr) minmax(16rem, 0.95fr);
   grid-template-rows: minmax(0, 1fr);
@@ -3504,9 +3539,11 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 .admin-dashboard-shell.is-agent .agent-workspace {
-  flex: 1;
+  flex: 1 1 0;
   height: auto;
   min-height: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .agent-workspace.is-compact {
@@ -3521,6 +3558,7 @@ html[data-theme="dark"] .ambient-orb {
 .agent-workspace > .agent-knowledge {
   min-width: 0;
   min-height: 0;
+  max-width: 100%;
   height: 100%;
 }
 
@@ -3885,16 +3923,20 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .admin-dashboard-shell.is-agent .admin-dash-head {
-    margin-bottom: 0.7rem;
-    padding: 0.85rem 1rem;
+    margin-bottom: 0.55rem;
+    padding: 0.7rem 0.85rem;
   }
 
   .admin-dashboard-shell.is-agent .admin-dash-head h1 {
     font-size: 1.15rem;
   }
 
+  .admin-dashboard-shell.is-agent .admin-dash-head p {
+    display: none;
+  }
+
   .admin-tab-bar {
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.55rem;
   }
 
   .agent-mobile-nav {
@@ -3908,6 +3950,7 @@ html[data-theme="dark"] .ambient-orb {
 
   .agent-mobile-nav button {
     flex: 1;
+    min-width: 0;
     min-height: 2.5rem;
     border: 0;
     border-radius: 12px;
@@ -3925,17 +3968,24 @@ html[data-theme="dark"] .ambient-orb {
   .agent-workspace:not(.is-compact) {
     display: flex;
     flex-direction: column;
-    height: 100%;
+    height: auto;
     min-height: 0;
+    overflow: hidden;
   }
 
   .agent-workspace:not(.is-compact) > .agent-conversations,
   .agent-workspace:not(.is-compact) > .agent-knowledge,
   .agent-workspace:not(.is-compact) > .agent-chat {
     display: none;
-    flex: 1;
+    flex: 1 1 0;
     width: 100%;
+    height: auto;
+    min-height: 0;
     max-height: none;
+  }
+
+  .agent-delete-mini {
+    opacity: 1;
   }
 
   .agent-workspace.is-conversations > .agent-conversations,
@@ -3957,7 +4007,11 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-message {
-    max-width: min(94%, 48rem);
+    max-width: 100%;
+  }
+
+  .agent-messages {
+    padding: 0.85rem;
   }
 
   .agent-composer {
@@ -3966,6 +4020,12 @@ html[data-theme="dark"] .ambient-orb {
         0.85rem,
         calc(env(safe-area-inset-bottom) + var(--agent-keyboard-inset, 0px))
       );
+  }
+
+  .agent-compose-row textarea {
+    height: 2.35rem;
+    min-height: 2.35rem;
+    max-height: 2.35rem;
   }
 
   .public-guide-panel {
@@ -4141,7 +4201,9 @@ html[data-theme="dark"] .ambient-orb {
 .agent-messages {
   display: flex;
   flex: 1 1 0;
+  min-width: 0;
   min-height: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: 0.85rem;
   overflow-x: hidden;
@@ -4169,6 +4231,13 @@ html[data-theme="dark"] .ambient-orb {
   font-size: 0.86rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.agent-message .markdown-body,
+.agent-message .markdown-body pre,
+.agent-message .markdown-body table {
+  max-width: 100%;
 }
 
 .agent-message.is-user {
@@ -4179,7 +4248,6 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 .agent-message.is-assistant {
-  width: min(100%, 36rem);
   align-self: flex-start;
   border-bottom-left-radius: 5px;
   background: var(--panel-fill-strong);
@@ -4397,6 +4465,30 @@ html[data-theme="dark"] .ambient-orb {
 .agent-send:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+@media (max-width: 760px) {
+  .agent-messages {
+    padding: 0.85rem;
+  }
+
+  .agent-message {
+    max-width: 100%;
+  }
+
+  .agent-composer {
+    padding: 0.75rem 0.85rem
+      max(
+        0.85rem,
+        calc(env(safe-area-inset-bottom) + var(--agent-keyboard-inset, 0px))
+      );
+  }
+
+  .agent-compose-row textarea {
+    height: 2.35rem;
+    min-height: 2.35rem;
+    max-height: 2.35rem;
+  }
 }
 
 .ai-field-button {

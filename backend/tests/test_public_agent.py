@@ -85,6 +85,18 @@ def test_public_prompt_stays_source_bound_without_lecturing() -> None:
     assert "Private GitHub repositories are out of scope" not in prompt
 
 
+def test_public_prompt_is_hiring_aware_without_pitching() -> None:
+    prompt = _system_prompt("en", '{"projects":[]}')
+
+    assert "hiring visitor" in prompt
+    assert "not a salesperson" in prompt
+    assert "Never volunteer weaknesses" in prompt
+    assert "Do not deflect" in prompt
+    assert "redirect to evidenced strengths" not in prompt
+    assert "credible candidate" not in prompt
+    assert "Journals only when asked" in prompt
+
+
 def test_public_guide_floor_stops_mid_sentence_truncation() -> None:
     assert public_guide_max_tokens(350) == 4096
     assert public_guide_max_tokens(1024) == 4096

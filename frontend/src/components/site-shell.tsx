@@ -79,7 +79,7 @@ export function SiteShell({ children }: Props) {
   const shellDict = { ...dict, brand };
 
   return (
-    <div className="relative z-10 min-h-screen">
+    <div className="site-root">
       <LocaleHtml locale={locale} />
       <RouteProgress />
       <Sidebar
