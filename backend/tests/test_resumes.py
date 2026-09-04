@@ -186,6 +186,29 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
 
 
 @pytest.mark.asyncio
+async def test_resume_title_follows_header_name(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(title="Internship CV"),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert created.json()["title"] == "Chan YatNam"
+
+    body = _resume_payload()
+    body["header"] = {**body["header"], "name": "Ken Chan"}
+    updated = await client.put(
+        f"/api/owner/resumes/{created.json()['id']}",
+        json=body,
+        headers=headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "Ken Chan"
+
+
+@pytest.mark.asyncio
 async def test_import_resume_from_github_uses_authorized_file(
     client, mailer, settings, app
 ):

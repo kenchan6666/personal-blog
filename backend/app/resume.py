@@ -193,7 +193,6 @@ def apply_template_body(template: ResumeTemplate, body: dict[str, Any]) -> None:
 
 def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
     resume.slug = validate_slug(str(body.get("slug") or resume.slug))
-    resume.title = str(body.get("title") or resume.title or resume.slug)
     resume.template_slug = str(
         body.get("templateSlug") or resume.template_slug or CLASSIC_RESUME_TEMPLATE_SLUG
     ).strip()
@@ -213,6 +212,8 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
     resume.status = force_draft_if_service(incoming_status, resume.status)
     header = body["header"] if "header" in body else resume.header
     resume.header = ResumeHeader.model_validate(header)
+    incoming_title = str(body.get("title") or "").strip()
+    resume.title = resume.header.name.strip() or incoming_title or resume.title or resume.slug
     resume.summary = [
         str(line).strip()
         for line in (body["summary"] if "summary" in body else resume.summary)

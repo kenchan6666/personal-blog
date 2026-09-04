@@ -136,12 +136,17 @@ export function ResumeEditor({ locale, dict }: Props) {
     setSaving(true);
     setError(null);
     try {
+      const payload = {
+        ...next,
+        title: next.header.name.trim() || next.title.trim() || next.slug,
+        slug:
+          next.slug ||
+          slugify(next.header.name || next.title) ||
+          "resume",
+      };
       const saved = next.id
-        ? await saveOwnerResume(token, next.id, next)
-        : await createOwnerResume(token, {
-            ...next,
-            slug: next.slug || slugify(next.title || next.header.name) || "resume",
-          });
+        ? await saveOwnerResume(token, next.id, payload)
+        : await createOwnerResume(token, payload);
       setCurrent(saved);
       await reload(token);
       setMessage(a.saved);
@@ -320,12 +325,6 @@ export function ResumeEditor({ locale, dict }: Props) {
               </button>
             </div>
 
-            <AgentField
-              label={a.fieldResumeTitle}
-              value={current.title}
-              closeLabel={a.close}
-              onChange={(title) => setCurrent({ ...current, title })}
-            />
             <label className="mb-3 block text-xs text-[var(--text-muted)]">
               {a.fieldResumeSlug}
               <input
@@ -360,6 +359,7 @@ export function ResumeEditor({ locale, dict }: Props) {
               onChange={(name) =>
                 setCurrent({
                   ...current,
+                  title: name,
                   header: { ...current.header, name },
                 })
               }
@@ -944,7 +944,7 @@ export function ResumeEditor({ locale, dict }: Props) {
                       ref: githubRef,
                       slug:
                         current.slug ||
-                        slugify(current.title) ||
+                        slugify(current.header.name || current.title) ||
                         "imported-resume",
                     });
                     setCurrent(imported);

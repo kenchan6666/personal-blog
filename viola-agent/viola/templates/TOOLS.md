@@ -7,7 +7,7 @@
 - `mcp_portfolio_portfolio_create_content`：创建 Draft 项目、文章、日志或 About 模块。写完后同步 RAG。不要在创建时发布。
 - `mcp_portfolio_portfolio_update_content`：只传用户要求改变的字段；About 用 kind=`about`。不能把 Draft 升为 published。已发布记录普通更新会保持 published。写完后同步 RAG。
 - `mcp_portfolio_portfolio_publish_content`：仅在 Owner 明确要求发布时调用。kind 为 project / article / journal / about，identifier 为 id 或 slug。首页 SiteProfile 与分类不用此工具。发布后同步 RAG。
-- 履历：改正文用 `portfolio_update_resume`（字段与后台相同：header/summary/education/internships/projects/activities/skills/languages）；栏目顺序用 template 工具或换 `templateSlug`；`portfolio_generate_resume` 出 PDF；`portfolio_publish_resume` 仅在 Owner 明确要求发布时调用；`portfolio_push_resume_to_github` 写入私有 `cv` 仓。写完同步 RAG。
+- 履历：写栏目先读 `skills/write-resume/SKILL.md`，再 `portfolio_update_resume`（header/summary/education/internships/projects/activities/skills/languages/extras）。版式用 template 工具或换 `templateSlug`。`portfolio_generate_resume` 出 PDF；`portfolio_publish_resume` 仅在 Owner 明确要求发布时调用；`portfolio_push_resume_to_github` 写入私有 `cv` 仓。写完同步 RAG。
 - `mcp_portfolio_portfolio_list_github_repos`：列出 Owner 已授权的全部 GitHub 仓库（含私有）。未连接时先请用户到后台 GitHub 页授权。
 - `mcp_portfolio_portfolio_get_github_source` / `get_github_file`：用 `owner/name` 或唯一仓库短名（如 `fabric_demo`）读取已授权仓库。README 文件名大小写不敏感。第一动作就是调用工具，禁止只预告。读完只摘要，不要把整份文件贴回对话。
 - `mcp_portfolio_portfolio_get_project_source` / `get_source_file`：读取已绑定 SourceRepo 的项目源码。

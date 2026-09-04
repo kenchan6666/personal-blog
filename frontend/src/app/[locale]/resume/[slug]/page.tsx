@@ -20,7 +20,7 @@ export async function generateMetadata({
     const resume = await fetchPublicResume(slug);
     return pageMetadata({
       locale,
-      title: resume.title || resume.header.name,
+      title: resume.header.name || resume.title,
       description: resume.summary[0] || getDictionary(locale).resume.lead,
       path: `/resume/${slug}`,
     });
@@ -52,7 +52,11 @@ export default async function ResumeDetailPage({
     : `${api}/api/public/resumes/${encodeURIComponent(slug)}/pdf`;
 
   return (
-    <PageFrame title={resume.title || resume.header.name} lead={dict.resume.lead} narrow>
+    <PageFrame
+      title={dict.resume.title}
+      lead={resume.summary[0] || dict.resume.lead}
+      narrow
+    >
       <div className="mb-5 flex flex-wrap gap-3">
         <a className="btn-cta" href={pdfHref}>
           {dict.resume.download}

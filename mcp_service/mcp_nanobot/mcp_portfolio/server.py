@@ -674,7 +674,7 @@ def create_server() -> FastMCP:
     @server.tool()
     def portfolio_create_resume(
         slug: str,
-        title: str,
+        title: str = "",
         template_slug: str = "classic-a4",
         locale: str = "en",
         header: dict[str, Any] | None = None,
@@ -686,7 +686,7 @@ def create_server() -> FastMCP:
         skills: list[str] | None = None,
         languages: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
-        """Create a Draft Resume filled from structured fields. Always draft."""
+        """Create a Draft Resume. title is optional and defaults to header.name. Printed name is header.name."""
         api.require_write()
         return api.request(
             "POST",
@@ -713,7 +713,7 @@ def create_server() -> FastMCP:
         identifier: str,
         changes: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update Resume fields the CMS can edit: title, slug, locale, templateSlug, header, summary[], education[], internships[], projects[], activities[], skills[], languages[], extras[] (custom sections: slug/title/lines/entries). Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
+        """Update Resume fields the CMS can edit: slug, locale, templateSlug, header (printed name is header.name), summary[], education[], internships[], projects[], activities[], skills[], languages[], extras[] (custom sections: slug/title/lines/entries). title follows header.name. Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
         api.require_write()
         current = _resume_by_id(identifier)
         payload = _merge(current, changes)

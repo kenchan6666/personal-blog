@@ -48,8 +48,14 @@
 | 绑定仓源码 | `portfolio_get_project_source` / `portfolio_get_source_file` | 已绑 SourceRepo 的项目 |
 | 评论 | `portfolio_list_comments` / `portfolio_comment_action` | 审核/回复须明确要求 |
 | RAG | `portfolio_list_knowledge` / `remember_knowledge` / `update_knowledge` | 改站点或需要身份事实 |
+| 列/读履历 | `portfolio_list_resumes` / `portfolio_get_resume` | 已有 Resume；写正文前先读 |
+| 写履历栏目 | `portfolio_update_resume` | summary / education / internship / projects / activities / skills / extras；先读 `skills/write-resume/SKILL.md` |
+| 版式 | `portfolio_list/get/create/update_resume_template` | 栏目顺序与自订栏目标题，不是正文 |
+| 出 PDF | `portfolio_generate_resume` | 按版式重画一页 A4 |
+| 发布履历 | `portfolio_publish_resume` | Owner 当前消息明确要求发布 |
+| 推 cv 仓 | `portfolio_push_resume_to_github` | 写入私有 `cv`；没有仓则创建 |
 
-Public Guide **没有**这些工具。
+Public Guide **没有**这些工具。写履历栏目的句式与取舍见 workspace skill [`skills/write-resume/SKILL.md`](../../skills/write-resume/SKILL.md)。
 
 ## 服务型：性格
 

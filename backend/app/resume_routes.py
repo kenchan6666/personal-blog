@@ -104,7 +104,7 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         return [
             {
                 "slug": item.slug,
-                "title": item.title or item.header.name or item.slug,
+                "title": item.header.name or item.title or item.slug,
                 "locale": item.locale,
                 "pdfUrl": item.pdf_url() if item.pdf_filename else "",
             }
