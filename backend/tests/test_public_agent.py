@@ -90,6 +90,9 @@ def test_public_prompt_is_hiring_aware_without_pitching() -> None:
     assert "Do not sell" in prompt
     assert "colleague" in prompt
     assert "direct answer" in prompt
+    assert "Talk about Ken, not about yourself" in prompt
+    assert "missing detail is not a weakness" in prompt
+    assert "Two short sentences at most" in prompt
     assert "Do not change the subject" in prompt
     assert "Stop when the question is answered" in prompt
     assert "2–5 named facts" not in prompt
