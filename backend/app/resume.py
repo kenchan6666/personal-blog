@@ -1,0 +1,439 @@
+from __future__ import annotations
+
+import io
+import json
+import re
+import uuid
+from pathlib import Path
+from typing import Any
+
+from fastapi import HTTPException, status
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
+
+from app.models import (
+    CLASSIC_RESUME_TEMPLATE_SLUG,
+    LOCALES,
+    RESUME_SECTIONS,
+    Resume,
+    ResumeEducation,
+    ResumeExperience,
+    ResumeHeader,
+    ResumeLanguage,
+    ResumeProject,
+    ResumeTemplate,
+    empty_localized,
+)
+from app.owner_actor import force_draft_if_service
+from app.store import current_store, new_document
+
+_SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_MONTHS = (
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+)
+_CJK_FONT_CANDIDATES = (
+    Path(r"C:\Windows\Fonts\msyh.ttc"),
+    Path(r"C:\Windows\Fonts\msyh.ttf"),
+    Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+    Path("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+)
+
+_PAGE_WIDTH, _PAGE_HEIGHT = A4
+_LEFT = 35
+_BODY = 50
+_DATE_RIGHT = 521
+_NAME_SIZE = 14
+_TITLE_SIZE = 10
+_BODY_SIZE = 9
+
+_REGISTERED_FONT = ""
+
+
+def ensure_resume_dir(path: str | Path) -> Path:
+    directory = Path(path)
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def save_resume_pdf_bytes(
+    data: bytes,
+    *,
+    directory: Path,
+    previous_filename: str | None,
+) -> str:
+    filename = f"{uuid.uuid4().hex}.pdf"
+    target = directory / filename
+    target.write_bytes(data)
+    if previous_filename:
+        old = directory / Path(previous_filename).name
+        if old.exists() and old != target:
+            old.unlink(missing_ok=True)
+    return filename
+
+
+def builtin_classic_template() -> dict[str, Any]:
+    return {
+        "slug": CLASSIC_RESUME_TEMPLATE_SLUG,
+        "name": {
+            "zh-Hant": "經典 A4 單欄",
+            "zh-Hans": "经典 A4 单栏",
+            "en": "Classic A4 single column",
+        },
+        "sections": ["summary", "education", "projects", "skillsOthers"],
+        "builtin": True,
+    }
+
+
+async def ensure_builtin_templates() -> None:
+    store = current_store()
+    existing = await store.find_one(
+        ResumeTemplate, slug=CLASSIC_RESUME_TEMPLATE_SLUG
+    )
+    if existing is not None:
+        return
+    template = new_document(ResumeTemplate, **builtin_classic_template())
+    await store.insert(template)
+
+
+def validate_slug(slug: str) -> str:
+    cleaned = slug.strip().lower()
+    if not _SLUG_RE.match(cleaned):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_slug",
+        )
+    return cleaned
+
+
+def validate_sections(sections: list[str]) -> list[str]:
+    cleaned: list[str] = []
+    for item in sections:
+        key = str(item).strip()
+        if key not in RESUME_SECTIONS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_section",
+            )
+        if key not in cleaned:
+            cleaned.append(key)
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_section",
+        )
+    return cleaned
+
+
+def apply_template_body(template: ResumeTemplate, body: dict[str, Any]) -> None:
+    template.slug = validate_slug(str(body.get("slug") or template.slug))
+    name = body.get("name") or template.name
+    if not isinstance(name, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_name",
+        )
+    merged = empty_localized()
+    merged.update({key: str(name.get(key) or "") for key in LOCALES})
+    template.name = merged
+    template.sections = validate_sections(
+        list(body.get("sections") or template.sections)
+    )
+    if body.get("builtin") is True:
+        template.builtin = True
+
+
+def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
+    resume.slug = validate_slug(str(body.get("slug") or resume.slug))
+    resume.title = str(body.get("title") or resume.title or resume.slug)
+    resume.template_slug = str(
+        body.get("templateSlug") or resume.template_slug or CLASSIC_RESUME_TEMPLATE_SLUG
+    ).strip()
+    locale = str(body.get("locale") or resume.locale or "en")
+    if locale not in LOCALES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_locale",
+        )
+    resume.locale = locale
+    incoming_status = str(body.get("status") or resume.status or "draft")
+    if incoming_status not in {"draft", "published"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_status",
+        )
+    resume.status = force_draft_if_service(incoming_status, resume.status)
+    header = body["header"] if "header" in body else resume.header
+    resume.header = ResumeHeader.model_validate(header)
+    resume.summary = [
+        str(line).strip()
+        for line in (body["summary"] if "summary" in body else resume.summary)
+        if str(line).strip()
+    ]
+    resume.education = [
+        ResumeEducation.model_validate(item)
+        for item in (
+            body["education"]
+            if "education" in body
+            else [item.model_dump() for item in resume.education]
+        )
+    ]
+    resume.internships = [
+        ResumeExperience.model_validate(item)
+        for item in (
+            body["internships"]
+            if "internships" in body
+            else [item.model_dump() for item in resume.internships]
+        )
+    ]
+    resume.projects = [
+        ResumeProject.model_validate(item)
+        for item in (
+            body["projects"]
+            if "projects" in body
+            else [item.model_dump() for item in resume.projects]
+        )
+    ]
+    resume.activities = [
+        ResumeExperience.model_validate(item)
+        for item in (
+            body["activities"]
+            if "activities" in body
+            else [item.model_dump() for item in resume.activities]
+        )
+    ]
+    resume.skills = [
+        str(item).strip()
+        for item in (body["skills"] if "skills" in body else resume.skills)
+        if str(item).strip()
+    ]
+    resume.languages = [
+        ResumeLanguage.model_validate(item)
+        for item in (
+            body["languages"]
+            if "languages" in body
+            else [item.model_dump() for item in resume.languages]
+        )
+    ]
+
+
+def parse_resume_import(payload: Any) -> dict[str, Any]:
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid_resume_json",
+        )
+    source = payload.get("instance") if isinstance(payload.get("instance"), dict) else payload
+    header = source.get("header") or {}
+    if not header and any(key in source for key in ("name", "phone", "email", "city")):
+        header = {
+            "name": source.get("name") or "",
+            "phone": source.get("phone") or "",
+            "email": source.get("email") or "",
+            "city": source.get("city") or "",
+        }
+    skills_block = source.get("skillsOthers") or {}
+    return {
+        "title": source.get("title") or header.get("name") or "",
+        "templateSlug": source.get("templateSlug") or CLASSIC_RESUME_TEMPLATE_SLUG,
+        "locale": source.get("locale") or "en",
+        "header": header,
+        "summary": source.get("summary") or [],
+        "education": source.get("education") or [],
+        "internships": source.get("internships") or [],
+        "projects": source.get("projects") or [],
+        "activities": source.get("activities") or [],
+        "skills": source.get("skills") or skills_block.get("skills") or [],
+        "languages": source.get("languages") or skills_block.get("languages") or [],
+    }
+
+
+def format_month(value: str) -> str:
+    text = (value or "").strip()
+    match = re.match(r"^(\d{4})-(\d{1,2})", text)
+    if not match:
+        return text
+    year = match.group(1)
+    month = int(match.group(2))
+    if 1 <= month <= 12:
+        return f"{_MONTHS[month - 1]} {year}"
+    return text
+
+
+def format_range(start: str, end: str) -> str:
+    left = format_month(start)
+    right = format_month(end) or "Present"
+    if left and right:
+        return f"{left} - {right}"
+    return left or right
+
+
+def _body_font() -> str:
+    global _REGISTERED_FONT
+    if _REGISTERED_FONT:
+        return _REGISTERED_FONT
+    for path in _CJK_FONT_CANDIDATES:
+        if not path.is_file():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont("ResumeBody", str(path), subfontIndex=0))
+            _REGISTERED_FONT = "ResumeBody"
+            return _REGISTERED_FONT
+        except Exception:
+            continue
+    _REGISTERED_FONT = "Helvetica"
+    return _REGISTERED_FONT
+
+
+def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
+    buffer = io.BytesIO()
+    page = canvas.Canvas(buffer, pagesize=A4)
+    font = _body_font()
+    y = _PAGE_HEIGHT - 36
+    page.setFillColorRGB(0.10, 0.09, 0.19)
+
+    def text_width(value: str, size: float) -> float:
+        return pdfmetrics.stringWidth(value, font, size)
+
+    def draw_centered(value: str, size: float) -> None:
+        nonlocal y
+        page.setFont(font, size)
+        page.drawString((_PAGE_WIDTH - text_width(value, size)) / 2, y, value)
+        y -= size + 4
+
+    def wrap(value: str, width: float, size: float) -> list[str]:
+        words = value.split()
+        if not words:
+            return []
+        lines = [words[0]]
+        for word in words[1:]:
+            trial = f"{lines[-1]} {word}"
+            if text_width(trial, size) <= width:
+                lines[-1] = trial
+            else:
+                lines.append(word)
+        return lines
+
+    def draw_wrapped(value: str, x: float, size: float, width: float) -> None:
+        nonlocal y
+        page.setFont(font, size)
+        for line in wrap(value, width, size) or [value]:
+            page.drawString(x, y, line)
+            y -= size + 4
+
+    def section_title(title: str) -> None:
+        nonlocal y
+        y -= 8
+        page.setFont(font, _TITLE_SIZE)
+        page.drawString(_LEFT, y, title)
+        y -= 6
+        page.setStrokeColorRGB(0.35, 0.27, 0.55)
+        page.setLineWidth(0.6)
+        page.line(_LEFT, y, _PAGE_WIDTH - 36, y)
+        y -= 14
+
+    def entry_row(left: str, right: str) -> None:
+        nonlocal y
+        page.setFont(font, _BODY_SIZE)
+        page.drawString(_LEFT, y, left)
+        if right:
+            page.drawRightString(_DATE_RIGHT + 36, y, right)
+        y -= _BODY_SIZE + 5
+
+    header = resume.header
+    draw_centered(header.name or resume.title or "Resume", _NAME_SIZE)
+    contact = "  |  ".join(part for part in (header.phone, header.email) if part)
+    if contact:
+        draw_centered(contact, _BODY_SIZE)
+    if header.city:
+        draw_centered(header.city, _BODY_SIZE)
+    for link in header.links:
+        if link:
+            draw_centered(link, _BODY_SIZE)
+
+    titles = {
+        "summary": "SUMMARY",
+        "education": "EDUCATION",
+        "internship": "INTERNSHIP",
+        "projects": "PROJECT EXPERIENCE",
+        "activities": "ACTIVITIES",
+        "skillsOthers": "SKILLS, CERTIFICATIONS & OTHERS",
+    }
+    width = _PAGE_WIDTH - _BODY - 40
+
+    for section in template.sections:
+        if section == "summary" and resume.summary:
+            section_title(titles[section])
+            for line in resume.summary:
+                draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        elif section == "education" and resume.education:
+            section_title(titles[section])
+            for item in resume.education:
+                entry_row(item.institution, format_range(item.start, item.end))
+                subtitle = " ".join(part for part in (item.field, item.degree) if part)
+                entry_row(subtitle, item.city)
+                if item.honor:
+                    draw_wrapped(item.honor, _LEFT, _BODY_SIZE, width)
+                if item.related_courses:
+                    draw_wrapped(
+                        "Related course: " + ", ".join(item.related_courses),
+                        _LEFT,
+                        _BODY_SIZE,
+                        width,
+                    )
+        elif section == "internship" and resume.internships:
+            section_title(titles[section])
+            for item in resume.internships:
+                entry_row(item.organization, format_range(item.start, item.end))
+                entry_row(item.role, item.city)
+                for line in item.description:
+                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        elif section == "projects" and resume.projects:
+            section_title(titles[section])
+            for item in resume.projects:
+                entry_row(item.name, format_range(item.start, item.end))
+                if item.tech_stack:
+                    draw_wrapped(
+                        "(" + ", ".join(item.tech_stack) + ")",
+                        _LEFT,
+                        _BODY_SIZE,
+                        width,
+                    )
+                for line in item.description:
+                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        elif section == "activities" and resume.activities:
+            section_title(titles[section])
+            for item in resume.activities:
+                entry_row(item.organization, format_range(item.start, item.end))
+                entry_row(item.role, item.city)
+                for line in item.description:
+                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        elif section == "skillsOthers" and (resume.skills or resume.languages):
+            section_title(titles[section])
+            if resume.skills:
+                draw_wrapped("Skills: " + ", ".join(resume.skills), _LEFT, _BODY_SIZE, width)
+            if resume.languages:
+                langs = ", ".join(
+                    f"{item.name} ({item.level})" if item.level else item.name
+                    for item in resume.languages
+                )
+                draw_wrapped("Languages: " + langs, _LEFT, _BODY_SIZE, width)
+
+    page.showPage()
+    page.save()
+    return buffer.getvalue()

@@ -1102,6 +1102,283 @@ export async function deleteOwnerAboutModule(
   if (!res.ok) throw new Error(await parseError(res));
 }
 
+export type ResumeSectionId =
+  | "summary"
+  | "education"
+  | "internship"
+  | "projects"
+  | "activities"
+  | "skillsOthers";
+
+export type OwnerResumeTemplate = {
+  id: string;
+  slug: string;
+  name: Localized;
+  sections: ResumeSectionId[];
+  builtin: boolean;
+};
+
+export type ResumeHeader = {
+  name: string;
+  phone: string;
+  email: string;
+  city: string;
+  links: string[];
+};
+
+export type ResumeEducation = {
+  institution: string;
+  field: string;
+  degree: string;
+  start: string;
+  end: string;
+  city: string;
+  honor: string;
+  related_courses: string[];
+};
+
+export type ResumeExperience = {
+  organization: string;
+  role: string;
+  start: string;
+  end: string;
+  city: string;
+  description: string[];
+};
+
+export type ResumeProject = {
+  name: string;
+  start: string;
+  end: string;
+  tech_stack: string[];
+  description: string[];
+};
+
+export type ResumeLanguage = {
+  name: string;
+  level: string;
+};
+
+export type OwnerResume = {
+  id: string;
+  slug: string;
+  title: string;
+  templateSlug: string;
+  locale: "zh-Hant" | "zh-Hans" | "en";
+  status: "draft" | "published";
+  header: ResumeHeader;
+  summary: string[];
+  education: ResumeEducation[];
+  internships: ResumeExperience[];
+  projects: ResumeProject[];
+  activities: ResumeExperience[];
+  skills: string[];
+  languages: ResumeLanguage[];
+  pdfUrl: string;
+};
+
+export type PublicResumeCard = {
+  slug: string;
+  title: string;
+  locale: string;
+  pdfUrl: string;
+};
+
+export type PublicResume = Omit<OwnerResume, "id" | "status">;
+
+export function emptyOwnerResume(): OwnerResume {
+  return {
+    id: "",
+    slug: "",
+    title: "",
+    templateSlug: "classic-a4",
+    locale: "en",
+    status: "draft",
+    header: { name: "", phone: "", email: "", city: "", links: [] },
+    summary: [],
+    education: [],
+    internships: [],
+    projects: [],
+    activities: [],
+    skills: [],
+    languages: [],
+    pdfUrl: "",
+  };
+}
+
+export function emptyOwnerResumeTemplate(): OwnerResumeTemplate {
+  return {
+    id: "",
+    slug: "",
+    name: emptyLocalized(),
+    sections: ["summary", "education", "projects", "skillsOthers"],
+    builtin: false,
+  };
+}
+
+export async function fetchPublicResumes(): Promise<PublicResumeCard[]> {
+  return publicJson<PublicResumeCard[]>(`${API_BASE}/api/public/resumes`);
+}
+
+export async function fetchPublicResume(slug: string): Promise<PublicResume> {
+  return publicJson<PublicResume>(
+    `${API_BASE}/api/public/resumes/${encodeURIComponent(slug)}`,
+  );
+}
+
+export async function fetchOwnerResumeTemplates(
+  token: string,
+): Promise<OwnerResumeTemplate[]> {
+  const res = await fetch(`${API_BASE}/api/owner/resume-templates`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResumeTemplate[];
+}
+
+export async function createOwnerResumeTemplate(
+  token: string,
+  body: Omit<OwnerResumeTemplate, "id" | "builtin">,
+): Promise<OwnerResumeTemplate> {
+  const res = await fetch(`${API_BASE}/api/owner/resume-templates`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResumeTemplate;
+}
+
+export async function saveOwnerResumeTemplate(
+  token: string,
+  id: string,
+  body: Omit<OwnerResumeTemplate, "id" | "builtin">,
+): Promise<OwnerResumeTemplate> {
+  const res = await fetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResumeTemplate;
+}
+
+export async function deleteOwnerResumeTemplate(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
+export async function fetchOwnerResumes(token: string): Promise<OwnerResume[]> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume[];
+}
+
+function resumePayload(resume: OwnerResume): Omit<OwnerResume, "id" | "pdfUrl"> {
+  const { id: _id, pdfUrl: _pdf, ...rest } = resume;
+  return rest;
+}
+
+export async function createOwnerResume(
+  token: string,
+  body: OwnerResume,
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(resumePayload(body)),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
+export async function saveOwnerResume(
+  token: string,
+  id: string,
+  body: OwnerResume,
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(resumePayload(body)),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
+export async function deleteOwnerResume(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
+export async function generateOwnerResume(
+  token: string,
+  id: string,
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/generate`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
+export async function publishOwnerResume(
+  token: string,
+  id: string,
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/publish`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
+export async function importOwnerResumeFromGithub(
+  token: string,
+  body: { fullName: string; path: string; ref?: string; slug?: string },
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/import-github`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
 export type AgentMessage = {
   role: "user" | "assistant";
   content: string;

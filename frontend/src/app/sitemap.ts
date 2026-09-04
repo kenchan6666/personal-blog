@@ -5,6 +5,7 @@ import {
   fetchPublicArticles,
   fetchPublicJournals,
   fetchPublicProjects,
+  fetchPublicResumes,
 } from "@/lib/api";
 import { pathWithoutLocale, siteOrigin } from "@/lib/seo";
 
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 const STATIC_PATHS = [
   "",
   "/about",
+  "/resume",
   "/articles",
   "/journals",
   "/projects",
@@ -29,10 +31,11 @@ async function safeList<T>(load: () => Promise<T[]>): Promise<T[]> {
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = siteOrigin();
-  const [articles, journals, projects] = await Promise.all([
+  const [articles, journals, projects, resumes] = await Promise.all([
     safeList(() => fetchPublicArticles("zh-Hant")),
     safeList(() => fetchPublicJournals("zh-Hant")),
     safeList(() => fetchPublicProjects("zh-Hant")),
+    safeList(() => fetchPublicResumes()),
   ]);
 
   const paths = [
@@ -42,6 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
     ...journals.map((journal) => `/journals/${journal.slug}`),
     ...projects.map((project) => `/projects/${project.slug}`),
+    ...resumes.map((resume) => `/resume/${resume.slug}`),
   ];
 
   return paths.flatMap((path) =>

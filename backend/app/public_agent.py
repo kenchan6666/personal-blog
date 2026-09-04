@@ -15,7 +15,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.github import GitHubBrowseError, GitHubClient
-from app.models import AboutModule, Article, Journal, Project, SiteProfile
+from app.models import AboutModule, Article, Journal, Project, Resume, SiteProfile
 from app.store import current_store
 from app.agent_limits import acquire_public_inflight, release_public_inflight
 from app.transport import is_retryable_transport_error
@@ -320,6 +320,7 @@ async def _public_context(
     sites = await current_store().find_all(SiteProfile)
     site = sites[0].resolve(locale) if sites else {}
     about = await current_store().find(AboutModule, status="published")
+    resumes = await current_store().find(Resume, status="published")
     articles = await current_store().find(Article, status="published")
     journals = await current_store().find(Journal, status="published")
     projects.sort(key=lambda item: (item.order, item.slug))
@@ -401,6 +402,15 @@ async def _public_context(
     payload = {
         "profile": profile,
         "about": about_rows,
+        "resumes": [
+            {
+                "title": item.title or item.header.name or item.slug,
+                "slug": item.slug,
+                "url": f"/{locale}/resume/{item.slug}",
+                "skills": item.skills[:12],
+            }
+            for item in sorted(resumes, key=lambda row: row.slug)[:8]
+        ],
         "projects": project_rows,
         "articles": [
             {

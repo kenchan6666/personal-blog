@@ -173,6 +173,22 @@ class RecordingGitHub:
             "master": {
                 "README.md": "# Glass\nHello\n",
                 "src/app.py": "print('hi')\n",
+                "cv/classic.format.json": (
+                    '{"instance":{"header":{"name":"Chan YatNam",'
+                    '"phone":"+852 63058683","email":"ynchanhk@gmail.com",'
+                    '"city":"Newcastle upon Tyne"},'
+                    '"summary":["Seeking a programming internship."],'
+                    '"education":[{"institution":"Newcastle University",'
+                    '"field":"Computer Science","degree":"Bachelor",'
+                    '"start":"2022-06","end":"2026-06","city":"Newcastle",'
+                    '"honor":"First Honor Degree","related_courses":'
+                    '["Web Development"]}],'
+                    '"projects":[{"name":"Pantry pal","start":"2024-05",'
+                    '"end":"2024-06","tech_stack":["Python","Flask"],'
+                    '"description":["Track food items and expiry dates."]}],'
+                    '"skills":["Python","Flask"],'
+                    '"languages":[{"name":"English","level":"Fluent"}]}}'
+                ),
             },
             "feature": {
                 "Readme.md": "# Feature\nnext\n",

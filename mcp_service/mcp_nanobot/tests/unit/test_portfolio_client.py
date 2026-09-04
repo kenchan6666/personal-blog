@@ -79,7 +79,10 @@ def test_fragment_enables_publish_tool() -> None:
         Path(__file__).resolve().parents[2] / "mcp_common" / "fragment.json"
     )
     fragment = json.loads(fragment_path.read_text(encoding="utf-8"))
-    assert "portfolio_publish_content" in fragment["portfolio"]["enabledTools"]
+    tools = fragment["portfolio"]["enabledTools"]
+    assert "portfolio_publish_content" in tools
+    assert "portfolio_generate_resume" in tools
+    assert "portfolio_import_resume_from_github" in tools
 
 
 def test_clip_text_keeps_short_source_and_marks_long_source() -> None:

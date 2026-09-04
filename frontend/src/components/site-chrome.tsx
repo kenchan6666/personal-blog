@@ -25,6 +25,9 @@ export function SiteChrome({ locale, dict }: Props) {
           <Link href={`/${locale}/about`} className="site-chrome-link">
             {dict.nav.about}
           </Link>
+          <Link href={`/${locale}/resume`} className="site-chrome-link">
+            {dict.nav.resume}
+          </Link>
         </>
       )}
       <ThemeToggle dict={dict} />

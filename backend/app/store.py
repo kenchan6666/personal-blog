@@ -18,6 +18,8 @@ from app.models import (
     KnowledgeRecord,
     OwnerSecret,
     Project,
+    Resume,
+    ResumeTemplate,
     SiteProfile,
 )
 
@@ -33,6 +35,8 @@ MODELS = (
     AgentConversation,
     KnowledgeRecord,
     OwnerSecret,
+    ResumeTemplate,
+    Resume,
 )
 
 _STORE: "Store | None" = None

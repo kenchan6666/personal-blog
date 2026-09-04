@@ -44,6 +44,14 @@ _Avoid_: Admin（指人时）, user（泛称）
 与某个 Project 绑定的 GitHub 仓库引用。后台可选/浏览 Owner GitHub 上的仓库列表；访客只能通过已加入站点且已发布的 Project 看到对应源码浏览。**Private 仓不对访客提供 tree/blob**（可展示 Owner 描述与指向 GitHub 的链接）。
 _Avoid_: clone, mirror（本站不镜像整仓）
 
+**ResumeTemplate**:
+一份一页 CV 的版式契约：模块顺序与字段骨架。Owner 可新建多套；生成 PDF 时按该契约排版。默认契约是 A4 单栏、日期靠右。
+_Avoid_: SuperCV 模板（作实体名时）, theme, skin
+
+**Resume**:
+按某一 ResumeTemplate 填好的单语履历文档。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。
+_Avoid_: CV（作实体名时）, 履历（作实体名时）, About 模块堆叠当履历
+
 **Draft**:
 尚未对访客公开的内容状态。Journal / Article / Project 均支持 Draft → Published；Draft 对访客不可见。
 _Avoid_: unpublished（作状态名时用 Draft）

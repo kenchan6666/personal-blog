@@ -300,6 +300,20 @@ def create_server() -> FastMCP:
                         "achievement, custom), not a page named main."
                     ),
                 },
+                "resume": {
+                    "route": "/resume",
+                    "tools": [
+                        "portfolio_list_resume_templates",
+                        "portfolio_list_resumes",
+                        "portfolio_create_resume",
+                        "portfolio_generate_resume",
+                        "portfolio_publish_resume",
+                    ],
+                    "note": (
+                        "Resume is a one-language CV document plus a ResumeTemplate. "
+                        "It is not About and not a SiteProfile link."
+                    ),
+                },
             },
             "site": api.request("GET", "/api/owner/site"),
             "projects": api.request("GET", "/api/owner/projects"),
@@ -307,6 +321,8 @@ def create_server() -> FastMCP:
             "articleCategories": api.request("GET", "/api/owner/article-categories"),
             "journals": api.request("GET", "/api/owner/journals"),
             "about": api.request("GET", "/api/owner/about-modules"),
+            "resumeTemplates": api.request("GET", "/api/owner/resume-templates"),
+            "resumes": api.request("GET", "/api/owner/resumes"),
             "comments": api.request("GET", "/api/owner/comments"),
             "github": _github_snapshot(api),
         }
@@ -567,6 +583,173 @@ def create_server() -> FastMCP:
             if "404" not in str(exc) and "not_found" not in str(exc):
                 raise
             return portfolio_get_github_file(project_slug, path, ref)
+
+    def _resume_by_id(identifier: str) -> dict[str, Any]:
+        items = api.request("GET", "/api/owner/resumes") or []
+        return _find(items, identifier, kind="resume")
+
+    def _template_by_id(identifier: str) -> dict[str, Any]:
+        items = api.request("GET", "/api/owner/resume-templates") or []
+        return _find(items, identifier, kind="template")
+
+    @server.tool()
+    def portfolio_list_resume_templates() -> dict[str, Any]:
+        """List ResumeTemplate layouts. classic-a4 is the built-in A4 single-column contract."""
+        items = api.request("GET", "/api/owner/resume-templates")
+        return {"items": items, "total": len(items)}
+
+    @server.tool()
+    def portfolio_get_resume_template(identifier: str) -> dict[str, Any]:
+        """Get one ResumeTemplate by id or slug."""
+        return _template_by_id(identifier)
+
+    @server.tool()
+    def portfolio_create_resume_template(
+        slug: str,
+        name: dict[str, str],
+        sections: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a ResumeTemplate. sections are summary, education, internship, projects, activities, skillsOthers."""
+        api.require_write()
+        return api.request(
+            "POST",
+            "/api/owner/resume-templates",
+            json={
+                "slug": slug,
+                "name": name,
+                "sections": sections
+                or ["summary", "education", "projects", "skillsOthers"],
+            },
+        )
+
+    @server.tool()
+    def portfolio_update_resume_template(
+        identifier: str,
+        changes: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update a ResumeTemplate. Built-in classic-a4 should not be deleted."""
+        api.require_write()
+        current = _template_by_id(identifier)
+        payload = _merge(current, changes)
+        payload.pop("id", None)
+        payload.pop("builtin", None)
+        return api.request(
+            "PUT",
+            f"/api/owner/resume-templates/{current['id']}",
+            json=payload,
+        )
+
+    @server.tool()
+    def portfolio_list_resumes(
+        status: Literal["draft", "published", "all"] = "all",
+    ) -> dict[str, Any]:
+        """List Resume documents. Each is one language and one template fill-in."""
+        items = api.request("GET", "/api/owner/resumes") or []
+        if status != "all":
+            items = [item for item in items if item.get("status") == status]
+        return {"items": items, "total": len(items)}
+
+    @server.tool()
+    def portfolio_get_resume(identifier: str) -> dict[str, Any]:
+        """Get one Resume by id or slug."""
+        return _resume_by_id(identifier)
+
+    @server.tool()
+    def portfolio_create_resume(
+        slug: str,
+        title: str,
+        template_slug: str = "classic-a4",
+        locale: str = "en",
+        header: dict[str, Any] | None = None,
+        summary: list[str] | None = None,
+        education: list[dict[str, Any]] | None = None,
+        internships: list[dict[str, Any]] | None = None,
+        projects: list[dict[str, Any]] | None = None,
+        activities: list[dict[str, Any]] | None = None,
+        skills: list[str] | None = None,
+        languages: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        """Create a Draft Resume filled from structured fields. Always draft."""
+        api.require_write()
+        return api.request(
+            "POST",
+            "/api/owner/resumes",
+            json={
+                "slug": slug,
+                "title": title,
+                "templateSlug": template_slug,
+                "locale": locale,
+                "status": "draft",
+                "header": header or {},
+                "summary": summary or [],
+                "education": education or [],
+                "internships": internships or [],
+                "projects": projects or [],
+                "activities": activities or [],
+                "skills": skills or [],
+                "languages": languages or [],
+            },
+        )
+
+    @server.tool()
+    def portfolio_update_resume(
+        identifier: str,
+        changes: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Update a Resume. Cannot publish here; call portfolio_publish_resume after the Owner asks."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        payload = _merge(current, changes)
+        payload.pop("id", None)
+        payload.pop("pdfUrl", None)
+        payload = _guard_status_on_update(current, payload)
+        return api.request(
+            "PUT",
+            f"/api/owner/resumes/{current['id']}",
+            json=payload,
+        )
+
+    @server.tool()
+    def portfolio_generate_resume(identifier: str) -> dict[str, Any]:
+        """Render the Resume PDF with Python from its ResumeTemplate."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        return api.request(
+            "POST", f"/api/owner/resumes/{current['id']}/generate"
+        )
+
+    @server.tool()
+    def portfolio_publish_resume(identifier: str) -> dict[str, Any]:
+        """Publish a Resume after the Owner explicitly asks. Generates PDF if missing."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        return api.request(
+            "POST", f"/api/owner/resumes/{current['id']}/publish"
+        )
+
+    @server.tool()
+    def portfolio_import_resume_from_github(
+        full_name: str,
+        path: str,
+        slug: str,
+        ref: str = "",
+        title: str = "",
+        template_slug: str = "",
+    ) -> dict[str, Any]:
+        """Import a Resume JSON from an authorized GitHub file. Accepts the extracted format.json shape."""
+        api.require_write()
+        return api.request(
+            "POST",
+            "/api/owner/resumes/import-github",
+            json={
+                "fullName": full_name,
+                "path": path,
+                "ref": ref,
+                "slug": slug,
+                "title": title,
+                "templateSlug": template_slug,
+            },
+        )
 
     @server.tool()
     def portfolio_comment_action(

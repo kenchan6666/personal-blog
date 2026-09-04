@@ -12,6 +12,15 @@ from app.avatar import avatar_public_url, hero_visual_public_url
 
 LOCALES = ("zh-Hant", "zh-Hans", "en")
 ABOUT_KINDS = ("summary", "education", "achievement", "experience", "custom")
+RESUME_SECTIONS = (
+    "summary",
+    "education",
+    "internship",
+    "projects",
+    "activities",
+    "skillsOthers",
+)
+CLASSIC_RESUME_TEMPLATE_SLUG = "classic-a4"
 LOCALE_FALLBACK = {
     "zh-Hans": ("zh-Hans", "zh-Hant", "en"),
     "zh-Hant": ("zh-Hant", "zh-Hans", "en"),
@@ -356,6 +365,118 @@ class Journal(Document):
             "wordCount": chars,
             "readingMinutes": reading_minutes(chars),
         }
+
+
+class ResumeHeader(BaseModel):
+    name: str = ""
+    phone: str = ""
+    email: str = ""
+    city: str = ""
+    links: list[str] = Field(default_factory=list)
+
+
+class ResumeEducation(BaseModel):
+    institution: str = ""
+    field: str = ""
+    degree: str = ""
+    start: str = ""
+    end: str = ""
+    city: str = ""
+    honor: str = ""
+    related_courses: list[str] = Field(default_factory=list)
+
+
+class ResumeExperience(BaseModel):
+    organization: str = ""
+    role: str = ""
+    start: str = ""
+    end: str = ""
+    city: str = ""
+    description: list[str] = Field(default_factory=list)
+
+
+class ResumeProject(BaseModel):
+    name: str = ""
+    start: str = ""
+    end: str = ""
+    tech_stack: list[str] = Field(default_factory=list)
+    description: list[str] = Field(default_factory=list)
+
+
+class ResumeLanguage(BaseModel):
+    name: str = ""
+    level: str = ""
+
+
+class ResumeTemplate(Document):
+    slug: str = ""
+    name: dict[str, str] = Field(default_factory=empty_localized)
+    sections: list[str] = Field(
+        default_factory=lambda: ["summary", "education", "projects", "skillsOthers"]
+    )
+    builtin: bool = False
+
+    class Settings:
+        name = "resume_templates"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "slug": self.slug,
+            "name": self.name,
+            "sections": list(self.sections),
+            "builtin": self.builtin,
+        }
+
+
+class Resume(Document):
+    slug: str = ""
+    title: str = ""
+    template_slug: str = CLASSIC_RESUME_TEMPLATE_SLUG
+    locale: str = "en"
+    status: str = "draft"
+    header: ResumeHeader = Field(default_factory=ResumeHeader)
+    summary: list[str] = Field(default_factory=list)
+    education: list[ResumeEducation] = Field(default_factory=list)
+    internships: list[ResumeExperience] = Field(default_factory=list)
+    projects: list[ResumeProject] = Field(default_factory=list)
+    activities: list[ResumeExperience] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    languages: list[ResumeLanguage] = Field(default_factory=list)
+    pdf_filename: str = ""
+
+    class Settings:
+        name = "resumes"
+
+    def pdf_url(self) -> str:
+        if not self.pdf_filename:
+            return ""
+        return f"/api/public/resumes/{self.slug}/pdf"
+
+    def to_owner_dict(self) -> dict[str, Any]:
+        return {
+            "id": str(self.id),
+            "slug": self.slug,
+            "title": self.title,
+            "templateSlug": self.template_slug,
+            "locale": self.locale,
+            "status": self.status,
+            "header": self.header.model_dump(),
+            "summary": list(self.summary),
+            "education": [item.model_dump() for item in self.education],
+            "internships": [item.model_dump() for item in self.internships],
+            "projects": [item.model_dump() for item in self.projects],
+            "activities": [item.model_dump() for item in self.activities],
+            "skills": list(self.skills),
+            "languages": [item.model_dump() for item in self.languages],
+            "pdfUrl": self.pdf_url() if self.pdf_filename else "",
+        }
+
+    def to_public_dict(self) -> dict[str, Any]:
+        payload = self.to_owner_dict()
+        payload.pop("id", None)
+        payload.pop("status", None)
+        return payload
 
 
 class AboutModule(Document):

@@ -57,6 +57,8 @@ from app.models import (
     Journal,
     KnowledgeRecord,
     LinkItem,
+    Resume,
+    ResumeTemplate,
     OwnerSecret,
     Project,
     SiteProfile,
@@ -66,6 +68,7 @@ from app.models import (
     pick_localized,
 )
 from app.public_agent import register_public_agent_routes
+from app.resume_routes import register_resume_routes
 from app.store import bind_store, build_store, current_store, new_document
 from app.translate import (
     GoogleGtxTranslator,
@@ -277,6 +280,8 @@ def create_app(
                     AgentConversation,
                     KnowledgeRecord,
                     OwnerSecret,
+                    ResumeTemplate,
+                    Resume,
                 ],
             )
         bind_store(store)
@@ -357,6 +362,7 @@ def create_app(
 
     register_agent_routes(app, require_owner)
     register_public_agent_routes(app)
+    register_resume_routes(app, require_owner)
 
     @app.get("/api/health")
     async def health(response: Response) -> dict[str, str]:

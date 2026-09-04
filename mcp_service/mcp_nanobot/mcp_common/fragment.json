@@ -27,6 +27,17 @@
       "portfolio_get_github_file",
       "portfolio_get_project_source",
       "portfolio_get_source_file",
+      "portfolio_list_resume_templates",
+      "portfolio_get_resume_template",
+      "portfolio_create_resume_template",
+      "portfolio_update_resume_template",
+      "portfolio_list_resumes",
+      "portfolio_get_resume",
+      "portfolio_create_resume",
+      "portfolio_update_resume",
+      "portfolio_generate_resume",
+      "portfolio_publish_resume",
+      "portfolio_import_resume_from_github",
       "portfolio_comment_action"
     ]
   }

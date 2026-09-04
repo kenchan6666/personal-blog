@@ -16,6 +16,7 @@ import { CommentModerator } from "./comment-moderator";
 import { GitHubConnect } from "./github-connect";
 import { JournalEditor } from "./journal-editor";
 import { ProjectEditor } from "./project-editor";
+import { ResumeEditor } from "./resume-editor";
 import { SiteEditor } from "./site-editor";
 
 type Props = {
@@ -23,7 +24,7 @@ type Props = {
   dict: Dictionary;
 };
 
-const TABS = ["site", "content", "comments", "github", "agent"] as const;
+const TABS = ["site", "content", "comments", "github", "resume", "agent"] as const;
 type Tab = (typeof TABS)[number];
 
 function isTab(value: string | null): value is Tab {
@@ -53,6 +54,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
     content: a.tabContent,
     comments: a.tabComments,
     github: a.tabGithub,
+    resume: a.tabResume,
     agent: a.tabAgent,
   };
 
@@ -105,6 +107,11 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
             <Suspense>
               <GitHubConnect locale={locale} dict={dict} />
             </Suspense>
+          </div>
+        ) : null}
+        {tab === "resume" ? (
+          <div className="lg:col-span-2">
+            <ResumeEditor dict={dict} />
           </div>
         ) : null}
         {tab === "site" ? (

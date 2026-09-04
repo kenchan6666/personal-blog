@@ -60,6 +60,7 @@ def settings(tmp_path) -> Settings:
         smtp_password="test",
         smtp_from="ynchanhk@gmail.com",
         avatar_dir=str(tmp_path / "avatars"),
+        resume_dir=str(tmp_path / "resumes"),
         local_data_dir=str(tmp_path / "local"),
         github_client_id="test-client",
         github_client_secret="test-secret",

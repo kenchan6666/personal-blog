@@ -20,6 +20,7 @@ type Props = {
 const links = [
   { key: "home", href: "" },
   { key: "about", href: "/about" },
+  { key: "resume", href: "/resume" },
   { key: "projects", href: "/projects" },
   { key: "articles", href: "/articles" },
   { key: "journals", href: "/journals" },

@@ -41,6 +41,7 @@ class Settings(BaseSettings):
 
     avatar_dir: str = "data/avatars"
     avatar_max_bytes: int = 2 * 1024 * 1024
+    resume_dir: str = "data/resumes"
 
     # The browser never talks to Viola directly. Owner-authenticated API
     # routes proxy chat traffic to this internal service.
