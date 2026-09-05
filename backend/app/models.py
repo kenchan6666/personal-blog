@@ -428,6 +428,7 @@ class ResumeTemplate(Document):
     )
     extras: list[ResumeExtraDef] = Field(default_factory=list)
     builtin: bool = False
+    github_path: str = ""
 
     class Settings:
         name = "resume_templates"
@@ -440,6 +441,7 @@ class ResumeTemplate(Document):
             "sections": list(self.sections),
             "extras": [item.model_dump() for item in self.extras],
             "builtin": self.builtin,
+            "githubPath": self.github_path,
         }
 
 

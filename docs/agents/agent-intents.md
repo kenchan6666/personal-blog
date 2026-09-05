@@ -50,7 +50,7 @@
 | RAG | `portfolio_list_knowledge` / `remember_knowledge` / `update_knowledge` | 改站点或需要身份事实 |
 | 列/读履历 | `portfolio_list_resumes` / `portfolio_get_resume` | 已有 Resume；写正文前先读 |
 | 写履历栏目 | `portfolio_update_resume` | summary / education / internship / projects / activities / skills / extras；先读 `skills/write-resume/SKILL.md` |
-| 版式 | `portfolio_list/get/create/update_resume_template` | 换栏目顺序；先列内置套，不要另存一份相同栏目 |
+| 版式 | `portfolio_list/get/create/update_resume_template` | 换栏目顺序；除 classic-a4 外写入 `cv/template/{slug}.json`，可改名 |
 | 出 PDF | `portfolio_generate_resume` | 按版式重画一页 A4 |
 | 发布履历 | `portfolio_publish_resume` | Owner 当前消息明确要求发布 |
 | 推 cv 仓 | `portfolio_push_resume_to_github` | 写入私有 `cv`；没有仓则创建 |

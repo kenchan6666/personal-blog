@@ -32,4 +32,4 @@ description: Write or rewrite one-page Resume copy. Use when drafting a CV, fill
 | skillsOthers | skills[], languages[] | 真用过的技能；语言写程度 |
 | extras | title, lines[], entries[] | 证书、奖项等自订段；title 是印在纸上的栏目标题 |
 
-自订栏目用 extras，不要塞进 About。版式先 `portfolio_list_resume_templates`，按投递类型换 `templateSlug`。不要另存一份和内置栏目完全相同的版式。
+自订栏目用 extras，不要塞进 About。版式先 `portfolio_list_resume_templates`，按投递类型换 `templateSlug`。只有 `classic-a4` 不可改；其余是 `cv` 仓 `template/{slug}.json`，改名或栏目用 `portfolio_update_resume_template`。不要另存一份和 classic-a4 栏目完全相同的版式。

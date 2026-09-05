@@ -45,15 +45,15 @@ _Avoid_: Admin（指人时）, user（泛称）
 _Avoid_: clone, mirror（本站不镜像整仓）
 
 **ResumeTemplate**:
-一份一页 CV 的版式契约：栏目顺序与字段骨架，可含自订栏目（标题）。内置多套栏目顺序（学生项目向、学历先行、实习投递、校园完整、经历优先、证书加持）；与内置栏目完全相同的自订版式会被收回。Owner 仍可新建不同的自订套。生成 PDF 时按该契约排版。视觉仍是 A4 单栏、日期靠右，不是换皮肤。
-_Avoid_: SuperCV 模板（作实体名时）, theme, skin, 把栏目顺序当视觉主题
+一份一页 CV 的版式契约：栏目顺序、名称与字段骨架，可含自订栏目（标题）。只有 `classic-a4`（学生项目向）写在代码里且不可改。其余版式是 CvRepo 里 `template/{slug}.json` 的文件，可改名称与栏目；新建也写入该文件夹。生成 PDF 时按该契约排版。视觉仍是 A4 单栏、日期靠右，不是换皮肤。
+_Avoid_: SuperCV 模板（作实体名时）, theme, skin, 把栏目顺序当视觉主题, 把除基础套外的版式写死在代码里
 
 **Resume**:
 按某一 ResumeTemplate 填好的单语履历文档。纸上姓名是 `header.name`。`title` 是后台列表标签，保存时等于姓名，不是第二行大标题。与 About（公开故事模块）和 Link（外链 PDF）都不是同一实体。可生成 PDF、可 Draft / Published；公开页只展示 Published。可推送到 Owner 名下的 CvRepo（JSON + PDF），与是否 Published 无关。可加自订栏目（标题 + 要点 / 条目指），不是 About 模块。写栏目正文走 Owner Agent skill `skills/write-resume/SKILL.md`。
 _Avoid_: CV（作实体名时）, 履历（作实体名时）, About 模块堆叠当履历, 把 title 当纸上姓名
 
 **CvRepo**:
-Owner GitHub 账号下名为 `cv` 的履历仓（默认私有）。没有则创建，有则覆盖写入 `{slug}.json` 与 `{slug}.pdf`。这是履历备份/投递工件仓，不是 SourceRepo，也不对访客代理 tree/blob。
+Owner GitHub 账号下名为 `cv` 的履历仓（默认私有）。没有则创建。履历写入 `{slug}.json` 与 `{slug}.pdf`；版式写入 `template/{slug}.json`。这是履历与版式的备份仓，不是 SourceRepo，也不对访客代理 tree/blob。
 _Avoid_: SourceRepo, clone, 把履历仓当公开 Project
 
 **Draft**:

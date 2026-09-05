@@ -13,6 +13,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
+from app.github import (
+    CV_TEMPLATE_DIR,
+    GitHubBrowseError,
+    GitHubClient,
+    cv_template_path,
+    ensure_owned_cv_repo,
+)
 from app.models import (
     CLASSIC_RESUME_TEMPLATE_SLUG,
     LOCALES,
@@ -87,19 +94,22 @@ def save_resume_pdf_bytes(
     return filename
 
 
-def builtin_resume_templates() -> list[dict[str, Any]]:
-    return [
-        {
-            "slug": CLASSIC_RESUME_TEMPLATE_SLUG,
-            "name": {
-                "zh-Hant": "學生項目向",
-                "zh-Hans": "学生项目向",
-                "en": "Student projects",
-            },
-            "sections": ["summary", "education", "projects", "skillsOthers"],
-            "extras": [],
-            "builtin": True,
+def builtin_classic_template() -> dict[str, Any]:
+    return {
+        "slug": CLASSIC_RESUME_TEMPLATE_SLUG,
+        "name": {
+            "zh-Hant": "學生項目向",
+            "zh-Hans": "学生项目向",
+            "en": "Student projects",
         },
+        "sections": ["summary", "education", "projects", "skillsOthers"],
+        "extras": [],
+        "builtin": True,
+    }
+
+
+def vault_seed_templates() -> list[dict[str, Any]]:
+    return [
         {
             "slug": "campus-a4",
             "name": {
@@ -109,7 +119,6 @@ def builtin_resume_templates() -> list[dict[str, Any]]:
             },
             "sections": ["education", "internship", "projects", "skillsOthers"],
             "extras": [],
-            "builtin": True,
         },
         {
             "slug": "intern-a4",
@@ -126,7 +135,6 @@ def builtin_resume_templates() -> list[dict[str, Any]]:
                 "skillsOthers",
             ],
             "extras": [],
-            "builtin": True,
         },
         {
             "slug": "full-a4",
@@ -144,7 +152,6 @@ def builtin_resume_templates() -> list[dict[str, Any]]:
                 "skillsOthers",
             ],
             "extras": [],
-            "builtin": True,
         },
         {
             "slug": "work-a4",
@@ -161,7 +168,6 @@ def builtin_resume_templates() -> list[dict[str, Any]]:
                 "skillsOthers",
             ],
             "extras": [],
-            "builtin": True,
         },
         {
             "slug": "certs-a4",
@@ -179,17 +185,16 @@ def builtin_resume_templates() -> list[dict[str, Any]]:
                 "certs",
             ],
             "extras": [{"slug": "certs", "title": "Certifications"}],
-            "builtin": True,
         },
     ]
 
 
-def builtin_classic_template() -> dict[str, Any]:
-    return builtin_resume_templates()[0]
+def builtin_resume_templates() -> list[dict[str, Any]]:
+    return [builtin_classic_template()]
 
 
 def builtin_template_slugs() -> set[str]:
-    return {item["slug"] for item in builtin_resume_templates()}
+    return {CLASSIC_RESUME_TEMPLATE_SLUG}
 
 
 def _layout_signature(template: ResumeTemplate) -> tuple[Any, ...]:
@@ -205,22 +210,74 @@ def _spec_signature(spec: dict[str, Any]) -> tuple[Any, ...]:
     return (tuple(spec["sections"]), extras)
 
 
-def _apply_builtin_spec(template: ResumeTemplate, spec: dict[str, Any]) -> None:
+def _apply_template_spec(
+    template: ResumeTemplate, spec: dict[str, Any], *, builtin: bool
+) -> None:
     template.slug = spec["slug"]
     template.name = spec["name"]
     template.extras = parse_extra_defs(spec.get("extras") or [])
     template.sections = list(spec["sections"])
-    template.builtin = True
+    template.builtin = builtin
+    if not builtin:
+        template.github_path = spec.get("github_path") or cv_template_path(
+            template.slug
+        )
+
+
+def template_vault_bytes(template: ResumeTemplate) -> bytes:
+    return json.dumps(
+        {
+            "slug": template.slug,
+            "name": template.name,
+            "sections": list(template.sections),
+            "extras": [item.model_dump() for item in template.extras],
+        },
+        ensure_ascii=False,
+        indent=2,
+    ).encode("utf-8")
+
+
+def parse_vault_template_file(path: str, raw: str) -> dict[str, Any] | None:
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    stem = Path(path).stem
+    try:
+        slug = validate_slug(str(data.get("slug") or stem))
+    except HTTPException:
+        return None
+    if slug == CLASSIC_RESUME_TEMPLATE_SLUG:
+        return None
+    name = data.get("name") if isinstance(data.get("name"), dict) else {}
+    extras = parse_extra_defs(data.get("extras") or [])
+    extra_slugs = {item.slug for item in extras}
+    try:
+        sections = validate_sections(
+            list(data.get("sections") or []), extra_slugs
+        )
+    except HTTPException:
+        return None
+    return {
+        "slug": slug,
+        "name": {
+            **empty_localized(),
+            **{key: str(name.get(key) or "") for key in LOCALES},
+        },
+        "sections": sections,
+        "extras": [item.model_dump() for item in extras],
+        "github_path": path,
+    }
 
 
 async def _prune_duplicate_custom_templates() -> None:
     store = current_store()
     rows = await store.find_all(ResumeTemplate)
-    target_by_sig = {
-        _spec_signature(spec): spec["slug"] for spec in builtin_resume_templates()
-    }
+    target_by_sig = {_spec_signature(builtin_classic_template()): CLASSIC_RESUME_TEMPLATE_SLUG}
     for item in rows:
-        if item.builtin:
+        if item.builtin or item.slug == CLASSIC_RESUME_TEMPLATE_SLUG:
             continue
         target = target_by_sig.get(_layout_signature(item))
         if not target or target == item.slug:
@@ -233,20 +290,148 @@ async def _prune_duplicate_custom_templates() -> None:
 
 async def ensure_builtin_templates() -> None:
     store = current_store()
-    for spec in builtin_resume_templates():
-        existing = await store.find_one(ResumeTemplate, slug=spec["slug"])
-        if existing is None:
-            template = new_document(ResumeTemplate)
-            _apply_builtin_spec(template, spec)
-            await store.insert(template)
-            continue
-        _apply_builtin_spec(existing, spec)
+    spec = builtin_classic_template()
+    existing = await store.find_one(ResumeTemplate, slug=spec["slug"])
+    if existing is None:
+        template = new_document(ResumeTemplate)
+        _apply_template_spec(template, spec, builtin=True)
+        template.github_path = ""
+        await store.insert(template)
+    else:
+        _apply_template_spec(existing, spec, builtin=True)
+        existing.github_path = ""
         await store.save(existing)
+    for item in await store.find_all(ResumeTemplate):
+        if item.builtin and item.slug != CLASSIC_RESUME_TEMPLATE_SLUG:
+            item.builtin = False
+            item.github_path = item.github_path or cv_template_path(item.slug)
+            await store.save(item)
+    for vault in vault_seed_templates():
+        current = await store.find_one(ResumeTemplate, slug=vault["slug"])
+        if current is not None:
+            continue
+        template = new_document(ResumeTemplate)
+        _apply_template_spec(template, vault, builtin=False)
+        await store.insert(template)
 
 
 async def fold_duplicate_custom_templates() -> None:
     await ensure_builtin_templates()
     await _prune_duplicate_custom_templates()
+
+
+async def write_cv_template_file(
+    github: GitHubClient,
+    *,
+    access_token: str,
+    template: ResumeTemplate,
+    previous_path: str = "",
+) -> str:
+    repo, _ = await ensure_owned_cv_repo(github, access_token=access_token)
+    branch = str(repo.get("defaultBranch") or "main")
+    path = cv_template_path(template.slug)
+    await github.put_file(
+        access_token=access_token,
+        owner=str(repo["owner"]),
+        name=str(repo["name"]),
+        path=path,
+        content=template_vault_bytes(template),
+        message=f"Update template {template.slug}",
+        branch=branch,
+    )
+    if previous_path and previous_path != path:
+        await github.delete_file(
+            access_token=access_token,
+            owner=str(repo["owner"]),
+            name=str(repo["name"]),
+            path=previous_path,
+            message=f"Remove renamed template {previous_path}",
+            branch=branch,
+        )
+    template.github_path = path
+    return path
+
+
+async def delete_cv_template_file(
+    github: GitHubClient,
+    *,
+    access_token: str,
+    path: str,
+) -> None:
+    if not path:
+        return
+    repo, _ = await ensure_owned_cv_repo(github, access_token=access_token)
+    await github.delete_file(
+        access_token=access_token,
+        owner=str(repo["owner"]),
+        name=str(repo["name"]),
+        path=path,
+        message=f"Remove template {path}",
+        branch=str(repo.get("defaultBranch") or "main"),
+    )
+
+
+async def sync_cv_templates(
+    github: GitHubClient,
+    *,
+    access_token: str,
+) -> None:
+    await ensure_builtin_templates()
+    store = current_store()
+    repo, _ = await ensure_owned_cv_repo(github, access_token=access_token)
+    branch = str(repo.get("defaultBranch") or "main")
+    owner = str(repo["owner"])
+    name = str(repo["name"])
+    try:
+        entries = await github.list_tree(
+            access_token=access_token,
+            owner=owner,
+            name=name,
+            ref=branch,
+            path=CV_TEMPLATE_DIR,
+        )
+    except GitHubBrowseError:
+        entries = []
+    remote_paths = {
+        item["path"]
+        for item in entries
+        if item.get("type") == "file" and str(item.get("name") or "").endswith(".json")
+    }
+    for item in await store.find_all(ResumeTemplate):
+        if item.builtin:
+            continue
+        path = item.github_path or cv_template_path(item.slug)
+        if path in remote_paths:
+            continue
+        await write_cv_template_file(
+            github, access_token=access_token, template=item
+        )
+        await store.save(item)
+        remote_paths.add(path)
+    for path in sorted(remote_paths):
+        try:
+            blob = await github.get_blob(
+                access_token=access_token,
+                owner=owner,
+                name=name,
+                ref=branch,
+                path=path,
+            )
+        except GitHubBrowseError:
+            continue
+        spec = parse_vault_template_file(path, blob.get("content") or "")
+        if spec is None:
+            continue
+        current = await store.find_one(ResumeTemplate, slug=spec["slug"])
+        if current is None:
+            template = new_document(ResumeTemplate)
+            _apply_template_spec(template, spec, builtin=False)
+            await store.insert(template)
+            continue
+        if current.builtin:
+            continue
+        _apply_template_spec(current, spec, builtin=False)
+        await store.save(current)
 
 
 def validate_slug(slug: str) -> str:

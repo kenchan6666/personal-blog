@@ -1171,6 +1171,7 @@ export type OwnerResumeTemplate = {
   sections: string[];
   extras: ResumeExtraDef[];
   builtin: boolean;
+  githubPath?: string;
 };
 
 export type ResumeHeader = {
@@ -1281,6 +1282,7 @@ export function emptyOwnerResumeTemplate(): OwnerResumeTemplate {
     ],
     extras: [],
     builtin: false,
+    githubPath: "",
   };
 }
 

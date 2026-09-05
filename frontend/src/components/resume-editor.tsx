@@ -263,55 +263,69 @@ export function ResumeEditor({ locale, dict }: Props) {
             <p className="mb-2 text-sm font-semibold">{a.fieldResumeLayout}</p>
             <div className="resume-layout-row mb-4">
               {templates.map((item) => (
-                <button
+                <div
                   key={item.id}
-                  type="button"
                   className={`resume-layout-card${
                     current.templateSlug === item.slug ? " is-active" : ""
                   }`}
-                  onClick={() => {
-                    if (current.templateSlug === item.slug && !item.builtin) {
-                      setTemplateDraft({
-                        ...item,
-                        extras: item.extras ?? [],
-                      });
-                      setOpenTemplate(true);
-                      return;
-                    }
-                    setCurrent({
-                      ...current,
-                      templateSlug: item.slug,
-                      extras: [
-                        ...(item.extras ?? []).map((def) => {
-                          const existing = current.extras.find(
-                            (extra) => extra.slug === def.slug,
-                          );
-                          return (
-                            existing ?? {
-                              slug: def.slug,
-                              title: def.title,
-                              lines: [],
-                              entries: [],
-                            }
-                          );
-                        }),
-                        ...current.extras.filter(
-                          (extra) =>
-                            !(item.extras ?? []).some(
-                              (def) => def.slug === extra.slug,
-                            ),
-                        ),
-                      ],
-                    });
-                  }}
                 >
-                  <strong>{localizedText(item.name) || item.slug}</strong>
-                  <span className="resume-layout-bars">
-                    {item.sections.map((id) => (
-                      <span key={id}>{sectionLabel(id)}</span>
-                    ))}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="resume-layout-pick"
+                    onClick={() => {
+                      setCurrent({
+                        ...current,
+                        templateSlug: item.slug,
+                        extras: [
+                          ...(item.extras ?? []).map((def) => {
+                            const existing = current.extras.find(
+                              (extra) => extra.slug === def.slug,
+                            );
+                            return (
+                              existing ?? {
+                                slug: def.slug,
+                                title: def.title,
+                                lines: [],
+                                entries: [],
+                              }
+                            );
+                          }),
+                          ...current.extras.filter(
+                            (extra) =>
+                              !(item.extras ?? []).some(
+                                (def) => def.slug === extra.slug,
+                              ),
+                          ),
+                        ],
+                      });
+                    }}
+                  >
+                    <strong>{localizedText(item.name) || item.slug}</strong>
+                    {item.githubPath ? (
+                      <em className="resume-layout-path">{item.githubPath}</em>
+                    ) : null}
+                    <span className="resume-layout-bars">
+                      {item.sections.map((id) => (
+                        <span key={id}>{sectionLabel(id)}</span>
+                      ))}
+                    </span>
+                  </button>
+                  {!item.builtin ? (
+                    <button
+                      type="button"
+                      className="btn-ghost resume-layout-edit"
+                      onClick={() => {
+                        setTemplateDraft({
+                          ...item,
+                          extras: item.extras ?? [],
+                        });
+                        setOpenTemplate(true);
+                      }}
+                    >
+                      {a.editLayout}
+                    </button>
+                  ) : null}
+                </div>
               ))}
               <button
                 type="button"

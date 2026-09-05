@@ -20,6 +20,11 @@ class GitHubWriteError(Exception):
 
 
 CV_REPO_NAME = "cv"
+CV_TEMPLATE_DIR = "template"
+
+
+def cv_template_path(slug: str) -> str:
+    return f"{CV_TEMPLATE_DIR}/{slug.strip().strip('/')}.json"
 
 
 def is_readme_filename(name: str) -> bool:
@@ -141,6 +146,17 @@ class GitHubClient(Protocol):
         branch: str = "",
     ) -> dict[str, str]: ...
 
+    async def delete_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        message: str,
+        branch: str = "",
+    ) -> None: ...
+
 
 class RecordingGitHub:
     """In-memory GitHub for HTTP-seam tests. Never talks to api.github.com."""
@@ -150,6 +166,7 @@ class RecordingGitHub:
         self.exchanged: list[str] = []
         self.created_repos: list[str] = []
         self.puts: list[str] = []
+        self.deletes: list[str] = []
         self.extra_repos: list[dict[str, object]] = []
         self.extra_files: dict[str, dict[str, dict[str, str]]] = {}
 
@@ -328,6 +345,24 @@ class RecordingGitHub:
             "path": path,
             "htmlUrl": f"https://github.com/{full}/blob/{ref}/{path}",
         }
+
+    async def delete_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        message: str,
+        branch: str = "",
+    ) -> None:
+        if access_token != "gho_test":
+            raise GitHubOAuthError("bad_token")
+        full = f"{owner}/{name}"
+        ref = branch or "main"
+        store = self.extra_files.setdefault(full, {}).setdefault(ref, {})
+        store.pop(path, None)
+        self.deletes.append(f"{full}:{path}")
 
     async def list_branches(
         self, *, access_token: str, owner: str, name: str
@@ -726,6 +761,43 @@ class HttpGitHub:
             "path": str(content_info.get("path") or path),
             "htmlUrl": str(content_info.get("html_url") or ""),
         }
+
+    async def delete_file(
+        self,
+        *,
+        access_token: str,
+        owner: str,
+        name: str,
+        path: str,
+        message: str,
+        branch: str = "",
+    ) -> None:
+        suffix = quote(path.strip("/"))
+        url = f"https://api.github.com/repos/{owner}/{name}/contents/{suffix}"
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            current = await client.get(
+                url,
+                headers=self._headers(access_token),
+                params={"ref": branch} if branch else None,
+            )
+            if current.status_code == 404:
+                return
+            if current.status_code >= 400:
+                raise GitHubWriteError("delete_failed")
+            sha = current.json().get("sha")
+            if not sha:
+                return
+            payload: dict[str, object] = {"message": message, "sha": sha}
+            if branch:
+                payload["branch"] = branch
+            response = await client.request(
+                "DELETE",
+                url,
+                headers=self._headers(access_token),
+                json=payload,
+            )
+        if response.status_code >= 400:
+            raise GitHubWriteError("delete_failed")
 
 
 def find_owned_cv_repo(

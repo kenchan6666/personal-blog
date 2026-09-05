@@ -14,15 +14,21 @@ from app.github import (
     GitHubOAuthError,
     GitHubWriteError,
     cv_repo_payload,
+    cv_template_path,
     ensure_owned_cv_repo,
     match_authorized_repo,
 )
-from app.models import Resume, ResumeTemplate, empty_localized
+from app.models import (
+    CLASSIC_RESUME_TEMPLATE_SLUG,
+    Resume,
+    ResumeTemplate,
+    empty_localized,
+)
 from app.resume import (
     apply_resume_body,
     apply_template_body,
-    builtin_resume_templates,
     builtin_template_slugs,
+    delete_cv_template_file,
     ensure_builtin_templates,
     fold_duplicate_custom_templates,
     ensure_resume_dir,
@@ -30,7 +36,10 @@ from app.resume import (
     render_resume_pdf,
     resume_vault_json,
     save_resume_pdf_bytes,
+    sync_cv_templates,
     validate_slug,
+    vault_seed_templates,
+    write_cv_template_file,
 )
 from app.store import current_store, new_document
 
@@ -100,6 +109,36 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         token = await app.state.redis.get(GITHUB_TOKEN_KEY)
         return str(token) if token else None
 
+    async def refresh_templates() -> None:
+        access = await owner_token()
+        if access:
+            try:
+                await sync_cv_templates(
+                    app.state.github, access_token=access
+                )
+            except (GitHubOAuthError, GitHubWriteError, GitHubBrowseError):
+                pass
+        await fold_duplicate_custom_templates()
+
+    async def push_template(
+        template: ResumeTemplate, *, previous_path: str = ""
+    ) -> None:
+        access = await owner_token()
+        if not access:
+            return
+        try:
+            await write_cv_template_file(
+                app.state.github,
+                access_token=access,
+                template=template,
+                previous_path=previous_path,
+            )
+        except (GitHubOAuthError, GitHubWriteError):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="github_write_failed",
+            ) from None
+
     @app.get("/api/public/resumes")
     async def public_list_resumes() -> list[dict[str, Any]]:
         rows = await current_store().find(Resume, status="published")
@@ -141,18 +180,12 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
 
     @app.get("/api/owner/resume-templates")
     async def owner_list_templates(_: str = Depends(require_owner)) -> list[dict[str, Any]]:
-        await fold_duplicate_custom_templates()
+        await refresh_templates()
         rows = await current_store().find_all(ResumeTemplate)
-        order = {
-            spec["slug"]: index
-            for index, spec in enumerate(builtin_resume_templates())
-        }
-        rows.sort(
-            key=lambda item: (
-                order.get(item.slug, 100) if item.builtin else 200,
-                item.slug,
-            )
-        )
+        order = {CLASSIC_RESUME_TEMPLATE_SLUG: 0}
+        for index, spec in enumerate(vault_seed_templates(), start=1):
+            order[spec["slug"]] = index
+        rows.sort(key=lambda item: (order.get(item.slug, 100), item.slug))
         return [item.to_owner_dict() for item in rows]
 
     @app.post("/api/owner/resume-templates")
@@ -168,6 +201,8 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
                 detail="reserved_template",
             )
         await unique_template_slug(template.slug)
+        template.github_path = cv_template_path(template.slug)
+        await push_template(template)
         await current_store().insert(template)
         return template.to_owner_dict()
 
@@ -184,8 +219,11 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="builtin_template"
             )
+        previous_path = template.github_path
         apply_template_body(template, body.model_dump())
         await unique_template_slug(template.slug, exclude_id=str(template.id))
+        template.github_path = cv_template_path(template.slug)
+        await push_template(template, previous_path=previous_path)
         await current_store().save(template)
         return template.to_owner_dict()
 
@@ -201,6 +239,20 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="builtin_template"
             )
+        access = await owner_token()
+        if access and (template.github_path or template.slug):
+            try:
+                await delete_cv_template_file(
+                    app.state.github,
+                    access_token=access,
+                    path=template.github_path
+                    or cv_template_path(template.slug),
+                )
+            except (GitHubOAuthError, GitHubWriteError):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="github_write_failed",
+                ) from None
         await current_store().delete(template)
         return {"status": "deleted"}
 

@@ -611,7 +611,7 @@ def create_server() -> FastMCP:
 
     @server.tool()
     def portfolio_list_resume_templates() -> dict[str, Any]:
-        """List ResumeTemplate layouts. Built-ins are classic-a4, campus-a4, intern-a4, full-a4, work-a4, certs-a4 (section order, not a visual theme)."""
+        """List ResumeTemplate layouts. classic-a4 is the only locked builtin. Other layouts are cv repo files under template/{slug}.json."""
         items = api.request("GET", "/api/owner/resume-templates")
         return {"items": items, "total": len(items)}
 
@@ -626,7 +626,7 @@ def create_server() -> FastMCP:
         name: dict[str, str],
         sections: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Create a ResumeTemplate. sections are summary, education, internship, projects, activities, skillsOthers."""
+        """Create a ResumeTemplate and write it to cv/template/{slug}.json. sections are summary, education, internship, projects, activities, skillsOthers plus extras."""
         api.require_write()
         return api.request(
             "POST",
@@ -644,7 +644,7 @@ def create_server() -> FastMCP:
         identifier: str,
         changes: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update a custom ResumeTemplate. Built-in layouts cannot be edited or deleted."""
+        """Update a ResumeTemplate file in cv/template/{slug}.json (name, sections, extras). classic-a4 cannot be edited."""
         api.require_write()
         current = _template_by_id(identifier)
         payload = _merge(current, changes)

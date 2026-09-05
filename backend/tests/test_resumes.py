@@ -86,6 +86,9 @@ async def test_builtin_template_is_seeded_and_cannot_be_deleted(
     ]
     classic = next(item for item in listed.json() if item["slug"] == "classic-a4")
     intern = next(item for item in listed.json() if item["slug"] == "intern-a4")
+    assert classic["builtin"] is True
+    assert intern["builtin"] is False
+    assert intern["githubPath"] == "template/intern-a4.json"
     assert classic["name"]["en"] == "Student projects"
     assert intern["sections"] == [
         "summary",
@@ -105,6 +108,17 @@ async def test_builtin_template_is_seeded_and_cannot_be_deleted(
         headers=headers,
     )
     assert edited.status_code == 400
+    renamed = await client.put(
+        f"/api/owner/resume-templates/{intern['id']}",
+        json={
+            "slug": "intern-a4",
+            "name": {**intern["name"], "en": "My intern layout"},
+            "sections": intern["sections"],
+        },
+        headers=headers,
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["name"]["en"] == "My intern layout"
 
 
 @pytest.mark.asyncio
@@ -340,6 +354,56 @@ async def test_push_resume_creates_cv_repo_then_updates(
     assert second.status_code == 200
     assert second.json()["created"] is False
     assert github.created_repos == ["kenchan6666/cv"]
+
+
+@pytest.mark.asyncio
+async def test_vault_templates_are_files_in_cv_template_folder(
+    client, mailer, settings, github, app
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    await app.state.redis.set("github:owner_token", "gho_test")
+    listed = await client.get("/api/owner/resume-templates", headers=headers)
+    assert listed.status_code == 200
+    intern = next(item for item in listed.json() if item["slug"] == "intern-a4")
+    assert intern["builtin"] is False
+    assert "kenchan6666/cv:template/intern-a4.json" in github.puts
+    files = github.extra_files["kenchan6666/cv"]["main"]
+    assert "template/campus-a4.json" in files
+    assert "template/certs-a4.json" in files
+
+    renamed = await client.put(
+        f"/api/owner/resume-templates/{intern['id']}",
+        json={
+            "slug": "intern-a4",
+            "name": {**intern["name"], "en": "Intern vault"},
+            "sections": intern["sections"],
+        },
+        headers=headers,
+    )
+    assert renamed.status_code == 200
+    assert '"Intern vault"' in files["template/intern-a4.json"]
+
+    created = await client.post(
+        "/api/owner/resume-templates",
+        json={
+            "slug": "my-layout",
+            "name": {"zh-Hant": "我的", "zh-Hans": "我的", "en": "Mine"},
+            "sections": ["summary", "projects"],
+        },
+        headers=headers,
+    )
+    assert created.status_code == 200
+    assert created.json()["githubPath"] == "template/my-layout.json"
+    assert "template/my-layout.json" in files
+
+    deleted = await client.delete(
+        f"/api/owner/resume-templates/{created.json()['id']}",
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+    assert "kenchan6666/cv:template/my-layout.json" in github.deletes
+    assert "template/my-layout.json" not in files
 
 
 def io_bytes(data: bytes):

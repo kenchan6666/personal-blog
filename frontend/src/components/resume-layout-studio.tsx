@@ -151,7 +151,7 @@ export function ResumeLayoutStudio({ draft, dict, disabled, onChange }: Props) {
 
   return (
     <div className="resume-studio">
-      <label className="mb-4 block text-xs text-[var(--text-muted)]">
+      <label className="mb-3 block text-xs text-[var(--text-muted)]">
         {a.fieldLayoutName}
         <input
           className="field"
@@ -170,6 +170,27 @@ export function ResumeLayoutStudio({ draft, dict, disabled, onChange }: Props) {
           }
         />
       </label>
+      <label className="mb-3 block text-xs text-[var(--text-muted)]">
+        {a.fieldLayoutSlug}
+        <input
+          className="field"
+          value={draft.slug}
+          disabled={disabled}
+          onChange={(event) =>
+            onChange({
+              ...draft,
+              slug: event.target.value,
+            })
+          }
+        />
+      </label>
+      {draft.githubPath ? (
+        <p className="mb-4 text-xs text-[var(--text-muted)]">
+          {a.layoutVaultFile.replace("{path}", draft.githubPath)}
+        </p>
+      ) : (
+        <p className="mb-4 text-xs text-[var(--text-muted)]">{a.layoutVaultHint}</p>
+      )}
       <ul className="resume-studio-list">
         {catalog.map((id) => {
           const on = draft.sections.includes(id);
