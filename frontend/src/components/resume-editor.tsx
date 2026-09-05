@@ -125,19 +125,6 @@ export function ResumeEditor({ locale, dict }: Props) {
     return map[id as ResumeSectionId] || id;
   }
 
-  function sectionBlurb(id: string) {
-    if (layout?.extras?.some((item) => item.slug === id)) return a.sectionBlurbCustom;
-    const map = {
-      summary: a.sectionBlurbSummary,
-      education: a.sectionBlurbEducation,
-      internship: a.sectionBlurbInternship,
-      projects: a.sectionBlurbProjects,
-      activities: a.sectionBlurbActivities,
-      skillsOthers: a.sectionBlurbSkills,
-    };
-    return map[id as ResumeSectionId] || a.sectionBlurbCustom;
-  }
-
   const layout = useMemo(
     () =>
       templates.find((item) => item.slug === current?.templateSlug) ??
@@ -282,93 +269,60 @@ export function ResumeEditor({ locale, dict }: Props) {
             ) : null}
 
             <p className="mb-2 text-sm font-semibold">{a.fieldResumeLayout}</p>
-            <div className="resume-layout-split mb-4">
-              <div className="resume-layout-row">
-                {templates.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`resume-layout-card${
-                      current.templateSlug === item.slug ? " is-active" : ""
-                    }`}
-                    onClick={() => {
-                      setCurrent({
-                        ...current,
-                        templateSlug: item.slug,
-                        extras: [
-                          ...(item.extras ?? []).map((def) => {
-                            const existing = current.extras.find(
-                              (extra) => extra.slug === def.slug,
-                            );
-                            return (
-                              existing ?? {
-                                slug: def.slug,
-                                title: def.title,
-                                lines: [],
-                                entries: [],
-                              }
-                            );
-                          }),
-                          ...current.extras.filter(
-                            (extra) =>
-                              !(item.extras ?? []).some(
-                                (def) => def.slug === extra.slug,
-                              ),
-                          ),
-                        ],
-                      });
-                    }}
-                  >
-                    <strong>{localizedText(item.name) || item.slug}</strong>
-                    <span className="resume-layout-bars">
-                      {item.sections.map((id) => (
-                        <span key={id}>{sectionLabel(id)}</span>
-                      ))}
-                    </span>
-                  </button>
-                ))}
+            <div className="resume-layout-row mb-4">
+              {templates.map((item) => (
                 <button
+                  key={item.id}
                   type="button"
-                  className="resume-layout-card is-new"
+                  className={`resume-layout-card${
+                    current.templateSlug === item.slug ? " is-active" : ""
+                  }`}
                   onClick={() => {
-                    setTemplateDraft(emptyOwnerResumeTemplate());
-                    setOpenTemplate(true);
+                    setCurrent({
+                      ...current,
+                      templateSlug: item.slug,
+                      extras: [
+                        ...(item.extras ?? []).map((def) => {
+                          const existing = current.extras.find(
+                            (extra) => extra.slug === def.slug,
+                          );
+                          return (
+                            existing ?? {
+                              slug: def.slug,
+                              title: def.title,
+                              lines: [],
+                              entries: [],
+                            }
+                          );
+                        }),
+                        ...current.extras.filter(
+                          (extra) =>
+                            !(item.extras ?? []).some(
+                              (def) => def.slug === extra.slug,
+                            ),
+                        ),
+                      ],
+                    });
                   }}
                 >
-                  {a.newLayout}
-                </button>
-              </div>
-              {layout ? (
-                <aside key={layout.slug} className="resume-layout-detail">
-                  <div className="resume-layout-detail-head">
-                    <div>
-                      <strong>{localizedText(layout.name) || layout.slug}</strong>
-                      {layout.githubPath ? (
-                        <p className="resume-layout-path">{layout.githubPath}</p>
-                      ) : null}
-                    </div>
-                    {!layout.builtin ? (
-                      <button
-                        type="button"
-                        className="btn-cta"
-                        onClick={() => openLayoutEditor(layout)}
-                      >
-                        {a.editLayout}
-                      </button>
-                    ) : (
-                      <span className="resume-layout-locked">{a.layoutLocked}</span>
-                    )}
-                  </div>
-                  <ul>
-                    {layout.sections.map((id) => (
-                      <li key={id}>
-                        <b>{sectionLabel(id)}</b>
-                        <span>{sectionBlurb(id)}</span>
-                      </li>
+                  <strong>{localizedText(item.name) || item.slug}</strong>
+                  <span className="resume-layout-bars">
+                    {item.sections.map((id) => (
+                      <span key={id}>{sectionLabel(id)}</span>
                     ))}
-                  </ul>
-                </aside>
-              ) : null}
+                  </span>
+                </button>
+              ))}
+              <button
+                type="button"
+                className="resume-layout-card is-new"
+                onClick={() => {
+                  setTemplateDraft(emptyOwnerResumeTemplate());
+                  setOpenTemplate(true);
+                }}
+              >
+                {a.newLayout}
+              </button>
             </div>
 
             <label className="mb-3 block text-xs text-[var(--text-muted)]">
@@ -1013,6 +967,15 @@ export function ResumeEditor({ locale, dict }: Props) {
               title={a.visualCv}
               action={
                 <div className="flex flex-wrap gap-2">
+                  {layout && !layout.builtin ? (
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      onClick={() => openLayoutEditor(layout)}
+                    >
+                      {a.editLayout}
+                    </button>
+                  ) : null}
                   {current.id ? (
                     <button
                       type="button"
