@@ -45,7 +45,7 @@ _Avoid_: Admin（指人时）, user（泛称）
 _Avoid_: clone, mirror（本站不镜像整仓）
 
 **ResumeTemplate**:
-一份一页 CV 的版式契约：栏目顺序、名称与字段骨架，可含自订栏目（标题）。只有 `classic-a4`（学生项目向）写在代码里且不可改。其余版式是 CvRepo 里 `template/{slug}.json` 的文件，可改名称与栏目；新建也写入该文件夹。生成 PDF 时按该契约排版。视觉仍是 A4 单栏、日期靠右，不是换皮肤。
+一份一页 CV 的版式契约：栏目顺序、名称与字段骨架，可含自订栏目（标题）。内置栏目含 `internship`（实习）与独立的 `work`（工作经验，数据在 `workExperiences`）。只有 `classic-a4`（学生项目向）写在代码里且不可改。其余版式是 CvRepo 里 `template/{slug}.json` 的文件，可改名称与栏目；新建也写入该文件夹。`job-a4`（工作）用 `work` 不用 `internship`。生成 PDF 时按该契约排版。视觉仍是 A4 单栏、日期靠右，不是换皮肤。
 _Avoid_: SuperCV 模板（作实体名时）, theme, skin, 把栏目顺序当视觉主题, 把除基础套外的版式写死在代码里
 
 **Resume**:

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import type { Dictionary } from "@/i18n/dictionaries";
-import type { Locale } from "@/i18n/config";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
+import { isLocale, type Locale } from "@/i18n/config";
 import {
   createOwnerResume,
   createOwnerResumeTemplate,
@@ -17,6 +17,7 @@ import {
   getSessionToken,
   importOwnerResumeFromGithub,
   localizedText,
+  localizedTextFor,
   publishOwnerResume,
   pushOwnerResumeToGithub,
   saveOwnerResume,
@@ -35,7 +36,63 @@ import { ResumePaper } from "./resume-paper";
 type Props = {
   locale: Locale;
   dict: Dictionary;
+  active?: boolean;
 };
+
+function resumePaperDict(resumeLocale: string, fallback: Dictionary) {
+  return isLocale(resumeLocale)
+    ? getDictionary(resumeLocale).resume
+    : fallback.resume;
+}
+
+function isEmptyResume(item: OwnerResume) {
+  return (
+    !item.header.name.trim() &&
+    !item.summary.length &&
+    !item.education.length &&
+    !item.internships.length &&
+    !(item.workExperiences ?? []).length &&
+    !item.projects.length &&
+    !item.activities.length &&
+    !item.skills.length &&
+    !item.languages.length &&
+    !(item.extras ?? []).length
+  );
+}
+
+function CollapsibleBlock({
+  id,
+  title,
+  collapsed,
+  onToggle,
+  action,
+  children,
+}: {
+  id: string;
+  title: string;
+  collapsed: boolean;
+  onToggle: (id: string) => void;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`resume-block${collapsed ? " is-collapsed" : ""}`}>
+      <div className="resume-block-head">
+        <button
+          type="button"
+          className="resume-block-toggle"
+          aria-expanded={!collapsed}
+          onClick={() => onToggle(id)}
+        >
+          <i />
+          <p className="text-sm font-semibold">{title}</p>
+        </button>
+        {action}
+      </div>
+      <div className="resume-block-body">{children}</div>
+    </section>
+  );
+}
 
 function slugify(value: string) {
   return value
@@ -60,9 +117,8 @@ function commasOf(value: string) {
     .filter(Boolean);
 }
 
-export function ResumeEditor({ locale, dict }: Props) {
+export function ResumeEditor({ locale, dict, active = true }: Props) {
   const a = dict.admin;
-  const r = dict.resume;
   const [templates, setTemplates] = useState<OwnerResumeTemplate[]>([]);
   const [resumes, setResumes] = useState<OwnerResume[]>([]);
   const [current, setCurrent] = useState<OwnerResume | null>(null);
@@ -80,6 +136,13 @@ export function ResumeEditor({ locale, dict }: Props) {
   const [githubPath, setGithubPath] = useState("");
   const [githubRef, setGithubRef] = useState("");
   const [extraTitle, setExtraTitle] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const currentRef = useRef<OwnerResume | null>(null);
+  const dirtyRef = useRef(false);
+  const baselineRef = useRef("");
+  const persistRef = useRef<(next: OwnerResume, silent?: boolean) => Promise<void>>(
+    async () => {},
+  );
 
   async function reload(token: string) {
     const [nextTemplates, nextResumes] = await Promise.all([
@@ -107,6 +170,8 @@ export function ResumeEditor({ locale, dict }: Props) {
     setOpenTemplate(true);
   }
 
+  const paper = resumePaperDict(current?.locale ?? locale, dict);
+
   function sectionLabel(id: string) {
     const extra = templates
       .flatMap((item) => item.extras ?? [])
@@ -115,14 +180,19 @@ export function ResumeEditor({ locale, dict }: Props) {
     const onResume = current?.extras?.find((item) => item.slug === id);
     if (onResume) return onResume.title || onResume.slug;
     const map: Record<ResumeSectionId, string> = {
-      summary: r.sectionSummary,
-      education: r.sectionEducation,
-      internship: r.sectionInternship,
-      projects: r.sectionProjects,
-      activities: r.sectionActivities,
-      skillsOthers: r.sectionSkills,
+      summary: paper.sectionSummary,
+      education: paper.sectionEducation,
+      internship: paper.sectionInternship,
+      work: paper.sectionWork,
+      projects: paper.sectionProjects,
+      activities: paper.sectionActivities,
+      skillsOthers: paper.sectionSkills,
     };
     return map[id as ResumeSectionId] || id;
+  }
+
+  function toggleBlock(id: string) {
+    setCollapsed((current) => ({ ...current, [id]: !current[id] }));
   }
 
   const layout = useMemo(
@@ -138,14 +208,18 @@ export function ResumeEditor({ locale, dict }: Props) {
     "skillsOthers",
   ];
 
-  async function persistResume(next: OwnerResume) {
+  async function persistResume(next: OwnerResume, silent = false) {
     const token = getSessionToken();
     if (!token) return;
-    setSaving(true);
-    setError(null);
+    if (silent && isEmptyResume(next)) return;
+    if (!silent) {
+      setSaving(true);
+      setError(null);
+    }
     try {
       const payload = {
         ...next,
+        workExperiences: next.workExperiences ?? [],
         title: next.header.name.trim() || next.title.trim() || next.slug,
         slug:
           next.slug ||
@@ -155,15 +229,18 @@ export function ResumeEditor({ locale, dict }: Props) {
       const saved = next.id
         ? await saveOwnerResume(token, next.id, payload)
         : await createOwnerResume(token, payload);
+      baselineRef.current = JSON.stringify(saved);
+      dirtyRef.current = false;
       setCurrent(saved);
       await reload(token);
-      setMessage(a.saved);
+      if (!silent) setMessage(a.saved);
     } catch {
-      setError(a.errorGeneric);
+      if (!silent) setError(a.errorGeneric);
     } finally {
-      setSaving(false);
+      if (!silent) setSaving(false);
     }
   }
+  persistRef.current = persistResume;
 
   async function persistTemplate(next: OwnerResumeTemplate) {
     const token = getSessionToken();
@@ -192,12 +269,576 @@ export function ResumeEditor({ locale, dict }: Props) {
   }
 
   function startNew() {
-    setCurrent({
+    const next = {
       ...emptyOwnerResume(),
       templateSlug: templates[0]?.slug || "classic-a4",
-    });
+    };
+    baselineRef.current = JSON.stringify(next);
+    dirtyRef.current = false;
+    setCurrent(next);
     setMessage(null);
     setError(null);
+  }
+
+  function openResume(item: OwnerResume) {
+    const next = {
+      ...item,
+      extras: item.extras ?? [],
+      workExperiences: item.workExperiences ?? [],
+    };
+    baselineRef.current = JSON.stringify(next);
+    dirtyRef.current = false;
+    setCurrent(next);
+    setMessage(null);
+    setError(null);
+  }
+
+  useEffect(() => {
+    currentRef.current = current;
+    if (!current || !baselineRef.current) return;
+    dirtyRef.current = JSON.stringify(current) !== baselineRef.current;
+  }, [current]);
+
+  useEffect(() => {
+    async function flush() {
+      const next = currentRef.current;
+      if (!next || !dirtyRef.current) return;
+      await persistRef.current(next, true);
+    }
+    function onLeave() {
+      void flush();
+    }
+    function onHidden() {
+      if (document.visibilityState === "hidden") onLeave();
+    }
+    window.addEventListener("pagehide", onLeave);
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("beforeunload", onLeave);
+    return () => {
+      window.removeEventListener("pagehide", onLeave);
+      document.removeEventListener("visibilitychange", onHidden);
+      window.removeEventListener("beforeunload", onLeave);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (active) return;
+    const next = currentRef.current;
+    if (!next || !dirtyRef.current) return;
+    void persistRef.current(next, true);
+  }, [active]);
+
+  const extras = current?.extras ?? [];
+  const extraBySlug = new Map(extras.map((item) => [item.slug, item]));
+  const editorOrder = (() => {
+    const seen = new Set<string>();
+    return [...sections, ...extras.map((item) => item.slug)].filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  })();
+
+  function renderEditorSection(id: string) {
+    if (!current) return null;
+    const folded = Boolean(collapsed[id]);
+    if (id === "summary") {
+      return (
+        <CollapsibleBlock
+          key={id}
+          id={id}
+          title={paper.sectionSummary}
+          collapsed={folded}
+          onToggle={toggleBlock}
+        >
+          <AgentField
+            label={a.fieldResumeSummary}
+            value={current.summary.join("\n")}
+            multiline
+            closeLabel={a.close}
+            onChange={(value) =>
+              setCurrent({ ...current, summary: linesOf(value) })
+            }
+          />
+        </CollapsibleBlock>
+      );
+    }
+    if (id === "education") {
+      return (
+        <CollapsibleBlock
+          key={id}
+          id={id}
+          title={paper.sectionEducation}
+          collapsed={folded}
+          onToggle={toggleBlock}
+          action={
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={() =>
+                setCurrent({
+                  ...current,
+                  education: [
+                    ...current.education,
+                    {
+                      institution: "",
+                      field: "",
+                      degree: "",
+                      start: "",
+                      end: "",
+                      city: "",
+                      honor: "",
+                      related_courses: [],
+                    },
+                  ],
+                })
+              }
+            >
+              {a.addEducation}
+            </button>
+          }
+        >
+          {current.education.map((item, index) => (
+            <div key={`edu-${index}`} className="resume-entry-form">
+              <AgentField
+                label={a.fieldInstitution}
+                value={item.institution}
+                closeLabel={a.close}
+                onChange={(institution) => {
+                  const education = [...current.education];
+                  education[index] = { ...item, institution };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <AgentField
+                label={a.fieldMajor}
+                value={item.field}
+                closeLabel={a.close}
+                onChange={(field) => {
+                  const education = [...current.education];
+                  education[index] = { ...item, field };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <AgentField
+                label={a.fieldDegree}
+                value={item.degree}
+                closeLabel={a.close}
+                onChange={(degree) => {
+                  const education = [...current.education];
+                  education[index] = { ...item, degree };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                  {a.fieldStart}
+                  <input
+                    className="field"
+                    value={item.start}
+                    onChange={(event) => {
+                      const education = [...current.education];
+                      education[index] = { ...item, start: event.target.value };
+                      setCurrent({ ...current, education });
+                    }}
+                  />
+                </label>
+                <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                  {a.fieldEnd}
+                  <input
+                    className="field"
+                    value={item.end}
+                    onChange={(event) => {
+                      const education = [...current.education];
+                      education[index] = { ...item, end: event.target.value };
+                      setCurrent({ ...current, education });
+                    }}
+                  />
+                </label>
+              </div>
+              <AgentField
+                label={a.fieldResumeCity}
+                value={item.city}
+                closeLabel={a.close}
+                onChange={(city) => {
+                  const education = [...current.education];
+                  education[index] = { ...item, city };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <AgentField
+                label={a.fieldHonor}
+                value={item.honor}
+                closeLabel={a.close}
+                onChange={(honor) => {
+                  const education = [...current.education];
+                  education[index] = { ...item, honor };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <AgentField
+                label={a.fieldCourses}
+                value={item.related_courses.join(", ")}
+                closeLabel={a.close}
+                onChange={(value) => {
+                  const education = [...current.education];
+                  education[index] = {
+                    ...item,
+                    related_courses: commasOf(value),
+                  };
+                  setCurrent({ ...current, education });
+                }}
+              />
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                onClick={() =>
+                  setCurrent({
+                    ...current,
+                    education: current.education.filter(
+                      (_, itemIndex) => itemIndex !== index,
+                    ),
+                  })
+                }
+              >
+                {a.removeEntry}
+              </button>
+            </div>
+          ))}
+        </CollapsibleBlock>
+      );
+    }
+    if (id === "internship" || id === "work") {
+      const items =
+        id === "work"
+          ? current.workExperiences ?? []
+          : current.internships;
+      return (
+        <ExperienceList
+          key={id}
+          id={id}
+          label={id === "work" ? paper.sectionWork : paper.sectionInternship}
+          items={items}
+          addLabel={id === "work" ? a.addWork : a.addInternship}
+          dict={dict}
+          collapsed={folded}
+          onToggle={toggleBlock}
+          onAdd={() => {
+            const empty = {
+              organization: "",
+              role: "",
+              start: "",
+              end: "",
+              city: "",
+              description: [],
+            };
+            if (id === "work") {
+              setCurrent({
+                ...current,
+                workExperiences: [...(current.workExperiences ?? []), empty],
+              });
+              return;
+            }
+            setCurrent({
+              ...current,
+              internships: [...current.internships, empty],
+            });
+          }}
+          onChange={(next) =>
+            setCurrent(
+              id === "work"
+                ? { ...current, workExperiences: next }
+                : { ...current, internships: next },
+            )
+          }
+        />
+      );
+    }
+    if (id === "projects") {
+      return (
+        <CollapsibleBlock
+          key={id}
+          id={id}
+          title={paper.sectionProjects}
+          collapsed={folded}
+          onToggle={toggleBlock}
+          action={
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={() =>
+                setCurrent({
+                  ...current,
+                  projects: [
+                    ...current.projects,
+                    {
+                      name: "",
+                      start: "",
+                      end: "",
+                      tech_stack: [],
+                      description: [],
+                    },
+                  ],
+                })
+              }
+            >
+              {a.addProject}
+            </button>
+          }
+        >
+          {current.projects.map((item, index) => (
+            <div key={`proj-${index}`} className="resume-entry-form">
+              <AgentField
+                label={a.fieldProjectName}
+                value={item.name}
+                closeLabel={a.close}
+                onChange={(name) => {
+                  const projects = [...current.projects];
+                  projects[index] = { ...item, name };
+                  setCurrent({ ...current, projects });
+                }}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                  {a.fieldStart}
+                  <input
+                    className="field"
+                    value={item.start}
+                    onChange={(event) => {
+                      const projects = [...current.projects];
+                      projects[index] = { ...item, start: event.target.value };
+                      setCurrent({ ...current, projects });
+                    }}
+                  />
+                </label>
+                <label className="mb-3 block text-xs text-[var(--text-muted)]">
+                  {a.fieldEnd}
+                  <input
+                    className="field"
+                    value={item.end}
+                    onChange={(event) => {
+                      const projects = [...current.projects];
+                      projects[index] = { ...item, end: event.target.value };
+                      setCurrent({ ...current, projects });
+                    }}
+                  />
+                </label>
+              </div>
+              <AgentField
+                label={a.fieldTech}
+                value={item.tech_stack.join(", ")}
+                closeLabel={a.close}
+                onChange={(value) => {
+                  const projects = [...current.projects];
+                  projects[index] = {
+                    ...item,
+                    tech_stack: commasOf(value),
+                  };
+                  setCurrent({ ...current, projects });
+                }}
+              />
+              <AgentField
+                label={a.fieldBulletLines}
+                value={item.description.join("\n")}
+                multiline
+                closeLabel={a.close}
+                onChange={(value) => {
+                  const projects = [...current.projects];
+                  projects[index] = {
+                    ...item,
+                    description: linesOf(value),
+                  };
+                  setCurrent({ ...current, projects });
+                }}
+              />
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                onClick={() =>
+                  setCurrent({
+                    ...current,
+                    projects: current.projects.filter(
+                      (_, itemIndex) => itemIndex !== index,
+                    ),
+                  })
+                }
+              >
+                {a.removeEntry}
+              </button>
+            </div>
+          ))}
+        </CollapsibleBlock>
+      );
+    }
+    if (id === "activities") {
+      return (
+        <ExperienceList
+          key={id}
+          id={id}
+          label={paper.sectionActivities}
+          items={current.activities}
+          addLabel={a.addActivity}
+          dict={dict}
+          collapsed={folded}
+          onToggle={toggleBlock}
+          onAdd={() =>
+            setCurrent({
+              ...current,
+              activities: [
+                ...current.activities,
+                {
+                  organization: "",
+                  role: "",
+                  start: "",
+                  end: "",
+                  city: "",
+                  description: [],
+                },
+              ],
+            })
+          }
+          onChange={(activities) => setCurrent({ ...current, activities })}
+        />
+      );
+    }
+    if (id === "skillsOthers") {
+      return (
+        <CollapsibleBlock
+          key={id}
+          id={id}
+          title={paper.sectionSkills}
+          collapsed={folded}
+          onToggle={toggleBlock}
+          action={
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              onClick={() =>
+                setCurrent({
+                  ...current,
+                  languages: [...current.languages, { name: "", level: "" }],
+                })
+              }
+            >
+              {a.addLanguage}
+            </button>
+          }
+        >
+          <AgentField
+            label={a.fieldResumeSkills}
+            value={current.skills.join(", ")}
+            closeLabel={a.close}
+            onChange={(value) =>
+              setCurrent({ ...current, skills: commasOf(value) })
+            }
+          />
+          {current.languages.map((item, index) => (
+            <div key={`lang-${index}`} className="grid grid-cols-2 gap-2">
+              <AgentField
+                label={a.fieldLanguageName}
+                value={item.name}
+                closeLabel={a.close}
+                onChange={(name) => {
+                  const languages = [...current.languages];
+                  languages[index] = { ...item, name };
+                  setCurrent({ ...current, languages });
+                }}
+              />
+              <AgentField
+                label={a.fieldLanguageLevel}
+                value={item.level}
+                closeLabel={a.close}
+                onChange={(level) => {
+                  const languages = [...current.languages];
+                  languages[index] = { ...item, level };
+                  setCurrent({ ...current, languages });
+                }}
+              />
+            </div>
+          ))}
+        </CollapsibleBlock>
+      );
+    }
+    const extra = extraBySlug.get(id);
+    const extraIndex = extras.findIndex((item) => item.slug === id);
+    if (!extra || extraIndex < 0) return null;
+    return (
+      <CollapsibleBlock
+        key={id}
+        id={id}
+        title={extra.title || id}
+        collapsed={folded}
+        onToggle={toggleBlock}
+        action={
+          <button
+            type="button"
+            className="btn-ghost text-sm"
+            onClick={() =>
+              setCurrent({
+                ...current,
+                extras: extras.filter((_, itemIndex) => itemIndex !== extraIndex),
+              })
+            }
+          >
+            {a.removeEntry}
+          </button>
+        }
+      >
+        <AgentField
+          label={a.fieldLayoutName}
+          value={extra.title}
+          closeLabel={a.close}
+          onChange={(title) => {
+            const next = [...extras];
+            next[extraIndex] = { ...extra, title };
+            setCurrent({ ...current, extras: next });
+          }}
+        />
+        <AgentField
+          label={a.fieldBulletLines}
+          value={extra.lines.join("\n")}
+          multiline
+          closeLabel={a.close}
+          onChange={(value) => {
+            const next = [...extras];
+            next[extraIndex] = { ...extra, lines: linesOf(value) };
+            setCurrent({ ...current, extras: next });
+          }}
+        />
+        <ExperienceList
+          id={`${id}-entries`}
+          label={extra.title || a.addSection}
+          items={extra.entries}
+          addLabel={a.addActivity}
+          dict={dict}
+          collapsed={Boolean(collapsed[`${id}-entries`])}
+          onToggle={toggleBlock}
+          onAdd={() => {
+            const next = [...extras];
+            next[extraIndex] = {
+              ...extra,
+              entries: [
+                ...extra.entries,
+                {
+                  organization: "",
+                  role: "",
+                  start: "",
+                  end: "",
+                  city: "",
+                  description: [],
+                },
+              ],
+            };
+            setCurrent({ ...current, extras: next });
+          }}
+          onChange={(entries) => {
+            const next = [...extras];
+            next[extraIndex] = { ...extra, entries };
+            setCurrent({ ...current, extras: next });
+          }}
+        />
+      </CollapsibleBlock>
+    );
   }
 
   if (loading) {
@@ -229,11 +870,7 @@ export function ResumeEditor({ locale, dict }: Props) {
                     className={`tile resume-pick w-full text-left${
                       current?.id === item.id ? " tile-active" : ""
                     }`}
-                    onClick={() => {
-                      setCurrent({ ...item, extras: item.extras ?? [] });
-                      setMessage(null);
-                      setError(null);
-                    }}
+                    onClick={() => openResume(item)}
                   >
                     <span className="flex items-center justify-between gap-3">
                       <strong>
@@ -305,7 +942,7 @@ export function ResumeEditor({ locale, dict }: Props) {
                     });
                   }}
                 >
-                  <strong>{localizedText(item.name) || item.slug}</strong>
+                  <strong>{localizedTextFor(item.name, locale) || item.slug}</strong>
                   <span className="resume-layout-bars">
                     {item.sections.map((id) => (
                       <span key={id}>{sectionLabel(id)}</span>
@@ -398,461 +1035,7 @@ export function ResumeEditor({ locale, dict }: Props) {
               }
             />
 
-            {sections.includes("summary") ? (
-              <AgentField
-                label={a.fieldResumeSummary}
-                value={current.summary.join("\n")}
-                multiline
-                closeLabel={a.close}
-                onChange={(value) =>
-                  setCurrent({ ...current, summary: linesOf(value) })
-                }
-              />
-            ) : null}
-
-            {sections.includes("education") ? (
-              <section className="resume-block">
-                <div className="resume-block-head">
-                  <p className="text-sm font-semibold">{r.sectionEducation}</p>
-                  <button
-                    type="button"
-                    className="btn-ghost text-sm"
-                    onClick={() =>
-                      setCurrent({
-                        ...current,
-                        education: [
-                          ...current.education,
-                          {
-                            institution: "",
-                            field: "",
-                            degree: "",
-                            start: "",
-                            end: "",
-                            city: "",
-                            honor: "",
-                            related_courses: [],
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    {a.addEducation}
-                  </button>
-                </div>
-                {current.education.map((item, index) => (
-                  <div key={`edu-${index}`} className="resume-entry-form">
-                    <AgentField
-                      label={a.fieldInstitution}
-                      value={item.institution}
-                      closeLabel={a.close}
-                      onChange={(institution) => {
-                        const education = [...current.education];
-                        education[index] = { ...item, institution };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldMajor}
-                      value={item.field}
-                      closeLabel={a.close}
-                      onChange={(field) => {
-                        const education = [...current.education];
-                        education[index] = { ...item, field };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldDegree}
-                      value={item.degree}
-                      closeLabel={a.close}
-                      onChange={(degree) => {
-                        const education = [...current.education];
-                        education[index] = { ...item, degree };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
-                        {a.fieldStart}
-                        <input
-                          className="field"
-                          placeholder="YYYY-MM"
-                          value={item.start}
-                          onChange={(event) => {
-                            const education = [...current.education];
-                            education[index] = {
-                              ...item,
-                              start: event.target.value,
-                            };
-                            setCurrent({ ...current, education });
-                          }}
-                        />
-                      </label>
-                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
-                        {a.fieldEnd}
-                        <input
-                          className="field"
-                          placeholder="YYYY-MM"
-                          value={item.end}
-                          onChange={(event) => {
-                            const education = [...current.education];
-                            education[index] = {
-                              ...item,
-                              end: event.target.value,
-                            };
-                            setCurrent({ ...current, education });
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <AgentField
-                      label={a.fieldResumeCity}
-                      value={item.city}
-                      closeLabel={a.close}
-                      onChange={(city) => {
-                        const education = [...current.education];
-                        education[index] = { ...item, city };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldHonor}
-                      value={item.honor}
-                      closeLabel={a.close}
-                      onChange={(honor) => {
-                        const education = [...current.education];
-                        education[index] = { ...item, honor };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldCourses}
-                      value={item.related_courses.join(", ")}
-                      closeLabel={a.close}
-                      onChange={(value) => {
-                        const education = [...current.education];
-                        education[index] = {
-                          ...item,
-                          related_courses: commasOf(value),
-                        };
-                        setCurrent({ ...current, education });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn-ghost text-sm"
-                      onClick={() =>
-                        setCurrent({
-                          ...current,
-                          education: current.education.filter(
-                            (_, itemIndex) => itemIndex !== index,
-                          ),
-                        })
-                      }
-                    >
-                      {a.removeEntry}
-                    </button>
-                  </div>
-                ))}
-              </section>
-            ) : null}
-
-            {sections.includes("internship") ? (
-              <ExperienceList
-                label={r.sectionInternship}
-                items={current.internships}
-                addLabel={a.addInternship}
-                dict={dict}
-                onAdd={() =>
-                  setCurrent({
-                    ...current,
-                    internships: [
-                      ...current.internships,
-                      {
-                        organization: "",
-                        role: "",
-                        start: "",
-                        end: "",
-                        city: "",
-                        description: [],
-                      },
-                    ],
-                  })
-                }
-                onChange={(internships) => setCurrent({ ...current, internships })}
-              />
-            ) : null}
-
-            {sections.includes("projects") ? (
-              <section className="resume-block">
-                <div className="resume-block-head">
-                  <p className="text-sm font-semibold">{r.sectionProjects}</p>
-                  <button
-                    type="button"
-                    className="btn-ghost text-sm"
-                    onClick={() =>
-                      setCurrent({
-                        ...current,
-                        projects: [
-                          ...current.projects,
-                          {
-                            name: "",
-                            start: "",
-                            end: "",
-                            tech_stack: [],
-                            description: [],
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    {a.addProject}
-                  </button>
-                </div>
-                {current.projects.map((item, index) => (
-                  <div key={`proj-${index}`} className="resume-entry-form">
-                    <AgentField
-                      label={a.fieldProjectName}
-                      value={item.name}
-                      closeLabel={a.close}
-                      onChange={(name) => {
-                        const projects = [...current.projects];
-                        projects[index] = { ...item, name };
-                        setCurrent({ ...current, projects });
-                      }}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
-                        {a.fieldStart}
-                        <input
-                          className="field"
-                          placeholder="YYYY-MM"
-                          value={item.start}
-                          onChange={(event) => {
-                            const projects = [...current.projects];
-                            projects[index] = {
-                              ...item,
-                              start: event.target.value,
-                            };
-                            setCurrent({ ...current, projects });
-                          }}
-                        />
-                      </label>
-                      <label className="mb-3 block text-xs text-[var(--text-muted)]">
-                        {a.fieldEnd}
-                        <input
-                          className="field"
-                          placeholder="YYYY-MM"
-                          value={item.end}
-                          onChange={(event) => {
-                            const projects = [...current.projects];
-                            projects[index] = {
-                              ...item,
-                              end: event.target.value,
-                            };
-                            setCurrent({ ...current, projects });
-                          }}
-                        />
-                      </label>
-                    </div>
-                    <AgentField
-                      label={a.fieldTech}
-                      value={item.tech_stack.join(", ")}
-                      closeLabel={a.close}
-                      onChange={(value) => {
-                        const projects = [...current.projects];
-                        projects[index] = {
-                          ...item,
-                          tech_stack: commasOf(value),
-                        };
-                        setCurrent({ ...current, projects });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldBulletLines}
-                      value={item.description.join("\n")}
-                      multiline
-                      closeLabel={a.close}
-                      onChange={(value) => {
-                        const projects = [...current.projects];
-                        projects[index] = {
-                          ...item,
-                          description: linesOf(value),
-                        };
-                        setCurrent({ ...current, projects });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="btn-ghost text-sm"
-                      onClick={() =>
-                        setCurrent({
-                          ...current,
-                          projects: current.projects.filter(
-                            (_, itemIndex) => itemIndex !== index,
-                          ),
-                        })
-                      }
-                    >
-                      {a.removeEntry}
-                    </button>
-                  </div>
-                ))}
-              </section>
-            ) : null}
-
-            {sections.includes("activities") ? (
-              <ExperienceList
-                label={r.sectionActivities}
-                items={current.activities}
-                addLabel={a.addActivity}
-                dict={dict}
-                onAdd={() =>
-                  setCurrent({
-                    ...current,
-                    activities: [
-                      ...current.activities,
-                      {
-                        organization: "",
-                        role: "",
-                        start: "",
-                        end: "",
-                        city: "",
-                        description: [],
-                      },
-                    ],
-                  })
-                }
-                onChange={(activities) => setCurrent({ ...current, activities })}
-              />
-            ) : null}
-
-            {sections.includes("skillsOthers") ? (
-              <section className="resume-block">
-                <AgentField
-                  label={a.fieldResumeSkills}
-                  value={current.skills.join(", ")}
-                  closeLabel={a.close}
-                  onChange={(value) =>
-                    setCurrent({ ...current, skills: commasOf(value) })
-                  }
-                />
-                <div className="resume-block-head">
-                  <p className="text-sm font-semibold">{a.fieldLanguages}</p>
-                  <button
-                    type="button"
-                    className="btn-ghost text-sm"
-                    onClick={() =>
-                      setCurrent({
-                        ...current,
-                        languages: [
-                          ...current.languages,
-                          { name: "", level: "" },
-                        ],
-                      })
-                    }
-                  >
-                    {a.addLanguage}
-                  </button>
-                </div>
-                {current.languages.map((item, index) => (
-                  <div
-                    key={`lang-${index}`}
-                    className="grid grid-cols-2 gap-2"
-                  >
-                    <AgentField
-                      label={a.fieldLanguageName}
-                      value={item.name}
-                      closeLabel={a.close}
-                      onChange={(name) => {
-                        const languages = [...current.languages];
-                        languages[index] = { ...item, name };
-                        setCurrent({ ...current, languages });
-                      }}
-                    />
-                    <AgentField
-                      label={a.fieldLanguageLevel}
-                      value={item.level}
-                      closeLabel={a.close}
-                      onChange={(level) => {
-                        const languages = [...current.languages];
-                        languages[index] = { ...item, level };
-                        setCurrent({ ...current, languages });
-                      }}
-                    />
-                  </div>
-                ))}
-              </section>
-            ) : null}
-
-            {(current.extras ?? []).map((extra, index) => (
-              <section key={extra.slug} className="resume-block">
-                <AgentField
-                  label={a.fieldLayoutName}
-                  value={extra.title}
-                  closeLabel={a.close}
-                  onChange={(title) => {
-                    const extras = [...(current.extras ?? [])];
-                    extras[index] = { ...extra, title };
-                    setCurrent({ ...current, extras });
-                  }}
-                />
-                <AgentField
-                  label={a.fieldBulletLines}
-                  value={extra.lines.join("\n")}
-                  multiline
-                  closeLabel={a.close}
-                  onChange={(value) => {
-                    const extras = [...(current.extras ?? [])];
-                    extras[index] = { ...extra, lines: linesOf(value) };
-                    setCurrent({ ...current, extras });
-                  }}
-                />
-                <ExperienceList
-                  label={extra.title || a.addSection}
-                  items={extra.entries}
-                  addLabel={a.addActivity}
-                  dict={dict}
-                  onAdd={() => {
-                    const extras = [...(current.extras ?? [])];
-                    extras[index] = {
-                      ...extra,
-                      entries: [
-                        ...extra.entries,
-                        {
-                          organization: "",
-                          role: "",
-                          start: "",
-                          end: "",
-                          city: "",
-                          description: [],
-                        },
-                      ],
-                    };
-                    setCurrent({ ...current, extras });
-                  }}
-                  onChange={(entries) => {
-                    const extras = [...(current.extras ?? [])];
-                    extras[index] = { ...extra, entries };
-                    setCurrent({ ...current, extras });
-                  }}
-                />
-                <button
-                  type="button"
-                  className="btn-ghost text-sm"
-                  onClick={() =>
-                    setCurrent({
-                      ...current,
-                      extras: (current.extras ?? []).filter(
-                        (_, itemIndex) => itemIndex !== index,
-                      ),
-                    })
-                  }
-                >
-                  {a.removeEntry}
-                </button>
-              </section>
-            ))}
+            {editorOrder.map((id) => renderEditorSection(id))}
 
             <div className="resume-studio-add">
               <input
@@ -1098,7 +1281,7 @@ export function ResumeEditor({ locale, dict }: Props) {
         open={openTemplate}
         title={
           templateDraft.id
-            ? localizedText(templateDraft.name)
+            ? localizedTextFor(templateDraft.name, locale)
             : a.newLayout
         }
         closeLabel={a.close}
@@ -1170,29 +1353,39 @@ export function ResumeEditor({ locale, dict }: Props) {
 }
 
 function ExperienceList({
+  id,
   label,
   items,
   addLabel,
   dict,
+  collapsed,
+  onToggle,
   onAdd,
   onChange,
 }: {
+  id: string;
   label: string;
   items: OwnerResume["internships"];
   addLabel: string;
   dict: Dictionary;
+  collapsed: boolean;
+  onToggle: (id: string) => void;
   onAdd: () => void;
   onChange: (next: OwnerResume["internships"]) => void;
 }) {
   const a = dict.admin;
   return (
-    <section className="resume-block">
-      <div className="resume-block-head">
-        <p className="text-sm font-semibold">{label}</p>
+    <CollapsibleBlock
+      id={id}
+      title={label}
+      collapsed={collapsed}
+      onToggle={onToggle}
+      action={
         <button type="button" className="btn-ghost text-sm" onClick={onAdd}>
           {addLabel}
         </button>
-      </div>
+      }
+    >
       {items.map((item, index) => (
         <div key={`${label}-${index}`} className="resume-entry-form">
           <AgentField
@@ -1275,6 +1468,6 @@ function ExperienceList({
           </button>
         </div>
       ))}
-    </section>
+    </CollapsibleBlock>
   );
 }

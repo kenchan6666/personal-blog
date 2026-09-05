@@ -87,6 +87,59 @@ async def test_about_me_knowledge_can_be_edited(client, settings) -> None:
     assert synced_all.json()[0]["id"] == record_id
 
 
+@pytest.mark.asyncio
+async def test_agent_stop_and_rewind(client, settings) -> None:
+    from app.models import AgentConversation, AgentMessage
+    from app.store import current_store
+
+    headers = owner_headers(settings)
+    created = await client.post(
+        "/api/owner/agent/conversations",
+        headers=headers,
+        json={"title": "改写"},
+    )
+    assert created.status_code == 200
+    conversation_id = created.json()["id"]
+    stopped = await client.post(
+        f"/api/owner/agent/conversations/{conversation_id}/stop",
+        headers=headers,
+    )
+    assert stopped.status_code == 200
+    assert stopped.json()["thinking"] is False
+
+    from beanie import PydanticObjectId
+
+    row = await current_store().get(
+        AgentConversation, PydanticObjectId(conversation_id)
+    )
+    assert row is not None
+    row.messages = [
+        AgentMessage(role="user", content="第一句"),
+        AgentMessage(role="assistant", content="答一"),
+        AgentMessage(role="user", content="第二句"),
+        AgentMessage(role="assistant", content="答二"),
+    ]
+    await current_store().save(row)
+
+    rewound = await client.post(
+        f"/api/owner/agent/conversations/{conversation_id}/rewind",
+        headers=headers,
+        json={"index": 2, "content": "第二句改写"},
+    )
+    assert rewound.status_code == 200
+    assert [item["content"] for item in rewound.json()["messages"]] == [
+        "第一句",
+        "答一",
+    ]
+
+    bad = await client.post(
+        f"/api/owner/agent/conversations/{conversation_id}/rewind",
+        headers=headers,
+        json={"index": 1, "content": "不是用户"},
+    )
+    assert bad.status_code == 400
+
+
 def test_live_thinking_expires_after_the_stale_window() -> None:
     from datetime import timedelta
 

@@ -1,6 +1,6 @@
 ---
 name: write-resume
-description: Write or rewrite one-page Resume copy. Use when drafting a CV, filling or polishing summary, education, internship, projects, activities, skills, or extras, or the Owner asks to 写履历 / 改简历 / 改 CV bullets.
+description: Write or rewrite one-page Resume copy. Use when drafting a CV, filling or polishing summary, education, internship, work, projects, activities, skills, or extras, or the Owner asks to 写履历 / 改简历 / 改 CV bullets.
 ---
 
 # Write Resume
@@ -27,6 +27,7 @@ description: Write or rewrite one-page Resume copy. Use when drafting a CV, fill
 | summary | `summary[]` | 2–3 句：身份、方向、最硬的一条证据。不要目标空话 |
 | education | institution, field, degree, start, end, city, honor, related_courses | 学校与学位为主；课程只留和投递相关的 |
 | internship | organization, role, start, end, city, description[] | 职责用要点，不用「负责日常事务」 |
+| work | workExperiences[]，字段同实习 | 全职/兼职工作经验；与 internships 分开存 |
 | projects | name, start, end, tech_stack[], description[] | 做出了什么、用什么、结果是什么；栈放 tech_stack |
 | activities | 同实习条目 | 社团/志愿；没有就空着，不要硬凑 |
 | skillsOthers | skills[], languages[] | 真用过的技能；语言写程度 |

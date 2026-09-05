@@ -1,4 +1,5 @@
-import type { Dictionary } from "@/i18n/dictionaries";
+import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
+import { isLocale } from "@/i18n/config";
 import type {
   OwnerResume,
   PublicResume,
@@ -17,6 +18,7 @@ const BUILTIN: ResumeSectionId[] = [
   "summary",
   "education",
   "internship",
+  "work",
   "projects",
   "activities",
   "skillsOthers",
@@ -30,6 +32,7 @@ function filled(id: string, resume: PublicResume | OwnerResume) {
   if (id === "summary") return resume.summary.length > 0;
   if (id === "education") return resume.education.length > 0;
   if (id === "internship") return resume.internships.length > 0;
+  if (id === "work") return (resume.workExperiences ?? []).length > 0;
   if (id === "projects") return resume.projects.length > 0;
   if (id === "activities") return resume.activities.length > 0;
   if (id === "skillsOthers") {
@@ -40,12 +43,15 @@ function filled(id: string, resume: PublicResume | OwnerResume) {
 }
 
 export function ResumePaper({ resume, dict, sections, showEmpty }: Props) {
-  const r = dict.resume;
+  const paperDict = isLocale(resume.locale)
+    ? getDictionary(resume.locale).resume
+    : dict.resume;
+  const r = paperDict;
   const header = resume.header;
   const extras = resume.extras ?? [];
   const seen = new Set<string>();
   const order = [
-    ...(sections ?? BUILTIN),
+    ...(sections ?? resume.sections ?? BUILTIN),
     ...extras.map((item) => item.slug),
   ].filter((id) => {
     if (seen.has(id)) return false;
@@ -100,11 +106,15 @@ export function ResumePaper({ resume, dict, sections, showEmpty }: Props) {
             </section>
           );
         }
-        if (id === "internship") {
+        if (id === "internship" || id === "work") {
+          const items =
+            id === "work" ? resume.workExperiences ?? [] : resume.internships;
+          const title =
+            id === "work" ? r.sectionWork : r.sectionInternship;
           return (
             <section key={id}>
-              <h3>{r.sectionInternship}</h3>
-              {resume.internships.map((item) => (
+              <h3>{title}</h3>
+              {items.map((item) => (
                 <div key={`${item.organization}-${item.start}`} className="resume-entry">
                   <div className="resume-entry-row">
                     <strong>{item.organization}</strong>

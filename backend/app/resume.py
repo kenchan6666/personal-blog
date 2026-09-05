@@ -67,6 +67,39 @@ _BODY = 50
 _DATE_RIGHT = 521
 _NAME_SIZE = 14
 _TITLE_SIZE = 10
+_SECTION_TITLES = {
+    "en": {
+        "summary": "SUMMARY",
+        "education": "EDUCATION",
+        "internship": "INTERNSHIP",
+        "work": "WORK EXPERIENCE",
+        "projects": "PROJECT EXPERIENCE",
+        "activities": "ACTIVITIES",
+        "skillsOthers": "SKILLS, CERTIFICATIONS & OTHERS",
+    },
+    "zh-Hant": {
+        "summary": "個人總結",
+        "education": "教育經歷",
+        "internship": "實習經歷",
+        "work": "工作經驗",
+        "projects": "項目經歷",
+        "activities": "活動經歷",
+        "skillsOthers": "技能／證書及其他",
+    },
+    "zh-Hans": {
+        "summary": "个人总结",
+        "education": "教育经历",
+        "internship": "实习经历",
+        "work": "工作经验",
+        "projects": "项目经历",
+        "activities": "活动经历",
+        "skillsOthers": "技能／证书及其他",
+    },
+}
+
+
+def _section_titles(locale: str) -> dict[str, str]:
+    return _SECTION_TITLES.get(locale, _SECTION_TITLES["en"])
 _BODY_SIZE = 9
 
 _REGISTERED_FONT = ""
@@ -185,6 +218,22 @@ def vault_seed_templates() -> list[dict[str, Any]]:
                 "certs",
             ],
             "extras": [{"slug": "certs", "title": "Certifications"}],
+        },
+        {
+            "slug": "job-a4",
+            "name": {
+                "zh-Hant": "工作",
+                "zh-Hans": "工作",
+                "en": "Work",
+            },
+            "sections": [
+                "summary",
+                "education",
+                "work",
+                "projects",
+                "skillsOthers",
+            ],
+            "extras": [],
         },
     ]
 
@@ -558,6 +607,14 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
             else [item.model_dump() for item in resume.internships]
         )
     ]
+    resume.work_experiences = [
+        ResumeExperience.model_validate(item)
+        for item in (
+            body["workExperiences"]
+            if "workExperiences" in body
+            else [item.model_dump() for item in resume.work_experiences]
+        )
+    ]
     resume.projects = [
         ResumeProject.model_validate(item)
         for item in (
@@ -630,6 +687,7 @@ def parse_resume_import(payload: Any) -> dict[str, Any]:
         "summary": source.get("summary") or [],
         "education": source.get("education") or [],
         "internships": source.get("internships") or [],
+        "workExperiences": source.get("workExperiences") or [],
         "projects": source.get("projects") or [],
         "activities": source.get("activities") or [],
         "skills": source.get("skills") or skills_block.get("skills") or [],
@@ -741,14 +799,7 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         if link:
             draw_centered(link, _BODY_SIZE)
 
-    titles = {
-        "summary": "SUMMARY",
-        "education": "EDUCATION",
-        "internship": "INTERNSHIP",
-        "projects": "PROJECT EXPERIENCE",
-        "activities": "ACTIVITIES",
-        "skillsOthers": "SKILLS, CERTIFICATIONS & OTHERS",
-    }
+    titles = _section_titles(resume.locale)
     width = _PAGE_WIDTH - _BODY - 40
 
     def draw_extra(extra: ResumeExtra) -> None:
@@ -785,6 +836,13 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         elif section == "internship" and resume.internships:
             section_title(titles[section])
             for item in resume.internships:
+                entry_row(item.organization, format_range(item.start, item.end))
+                entry_row(item.role, item.city)
+                for line in item.description:
+                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+        elif section == "work" and resume.work_experiences:
+            section_title(titles[section])
+            for item in resume.work_experiences:
                 entry_row(item.organization, format_range(item.start, item.end))
                 entry_row(item.role, item.city)
                 for line in item.description:

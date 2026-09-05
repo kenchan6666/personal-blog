@@ -10,6 +10,8 @@ import {
   getSessionToken,
   listAgentConversations,
   listAgentKnowledge,
+  rewindOwnerAgentConversation,
+  stopOwnerAgentTurn,
   syncAgentKnowledge,
   syncAllAgentKnowledge,
   streamOwnerAgent,
@@ -32,7 +34,7 @@ type Props = {
   onInsert?: (locale: AgentInsertTarget, text: string) => void;
 };
 
-type MobilePane = "conversations" | "chat" | "knowledge";
+type MobileSheet = "" | "conversations" | "knowledge";
 
 const ACTIVE_CONVERSATION_KEY = "portfolio_agent_active_conversation";
 const EMPTY_KNOWLEDGE: AgentKnowledgeInput = {
@@ -111,11 +113,15 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   );
   const [error, setError] = useState("");
   const [awaitingMore, setAwaitingMore] = useState(false);
-  const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
+  const [mobileSheet, setMobileSheet] = useState<MobileSheet>("");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const composeRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const knowledgeListRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const activityTimerRef = useRef<number | null>(null);
   const knowledgeRevealTimerRef = useRef<number | null>(null);
 
@@ -284,7 +290,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setAgentActivity(
       changed ? `已同步到“关于我” · ${changed.title}` : "“关于我”已同步",
     );
-    if (!compact) setMobilePane("knowledge");
+    if (!compact) setMobileSheet("knowledge");
     if (activityTimerRef.current !== null) {
       window.clearTimeout(activityTimerRef.current);
     }
@@ -316,7 +322,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
       const row = await createAgentConversation(token);
       await refreshConversations(token);
       await openConversation(token, row.id);
-      setMobilePane("chat");
+      setMobileSheet("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法新建对话。");
     }
@@ -328,7 +334,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     try {
       setLoading(true);
       await openConversation(token, id);
-      setMobilePane("chat");
+      setMobileSheet("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "无法打开对话。");
     } finally {
@@ -356,9 +362,36 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     }
   }
 
-  async function send(event: React.FormEvent) {
-    event.preventDefault();
-    const text = input.trim();
+  function resizeComposer() {
+    const node = composeRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
+  }
+
+  async function stopTurn() {
+    const token = getSessionToken();
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setSending(false);
+    setThinking(false);
+    setToolActivity("");
+    if (!token || !activeId) return;
+    try {
+      const conversation = await stopOwnerAgentTurn(token, activeId);
+      setThinking(Boolean(conversation.thinking));
+      setMessages(
+        messagesWithThinking(conversation.messages, conversation.thinking),
+      );
+      await refreshConversations(token);
+    } catch {
+      /* keep the local stopped state */
+    }
+  }
+
+  async function send(event?: React.FormEvent, override?: string) {
+    event?.preventDefault();
+    const text = (override ?? input).trim();
     const token = getSessionToken();
     if ((!text && files.length === 0) || !token || !activeId || sending || thinking)
       return;
@@ -385,10 +418,13 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     ]);
     setInput("");
     setFiles([]);
+    setEditingIndex(null);
     setError("");
     setToolActivity("");
     setThinking(true);
     setSending(true);
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const editorContext = context
       ? [
@@ -417,6 +453,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           );
         },
         handleStreamEvent,
+        controller.signal,
       );
       if (!reply.trim()) {
         throw new Error("这一轮没有收到完整回复，请再发一次。");
@@ -433,7 +470,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         (reason instanceof DOMException && reason.name === "AbortError") ||
         (reason instanceof Error && reason.name === "AbortError");
       if (aborted) {
-        setThinking(true);
+        setThinking(false);
         return;
       }
       const busy =
@@ -473,6 +510,21 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     } finally {
       setToolActivity("");
       setSending(false);
+      if (abortRef.current === controller) abortRef.current = null;
+    }
+  }
+
+  async function submitEdit(index: number) {
+    const token = getSessionToken();
+    const text = editDraft.trim();
+    if (!token || !activeId || !text || sending || thinking) return;
+    try {
+      await rewindOwnerAgentConversation(token, activeId, index, text);
+      setMessages((current) => current.slice(0, index));
+      setEditingIndex(null);
+      await send(undefined, text);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "无法改写这句话。");
     }
   }
 
@@ -579,27 +631,41 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   return (
     <section
       ref={workspaceRef}
-      className={`agent-workspace${compact ? " is-compact" : ""} is-${mobilePane}`}
+      className={`agent-workspace${compact ? " is-compact" : ""}${
+        mobileSheet ? ` is-${mobileSheet}` : ""
+      }`}
     >
       {!compact ? (
         <nav className="agent-mobile-nav" aria-label="Agent 面板">
           {(
             [
               ["conversations", "会话"],
-              ["chat", "对话"],
+              ["", "对话"],
               ["knowledge", "关于我"],
             ] as const
           ).map(([pane, label]) => (
             <button
-              key={pane}
+              key={label}
               type="button"
-              className={mobilePane === pane ? "is-active" : ""}
-              onClick={() => setMobilePane(pane)}
+              className={mobileSheet === pane ? "is-active" : ""}
+              onClick={() =>
+                setMobileSheet((current) =>
+                  pane === "" ? "" : current === pane ? "" : pane,
+                )
+              }
             >
               {label}
             </button>
           ))}
         </nav>
+      ) : null}
+      {!compact ? (
+        <button
+          type="button"
+          className="agent-sheet-backdrop"
+          aria-label="关闭"
+          onClick={() => setMobileSheet("")}
+        />
       ) : null}
       {!compact ? (
         <aside className="agent-conversations">
@@ -702,7 +768,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           aria-live="polite"
         >
           {loading ? <div className="agent-empty">正在读取对话…</div> : null}
-          {messages.map((message) => (
+          {messages.map((message, index) => (
             <article
               key={message.id}
               className={`agent-message is-${message.role}${
@@ -712,6 +778,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                     : " is-thinking"
                   : ""
               }`}
+              onClick={() => {
+                if (message.role !== "user" || awaitingTurn) return;
+                if (message.id === "thinking-placeholder") return;
+                setEditingIndex(index);
+                setEditDraft(message.content);
+              }}
             >
               {message.files?.length ? (
                 <p className="agent-files">{message.files.join(" · ")}</p>
@@ -741,6 +813,26 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                     <i />
                   </span>
                 ) : null
+              ) : editingIndex === index ? (
+                <textarea
+                  className="agent-message-edit"
+                  value={editDraft}
+                  autoFocus
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) => setEditDraft(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void submitEdit(index);
+                    }
+                    if (event.key === "Escape") setEditingIndex(null);
+                  }}
+                  onBlur={() => {
+                    if (editDraft.trim() === message.content) {
+                      setEditingIndex(null);
+                    }
+                  }}
+                />
               ) : (
                 <p className="whitespace-pre-wrap">{message.content}</p>
               )}
@@ -810,27 +902,39 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               }
             />
             <textarea
+              ref={composeRef}
               value={input}
               rows={compact ? 2 : 3}
-              placeholder="输入消息…"
-              disabled={awaitingTurn || !activeId}
-              onChange={(event) => setInput(event.target.value)}
+              disabled={!activeId}
+              onChange={(event) => {
+                setInput(event.target.value);
+                resizeComposer();
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
+                  if (awaitingTurn) return;
                   event.currentTarget.form?.requestSubmit();
                 }
               }}
             />
-            <button
-              type="submit"
-              className="agent-send"
-              disabled={
-                awaitingTurn || !activeId || (!input.trim() && files.length === 0)
-              }
-            >
-              {awaitingTurn ? "•••" : "发送"}
-            </button>
+            {awaitingTurn ? (
+              <button
+                type="button"
+                className="agent-send"
+                onClick={() => void stopTurn()}
+              >
+                停止
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="agent-send"
+                disabled={!activeId || (!input.trim() && files.length === 0)}
+              >
+                发送
+              </button>
+            )}
           </div>
         </form>
       </div>

@@ -76,13 +76,14 @@ async def test_builtin_template_is_seeded_and_cannot_be_deleted(
     listed = await client.get("/api/owner/resume-templates", headers=headers)
     assert listed.status_code == 200
     slugs = [item["slug"] for item in listed.json()]
-    assert slugs[:6] == [
+    assert slugs[:7] == [
         "classic-a4",
         "campus-a4",
         "intern-a4",
         "full-a4",
         "work-a4",
         "certs-a4",
+        "job-a4",
     ]
     classic = next(item for item in listed.json() if item["slug"] == "classic-a4")
     intern = next(item for item in listed.json() if item["slug"] == "intern-a4")
@@ -366,11 +367,21 @@ async def test_vault_templates_are_files_in_cv_template_folder(
     listed = await client.get("/api/owner/resume-templates", headers=headers)
     assert listed.status_code == 200
     intern = next(item for item in listed.json() if item["slug"] == "intern-a4")
+    job = next(item for item in listed.json() if item["slug"] == "job-a4")
     assert intern["builtin"] is False
+    assert job["name"]["en"] == "Work"
+    assert job["sections"] == [
+        "summary",
+        "education",
+        "work",
+        "projects",
+        "skillsOthers",
+    ]
     assert "kenchan6666/cv:template/intern-a4.json" in github.puts
     files = github.extra_files["kenchan6666/cv"]["main"]
     assert "template/campus-a4.json" in files
     assert "template/certs-a4.json" in files
+    assert "template/job-a4.json" in files
 
     renamed = await client.put(
         f"/api/owner/resume-templates/{intern['id']}",
@@ -404,6 +415,56 @@ async def test_vault_templates_are_files_in_cv_template_folder(
     assert deleted.status_code == 200
     assert "kenchan6666/cv:template/my-layout.json" in github.deletes
     assert "template/my-layout.json" not in files
+
+
+@pytest.mark.asyncio
+async def test_work_section_and_locale_titles(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            slug="job-en",
+            templateSlug="job-a4",
+            locale="en",
+            internships=[
+                {
+                    "organization": "Intern Co",
+                    "role": "Intern",
+                    "start": "2023-01",
+                    "end": "2023-06",
+                    "city": "HK",
+                    "description": ["Interned."],
+                }
+            ],
+            workExperiences=[
+                {
+                    "organization": "Work Co",
+                    "role": "Engineer",
+                    "start": "2024-01",
+                    "end": "2025-01",
+                    "city": "HK",
+                    "description": ["Shipped the site."],
+                }
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["workExperiences"][0]["organization"] == "Work Co"
+    assert body["internships"][0]["organization"] == "Intern Co"
+
+    generated = await client.post(
+        f"/api/owner/resumes/{body['id']}/generate",
+        headers=headers,
+    )
+    assert generated.status_code == 200
+    pdf = await client.get(f"/api/owner/resumes/{body['id']}/pdf", headers=headers)
+    text = PdfReader(io_bytes(pdf.content)).pages[0].extract_text() or ""
+    assert "WORK EXPERIENCE" in text
+    assert "Work Co" in text
+    assert "INTERNSHIP" not in text
 
 
 def io_bytes(data: bytes):

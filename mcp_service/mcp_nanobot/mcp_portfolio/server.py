@@ -681,6 +681,7 @@ def create_server() -> FastMCP:
         summary: list[str] | None = None,
         education: list[dict[str, Any]] | None = None,
         internships: list[dict[str, Any]] | None = None,
+        work_experiences: list[dict[str, Any]] | None = None,
         projects: list[dict[str, Any]] | None = None,
         activities: list[dict[str, Any]] | None = None,
         skills: list[str] | None = None,
@@ -701,6 +702,7 @@ def create_server() -> FastMCP:
                 "summary": summary or [],
                 "education": education or [],
                 "internships": internships or [],
+                "workExperiences": work_experiences or [],
                 "projects": projects or [],
                 "activities": activities or [],
                 "skills": skills or [],
@@ -713,7 +715,7 @@ def create_server() -> FastMCP:
         identifier: str,
         changes: dict[str, Any],
     ) -> dict[str, Any]:
-        """Update Resume fields the CMS can edit: slug, locale, templateSlug, header (printed name is header.name), summary[], education[], internships[], projects[], activities[], skills[], languages[], extras[] (custom sections: slug/title/lines/entries). title follows header.name. Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
+        """Update Resume fields the CMS can edit: slug, locale, templateSlug, header (printed name is header.name), summary[], education[], internships[], workExperiences[], projects[], activities[], skills[], languages[], extras[] (custom sections: slug/title/lines/entries). title follows header.name. Same fields as the admin resume form. Do not publish here; call portfolio_publish_resume after the Owner asks."""
         api.require_write()
         current = _resume_by_id(identifier)
         payload = _merge(current, changes)

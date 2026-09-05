@@ -51,6 +51,11 @@ class ConversationUpdate(BaseModel):
     title: str = Field(min_length=1, max_length=80)
 
 
+class ConversationRewind(BaseModel):
+    index: int = Field(ge=0)
+    content: str = Field(min_length=1, max_length=20000)
+
+
 class KnowledgeWrite(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     category: Literal[
@@ -399,6 +404,24 @@ def register_agent_routes(
 
         outbound: asyncio.Queue[bytes | None] = asyncio.Queue()
 
+        async def persist_assistant(text: str) -> None:
+            cleaned = strip_tool_noise(text)
+            latest = await current_store().get(AgentConversation, parsed_id)
+            if latest is None:
+                return
+            if cleaned and (
+                not latest.messages
+                or latest.messages[-1].role != "assistant"
+                or latest.messages[-1].content != cleaned
+            ):
+                latest.messages.append(
+                    AgentMessage(role="assistant", content=cleaned)
+                )
+            latest.thinking = False
+            latest.thinking_at = None
+            latest.updated_at = utc_now()
+            await current_store().save(latest)
+
         async def consume() -> None:
             assistant = ""
             buffer = ""
@@ -499,22 +522,16 @@ def register_agent_routes(
                         event = await knowledge_update_event(force=True)
                         if event is not None:
                             await outbound.put(event)
+                except asyncio.CancelledError:
+                    await persist_assistant(assistant)
+                    raise
                 except httpx.HTTPError:
                     await outbound.put(
                         b'event: error\ndata: {"message":"Agent service unavailable"}\n\n'
                     )
                     return
                 cleaned = strip_tool_noise(assistant)
-                latest = await current_store().get(AgentConversation, parsed_id)
-                if latest is not None:
-                    if cleaned:
-                        latest.messages.append(
-                            AgentMessage(role="assistant", content=cleaned)
-                        )
-                    latest.thinking = False
-                    latest.thinking_at = None
-                    latest.updated_at = utc_now()
-                    await current_store().save(latest)
+                await persist_assistant(assistant)
                 if not cleaned:
                     await outbound.put(empty_turn_sse())
             finally:
@@ -528,11 +545,23 @@ def register_agent_routes(
                 await outbound.put(None)
 
         async def relay() -> AsyncIterator[bytes]:
-            while True:
-                item = await outbound.get()
-                if item is None:
-                    break
-                yield item
+            task = turns[turn_key]
+            try:
+                while True:
+                    if await request.is_disconnected():
+                        if not task.done():
+                            task.cancel()
+                        break
+                    try:
+                        item = await asyncio.wait_for(outbound.get(), timeout=0.4)
+                    except TimeoutError:
+                        continue
+                    if item is None:
+                        break
+                    yield item
+            finally:
+                if not task.done():
+                    task.cancel()
 
         turns[turn_key] = asyncio.create_task(consume())
         return StreamingResponse(
@@ -543,6 +572,65 @@ def register_agent_routes(
                 "X-Accel-Buffering": "no",
             },
         )
+
+    async def _cancel_turn(turn_key: str) -> None:
+        running = app.state.agent_turns.get(turn_key)
+        if running is None or running.done():
+            return
+        running.cancel()
+        try:
+            await running
+        except asyncio.CancelledError:
+            pass
+
+    @app.post("/api/owner/agent/conversations/{conversation_id}/stop")
+    async def stop_conversation(
+        conversation_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(AgentConversation, conversation_id)
+        if row is None:
+            raise _not_found("agent_conversation_not_found")
+        await _cancel_turn(str(conversation_id))
+        latest = await current_store().get(AgentConversation, conversation_id)
+        if latest is None:
+            raise _not_found("agent_conversation_not_found")
+        if latest.thinking:
+            latest.thinking = False
+            latest.thinking_at = None
+            latest.updated_at = utc_now()
+            await current_store().save(latest)
+        return latest.to_owner_dict()
+
+    @app.post("/api/owner/agent/conversations/{conversation_id}/rewind")
+    async def rewind_conversation(
+        conversation_id: PydanticObjectId,
+        body: ConversationRewind,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        row = await current_store().get(AgentConversation, conversation_id)
+        if row is None:
+            raise _not_found("agent_conversation_not_found")
+        await _cancel_turn(str(conversation_id))
+        latest = await current_store().get(AgentConversation, conversation_id)
+        if latest is None:
+            raise _not_found("agent_conversation_not_found")
+        if body.index >= len(latest.messages):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_message_index",
+            )
+        if latest.messages[body.index].role != "user":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="invalid_message_index",
+            )
+        latest.messages = latest.messages[: body.index]
+        latest.thinking = False
+        latest.thinking_at = None
+        latest.updated_at = utc_now()
+        await current_store().save(latest)
+        return latest.to_owner_dict()
 
     @app.get("/api/owner/agent/media/{token}")
     async def owner_agent_media(

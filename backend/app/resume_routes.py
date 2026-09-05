@@ -65,6 +65,7 @@ class ResumeBody(BaseModel):
     summary: list[str] = Field(default_factory=list)
     education: list[dict[str, Any]] = Field(default_factory=list)
     internships: list[dict[str, Any]] = Field(default_factory=list)
+    workExperiences: list[dict[str, Any]] = Field(default_factory=list)
     projects: list[dict[str, Any]] = Field(default_factory=list)
     activities: list[dict[str, Any]] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
@@ -160,7 +161,13 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         )
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
-        return row.to_public_dict()
+        payload = row.to_public_dict()
+        template = await current_store().find_one(
+            ResumeTemplate, slug=row.template_slug
+        )
+        if template is not None:
+            payload["sections"] = list(template.sections)
+        return payload
 
     @app.get("/api/public/resumes/{slug}/pdf")
     async def public_resume_pdf(slug: str) -> Response:

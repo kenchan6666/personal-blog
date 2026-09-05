@@ -4291,16 +4291,15 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-workspace:not(.is-compact) {
+    position: relative;
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
   }
 
-  .agent-workspace:not(.is-compact) > .agent-conversations,
-  .agent-workspace:not(.is-compact) > .agent-knowledge,
   .agent-workspace:not(.is-compact) > .agent-chat {
-    display: none;
+    display: flex;
     flex: 1 1 0;
     width: 100%;
     height: auto;
@@ -4308,14 +4307,51 @@ html[data-theme="dark"] .ambient-orb {
     max-height: none;
   }
 
-  .agent-delete-mini {
-    opacity: 1;
+  .agent-sheet-backdrop {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    border: 0;
+    background: color-mix(in srgb, var(--text-primary) 28%, transparent);
+  }
+
+  .agent-workspace.is-conversations > .agent-sheet-backdrop,
+  .agent-workspace.is-knowledge > .agent-sheet-backdrop {
+    display: block;
+  }
+
+  .agent-workspace:not(.is-compact) > .agent-conversations,
+  .agent-workspace:not(.is-compact) > .agent-knowledge {
+    display: flex;
+    position: absolute;
+    top: 2.75rem;
+    bottom: 0;
+    z-index: 4;
+    width: min(88vw, 20.5rem);
+    height: auto;
+    max-height: none;
+    transition: transform 280ms ease;
+  }
+
+  .agent-workspace:not(.is-compact) > .agent-conversations {
+    left: 0;
+    transform: translateX(-110%);
+  }
+
+  .agent-workspace:not(.is-compact) > .agent-knowledge {
+    right: 0;
+    left: auto;
+    transform: translateX(110%);
   }
 
   .agent-workspace.is-conversations > .agent-conversations,
-  .agent-workspace.is-chat > .agent-chat,
   .agent-workspace.is-knowledge > .agent-knowledge {
-    display: flex;
+    transform: none;
+  }
+
+  .agent-delete-mini {
+    opacity: 1;
   }
 
   .agent-chat-intro {
@@ -4353,9 +4389,16 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-compose-row textarea {
-    height: 2.2rem;
-    min-height: 2.2rem;
-    max-height: 2.2rem;
+    min-height: 2.8rem;
+    max-height: 8rem;
+    height: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-workspace:not(.is-compact) > .agent-conversations,
+  .agent-workspace:not(.is-compact) > .agent-knowledge {
+    transition: none;
   }
 }
 
@@ -4387,9 +4430,8 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .admin-dashboard-shell.is-agent .agent-compose-row textarea {
-    height: 2rem;
-    min-height: 2rem;
-    max-height: 2rem;
+    min-height: 2.6rem;
+    max-height: 7rem;
   }
 }
 
@@ -4429,9 +4471,8 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .admin-dashboard-shell.is-agent .agent-compose-row textarea {
-    height: 1.75rem;
-    min-height: 1.75rem;
-    max-height: 1.75rem;
+    min-height: 2.4rem;
+    max-height: 6rem;
   }
 }
 
@@ -4850,12 +4891,59 @@ html[data-theme="dark"] .ambient-orb {
 
 .agent-compose-row textarea {
   min-height: 2.5rem;
+  max-height: 10rem;
   flex: 1;
   resize: none;
+  overflow-y: auto;
   border: 0;
   outline: 0;
   color: var(--text-primary);
   background: transparent;
+}
+
+.agent-message-edit {
+  width: 100%;
+  min-height: 4rem;
+  resize: vertical;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 0.65rem 0.75rem;
+  color: var(--text-primary);
+  background: var(--field-bg);
+}
+
+.agent-message.is-user {
+  cursor: text;
+}
+
+.resume-block.is-collapsed .resume-block-body {
+  display: none;
+}
+
+.resume-block-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+}
+
+.resume-block-toggle i {
+  width: 0.4rem;
+  height: 0.4rem;
+  flex: 0 0 auto;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.55;
+}
+
+.resume-block.is-collapsed .resume-block-toggle i {
+  transform: rotate(-45deg);
 }
 
 .agent-send {

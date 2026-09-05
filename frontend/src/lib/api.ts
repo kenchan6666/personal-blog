@@ -85,9 +85,28 @@ export function emptyLocalized(): Localized {
   return { "zh-Hant": "", "zh-Hans": "", en: "" };
 }
 
+const LOCALE_FALLBACK: Record<string, readonly (keyof Localized)[]> = {
+  "zh-Hans": ["zh-Hans", "zh-Hant", "en"],
+  "zh-Hant": ["zh-Hant", "zh-Hans", "en"],
+  en: ["en", "zh-Hant", "zh-Hans"],
+};
+
 export function localizedText(value: Localized | undefined, fallback = ""): string {
   if (!value) return fallback;
   return value["zh-Hant"] || value["zh-Hans"] || value.en || fallback;
+}
+
+export function localizedTextFor(
+  value: Localized | undefined,
+  locale: string,
+  fallback = "",
+): string {
+  if (!value) return fallback;
+  for (const key of LOCALE_FALLBACK[locale] ?? LOCALE_FALLBACK["zh-Hant"]) {
+    const text = value[key];
+    if (text?.trim()) return text;
+  }
+  return localizedText(value, fallback);
 }
 
 export function emptyOwnerSite(): OwnerSite {
@@ -1148,6 +1167,7 @@ export type ResumeSectionId =
   | "summary"
   | "education"
   | "internship"
+  | "work"
   | "projects"
   | "activities"
   | "skillsOthers";
@@ -1226,12 +1246,14 @@ export type OwnerResume = {
   summary: string[];
   education: ResumeEducation[];
   internships: ResumeExperience[];
+  workExperiences: ResumeExperience[];
   projects: ResumeProject[];
   activities: ResumeExperience[];
   skills: string[];
   languages: ResumeLanguage[];
   extras: ResumeExtra[];
   pdfUrl: string;
+  sections?: string[];
   githubRepo?: string;
   githubJsonPath?: string;
   githubPdfPath?: string;
@@ -1258,6 +1280,7 @@ export function emptyOwnerResume(): OwnerResume {
     summary: [],
     education: [],
     internships: [],
+    workExperiences: [],
     projects: [],
     activities: [],
     skills: [],
@@ -1276,6 +1299,7 @@ export function emptyOwnerResumeTemplate(): OwnerResumeTemplate {
       "summary",
       "education",
       "internship",
+      "work",
       "projects",
       "activities",
       "skillsOthers",
@@ -1585,6 +1609,27 @@ export async function deleteAgentConversation(token: string, id: string) {
   );
 }
 
+export function stopOwnerAgentTurn(token: string, id: string) {
+  return ownerAgentJson<AgentConversation>(
+    token,
+    `/api/owner/agent/conversations/${id}/stop`,
+    { method: "POST" },
+  );
+}
+
+export function rewindOwnerAgentConversation(
+  token: string,
+  id: string,
+  index: number,
+  content: string,
+) {
+  return ownerAgentJson<AgentConversation>(
+    token,
+    `/api/owner/agent/conversations/${id}/rewind`,
+    { method: "POST", body: JSON.stringify({ index, content }) },
+  );
+}
+
 export function listAgentKnowledge(token: string) {
   return ownerAgentJson<AgentKnowledge[]>(
     token,
@@ -1647,6 +1692,7 @@ export async function streamOwnerAgent(
   files: File[],
   onDelta: (text: string) => void,
   onEvent?: (event: AgentStreamEvent) => void,
+  signal?: AbortSignal,
 ): Promise<string> {
   let body: BodyInit;
   let headers: HeadersInit = { Authorization: `Bearer ${token}` };
@@ -1670,6 +1716,7 @@ export async function streamOwnerAgent(
     method: "POST",
     headers,
     body,
+    signal,
   });
   if (!response.ok || !response.body) throw new Error(await parseError(response));
 

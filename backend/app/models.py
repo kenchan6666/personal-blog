@@ -16,6 +16,7 @@ RESUME_SECTIONS = (
     "summary",
     "education",
     "internship",
+    "work",
     "projects",
     "activities",
     "skillsOthers",
@@ -455,6 +456,7 @@ class Resume(Document):
     summary: list[str] = Field(default_factory=list)
     education: list[ResumeEducation] = Field(default_factory=list)
     internships: list[ResumeExperience] = Field(default_factory=list)
+    work_experiences: list[ResumeExperience] = Field(default_factory=list)
     projects: list[ResumeProject] = Field(default_factory=list)
     activities: list[ResumeExperience] = Field(default_factory=list)
     skills: list[str] = Field(default_factory=list)
@@ -485,6 +487,7 @@ class Resume(Document):
             "summary": list(self.summary),
             "education": [item.model_dump() for item in self.education],
             "internships": [item.model_dump() for item in self.internships],
+            "workExperiences": [item.model_dump() for item in self.work_experiences],
             "projects": [item.model_dump() for item in self.projects],
             "activities": [item.model_dump() for item in self.activities],
             "skills": list(self.skills),

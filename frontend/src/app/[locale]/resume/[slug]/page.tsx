@@ -62,7 +62,11 @@ export default async function ResumeDetailPage({
           {dict.resume.download}
         </a>
       </div>
-      <ResumePaper resume={resume} dict={dict} />
+      <ResumePaper
+        resume={resume}
+        dict={dict}
+        sections={resume.sections}
+      />
     </PageFrame>
   );
 }
