@@ -99,6 +99,14 @@ export function ResumeEditor({ locale, dict }: Props) {
       .finally(() => setLoading(false));
   }, [a.errorGeneric]);
 
+  function openLayoutEditor(item: OwnerResumeTemplate) {
+    setTemplateDraft({
+      ...item,
+      extras: item.extras ?? [],
+    });
+    setOpenTemplate(true);
+  }
+
   function sectionLabel(id: string) {
     const extra = templates
       .flatMap((item) => item.extras ?? [])
@@ -115,6 +123,19 @@ export function ResumeEditor({ locale, dict }: Props) {
       skillsOthers: r.sectionSkills,
     };
     return map[id as ResumeSectionId] || id;
+  }
+
+  function sectionBlurb(id: string) {
+    if (layout?.extras?.some((item) => item.slug === id)) return a.sectionBlurbCustom;
+    const map = {
+      summary: a.sectionBlurbSummary,
+      education: a.sectionBlurbEducation,
+      internship: a.sectionBlurbInternship,
+      projects: a.sectionBlurbProjects,
+      activities: a.sectionBlurbActivities,
+      skillsOthers: a.sectionBlurbSkills,
+    };
+    return map[id as ResumeSectionId] || a.sectionBlurbCustom;
   }
 
   const layout = useMemo(
@@ -261,17 +282,15 @@ export function ResumeEditor({ locale, dict }: Props) {
             ) : null}
 
             <p className="mb-2 text-sm font-semibold">{a.fieldResumeLayout}</p>
-            <div className="resume-layout-row mb-4">
-              {templates.map((item) => (
-                <div
-                  key={item.id}
-                  className={`resume-layout-card${
-                    current.templateSlug === item.slug ? " is-active" : ""
-                  }`}
-                >
+            <div className="resume-layout-split mb-4">
+              <div className="resume-layout-row">
+                {templates.map((item) => (
                   <button
+                    key={item.id}
                     type="button"
-                    className="resume-layout-pick"
+                    className={`resume-layout-card${
+                      current.templateSlug === item.slug ? " is-active" : ""
+                    }`}
                     onClick={() => {
                       setCurrent({
                         ...current,
@@ -301,42 +320,55 @@ export function ResumeEditor({ locale, dict }: Props) {
                     }}
                   >
                     <strong>{localizedText(item.name) || item.slug}</strong>
-                    {item.githubPath ? (
-                      <em className="resume-layout-path">{item.githubPath}</em>
-                    ) : null}
                     <span className="resume-layout-bars">
                       {item.sections.map((id) => (
                         <span key={id}>{sectionLabel(id)}</span>
                       ))}
                     </span>
                   </button>
-                  {!item.builtin ? (
-                    <button
-                      type="button"
-                      className="btn-ghost resume-layout-edit"
-                      onClick={() => {
-                        setTemplateDraft({
-                          ...item,
-                          extras: item.extras ?? [],
-                        });
-                        setOpenTemplate(true);
-                      }}
-                    >
-                      {a.editLayout}
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-              <button
-                type="button"
-                className="resume-layout-card is-new"
-                onClick={() => {
-                  setTemplateDraft(emptyOwnerResumeTemplate());
-                  setOpenTemplate(true);
-                }}
-              >
-                {a.newLayout}
-              </button>
+                ))}
+                <button
+                  type="button"
+                  className="resume-layout-card is-new"
+                  onClick={() => {
+                    setTemplateDraft(emptyOwnerResumeTemplate());
+                    setOpenTemplate(true);
+                  }}
+                >
+                  {a.newLayout}
+                </button>
+              </div>
+              {layout ? (
+                <aside key={layout.slug} className="resume-layout-detail">
+                  <div className="resume-layout-detail-head">
+                    <div>
+                      <strong>{localizedText(layout.name) || layout.slug}</strong>
+                      {layout.githubPath ? (
+                        <p className="resume-layout-path">{layout.githubPath}</p>
+                      ) : null}
+                    </div>
+                    {!layout.builtin ? (
+                      <button
+                        type="button"
+                        className="btn-cta"
+                        onClick={() => openLayoutEditor(layout)}
+                      >
+                        {a.editLayout}
+                      </button>
+                    ) : (
+                      <span className="resume-layout-locked">{a.layoutLocked}</span>
+                    )}
+                  </div>
+                  <ul>
+                    {layout.sections.map((id) => (
+                      <li key={id}>
+                        <b>{sectionLabel(id)}</b>
+                        <span>{sectionBlurb(id)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </aside>
+              ) : null}
             </div>
 
             <label className="mb-3 block text-xs text-[var(--text-muted)]">

@@ -1626,6 +1626,18 @@ html.is-locale-hold .article-page {
   background: color-mix(in srgb, var(--accent-link) 28%, var(--hairline));
 }
 
+.resume-layout-split {
+  display: grid;
+  gap: 0.75rem;
+}
+
+@media (min-width: 720px) {
+  .resume-layout-split {
+    grid-template-columns: minmax(0, 1.1fr) minmax(12rem, 0.9fr);
+    align-items: start;
+  }
+}
+
 .resume-layout-row {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
@@ -1644,26 +1656,73 @@ html.is-locale-hold .article-page {
   color: var(--text-primary);
 }
 
-.resume-layout-pick {
-  display: grid;
-  gap: 0.45rem;
-  text-align: left;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  padding: 0;
-}
-
-.resume-layout-path,
-.resume-layout-edit {
-  font-size: 0.65rem;
+.resume-layout-path {
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
   font-style: normal;
   color: var(--text-muted);
 }
 
-.resume-layout-edit {
-  justify-self: start;
-  padding-inline: 0.45rem;
+.resume-layout-detail {
+  display: grid;
+  gap: 0.75rem;
+  min-height: 6.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-card);
+  background: var(--panel-fill-strong);
+  animation: resume-detail-in 200ms ease;
+}
+
+@keyframes resume-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resume-layout-detail {
+    animation: none;
+  }
+}
+
+.resume-layout-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.resume-layout-detail ul {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.resume-layout-detail li {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.resume-layout-detail li b {
+  font-size: 0.8rem;
+}
+
+.resume-layout-detail li span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.resume-layout-locked {
+  font-size: 0.75rem;
+  color: var(--text-muted);
 }
 
 .resume-layout-card strong {
