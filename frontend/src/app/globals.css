@@ -4225,11 +4225,30 @@ html[data-theme="dark"] .ambient-orb {
     padding-right: max(0.55rem, env(safe-area-inset-right));
   }
 
+  html:has(.admin-dashboard-shell.is-agent),
+  html:has(.admin-dashboard-shell.is-agent) body,
+  .site-root:has(.admin-dashboard-shell.is-agent),
+  .site-main:has(.admin-dashboard-shell.is-agent) {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .admin-page:has(.admin-dashboard-shell.is-agent) {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
     padding-top: max(3.25rem, calc(2.6rem + env(safe-area-inset-top)));
     padding-bottom: max(0.45rem, env(safe-area-inset-bottom));
     padding-left: max(0.55rem, env(safe-area-inset-left));
     padding-right: max(0.55rem, env(safe-area-inset-right));
+  }
+
+  .admin-dashboard-shell.is-agent,
+  .admin-dashboard-shell.is-agent .admin-tab-panel,
+  .admin-dashboard-shell.is-agent .admin-tab-panel > div {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
   }
 
   .admin-dashboard-shell .admin-dash-head {
@@ -4316,14 +4335,20 @@ html[data-theme="dark"] .ambient-orb {
     position: relative;
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     min-height: 0;
     overflow: hidden;
+    grid-template-columns: none;
   }
 
   .agent-workspace:not(.is-compact) > .agent-chat {
     display: flex;
     flex: 1 1 0;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
     height: auto;
     min-height: 0;
     max-height: none;
@@ -4377,8 +4402,14 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-chat-intro {
+    min-width: 0;
+    max-width: 100%;
     gap: 0.55rem;
     padding: 0.5rem 0.75rem;
+  }
+
+  .agent-chat-intro > div {
+    min-width: 0;
   }
 
   .agent-chat-intro .agent-orb {
@@ -4387,7 +4418,10 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-chat-intro h2 {
+    overflow: hidden;
     font-size: 0.95rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .agent-chat-intro p {
@@ -4395,7 +4429,9 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-live-activity {
-    max-width: 10.5rem;
+    min-width: 0;
+    max-width: 7.5rem;
+    flex: 0 1 auto;
   }
 
   .agent-messages {
@@ -4403,6 +4439,8 @@ html[data-theme="dark"] .ambient-orb {
   }
 
   .agent-composer {
+    min-width: 0;
+    max-width: 100%;
     padding: 0.55rem 0.7rem
       max(
         0.55rem,
@@ -4410,10 +4448,30 @@ html[data-theme="dark"] .ambient-orb {
       );
   }
 
+  .agent-compose-row {
+    min-width: 0;
+    max-width: 100%;
+    gap: 0.4rem;
+    padding: 0.4rem;
+  }
+
   .agent-compose-row textarea {
+    flex: 1 1 0;
+    width: 0;
+    min-width: 0;
     min-height: 2.8rem;
     max-height: 8rem;
     height: auto;
+  }
+
+  .agent-compose-row .icon-btn {
+    flex: 0 0 auto;
+  }
+
+  .agent-workspace:not(.is-compact) .agent-send {
+    min-width: 0;
+    flex: 0 0 auto;
+    padding: 0.55rem 0.7rem;
   }
 }
 
