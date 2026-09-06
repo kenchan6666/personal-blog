@@ -60,9 +60,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
 
   return (
     <div
-      className={`admin-dashboard-shell${tab === "agent" ? " is-agent" : ""}${
-        tab === "resume" ? " is-resume" : ""
-      }`}
+      className={`admin-dashboard-shell${tab === "agent" ? " is-agent" : ""}`}
     >
       <div className="admin-dash-head glass mb-6 flex flex-wrap items-start justify-between gap-4 rounded-[var(--radius-panel)] p-6">
         <div>
