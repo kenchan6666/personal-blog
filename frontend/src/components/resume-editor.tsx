@@ -150,7 +150,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
   const [githubRepos, setGithubRepos] = useState<SourceRepo[]>([]);
   const [githubReady, setGithubReady] = useState(false);
   const [repoQuery, setRepoQuery] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
+  const [analyzingIndex, setAnalyzingIndex] = useState<number | null>(null);
   const [extraTitle, setExtraTitle] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const currentRef = useRef<OwnerResume | null>(null);
@@ -248,6 +248,33 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
     }
   }
 
+  async function typeProjectCopy(
+    index: number,
+    tech: string,
+    description: string,
+  ) {
+    for (let step = 1; step <= tech.length; step += 1) {
+      const next = tech.slice(0, step);
+      setCurrent((prev) => {
+        if (!prev || !prev.projects[index]) return prev;
+        const projects = [...prev.projects];
+        projects[index] = { ...projects[index], tech_stack: commasOf(next) };
+        return { ...prev, projects };
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 8));
+    }
+    for (let step = 1; step <= description.length; step += 1) {
+      const next = description.slice(0, step);
+      setCurrent((prev) => {
+        if (!prev || !prev.projects[index]) return prev;
+        const projects = [...prev.projects];
+        projects[index] = { ...projects[index], description: linesOf(next) };
+        return { ...prev, projects };
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 8));
+    }
+  }
+
   async function addProjectFromRepo(repo: SourceRepo) {
     if (!current) return;
     const token = getSessionToken();
@@ -258,41 +285,35 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
       tech_stack: [] as string[],
       description: [] as string[],
     };
+    const index = current.projects.length;
     setCurrent({ ...current, projects: [...current.projects, entry] });
     setPickGithubOpen(false);
     setCollapsed((state) => ({ ...state, projects: false }));
     if (!token) return;
-    setAnalyzing(true);
+    setAnalyzingIndex(index);
     try {
       const analyzed = await analyzeOwnerResumeGithubProject(token, {
         fullName: repo.fullName,
         locale: current.locale,
       });
       setCurrent((prev) => {
-        if (!prev) return prev;
+        if (!prev || !prev.projects[index]) return prev;
         const projects = [...prev.projects];
-        const index = [...projects]
-          .reverse()
-          .findIndex(
-            (item) =>
-              item.name === repo.name &&
-              !item.tech_stack.length &&
-              !item.description.length,
-          );
-        const actual = index < 0 ? -1 : projects.length - 1 - index;
-        if (actual < 0) return prev;
-        projects[actual] = {
-          ...projects[actual],
+        projects[index] = {
+          ...projects[index],
           name: analyzed.name || repo.name,
-          tech_stack: analyzed.tech_stack,
-          description: analyzed.description,
         };
         return { ...prev, projects };
       });
+      setAnalyzingIndex(null);
+      await typeProjectCopy(
+        index,
+        analyzed.tech_stack.join(", "),
+        analyzed.description.join("\n"),
+      );
     } catch {
       setError(a.errorGeneric);
-    } finally {
-      setAnalyzing(false);
+      setAnalyzingIndex(null);
     }
   }
 
@@ -676,7 +697,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
               <button
                 type="button"
                 className="btn-ghost text-sm"
-                disabled={analyzing}
+                disabled={analyzingIndex !== null}
                 onClick={() => void openGithubPicker()}
               >
                 {a.addProjectGithub}
@@ -726,6 +747,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                 label={a.fieldTech}
                 value={item.tech_stack.join(", ")}
                 closeLabel={a.close}
+                pending={analyzingIndex === index}
                 onChange={(value) => {
                   const projects = [...current.projects];
                   projects[index] = {
@@ -740,6 +762,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                 value={item.description.join("\n")}
                 multiline
                 closeLabel={a.close}
+                pending={analyzingIndex === index}
                 onChange={(value) => {
                   const projects = [...current.projects];
                   projects[index] = {

@@ -5074,6 +5074,27 @@ html[data-theme="dark"] .ambient-orb {
   color: var(--accent-link);
 }
 
+.agent-field-box {
+  position: relative;
+}
+
+.agent-field-box .agent-thinking {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.9rem;
+  pointer-events: none;
+}
+
+.agent-field-box.is-pending .field {
+  min-height: 2.75rem;
+  color: transparent;
+  caret-color: transparent;
+}
+
+.agent-field-box.is-pending textarea.field {
+  min-height: 6.5rem;
+}
+
 @keyframes agent-pulse {
   0%, 100% { opacity: 0.3; transform: translateX(0); }
   50% { opacity: 1; transform: translateX(2px); }

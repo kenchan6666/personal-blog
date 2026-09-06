@@ -13,6 +13,7 @@ type Props = {
   rows?: number;
   placeholder?: string;
   closeLabel: string;
+  pending?: boolean;
 };
 
 export function AgentField({
@@ -23,6 +24,7 @@ export function AgentField({
   rows = 4,
   placeholder,
   closeLabel,
+  pending = false,
 }: Props) {
   const [agentOpen, setAgentOpen] = useState(false);
   const insertionRun = useRef(0);
@@ -47,27 +49,40 @@ export function AgentField({
         <button
           type="button"
           className="btn-ghost ai-field-button text-sm"
+          disabled={pending}
           onClick={() => setAgentOpen(true)}
         >
           ✦ AI
         </button>
       </div>
-      {multiline ? (
-        <textarea
-          className="field"
-          rows={rows}
-          placeholder={placeholder}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <input
-          className="field"
-          placeholder={placeholder}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
+      <div className={`agent-field-box${pending ? " is-pending" : ""}`}>
+        {multiline ? (
+          <textarea
+            className="field"
+            rows={rows}
+            placeholder={placeholder}
+            value={value}
+            readOnly={pending}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        ) : (
+          <input
+            className="field"
+            placeholder={placeholder}
+            value={value}
+            readOnly={pending}
+            onChange={(event) => onChange(event.target.value)}
+          />
+        )}
+        {pending ? (
+          <span className="agent-thinking" aria-label="等待模型">
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+        ) : null}
+      </div>
       <CmsModal
         open={agentOpen}
         title={`AI · ${label}`}
