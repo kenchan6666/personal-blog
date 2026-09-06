@@ -586,5 +586,29 @@ async def test_analyze_github_project_fills_stack_without_dates(
     assert "start" not in body
     assert "end" not in body
     assert "Python" in body["tech_stack"]
-    assert body["description"]
-    assert all(isinstance(item, str) and item for item in body["description"])
+    assert isinstance(body["description"], list)
+    assert all("Primary features of" not in item for item in body["description"])
+
+
+def test_github_project_heuristic_does_not_invent_features():
+    from app.resume_github import _heuristic_project
+
+    empty = _heuristic_project(
+        name="area_demo",
+        description="",
+        readme="# area_demo\n",
+        names=["src", "app.py"],
+        locale="en",
+    )
+    assert empty["tech_stack"] == ["Python"]
+    assert empty["description"] == []
+
+    filled = _heuristic_project(
+        name="area_demo",
+        description="",
+        readme="# area_demo\n- Track nearby shops with FastAPI\n- Render the map in React\n",
+        names=["package.json", "main.py"],
+        locale="en",
+    )
+    assert "Track nearby shops with FastAPI" in filled["description"]
+    assert all("Primary features of" not in item for item in filled["description"])

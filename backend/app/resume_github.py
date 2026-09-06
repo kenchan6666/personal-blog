@@ -47,6 +47,10 @@ _NAME_STACK = {
     "manage.py": "Django",
 }
 _JSON_RE = re.compile(r"\{.*\}", re.S)
+_FILLER_BULLET_RE = re.compile(
+    r"^(primary features of|key features of|overview of|主要功能|的主要功能)\b",
+    re.I,
+)
 
 
 async def analyze_github_project(
@@ -104,13 +108,14 @@ async def analyze_github_project(
         names=names,
     )
     tech = _limit_stack((completed or {}).get("tech_stack") or inferred["tech_stack"])
-    bullets = split_resume_lines(
-        (completed or {}).get("description") or inferred["description"]
+    bullets = _usable_bullets(
+        (completed or {}).get("description") or inferred["description"],
+        name,
     )
     return {
         "name": name,
         "tech_stack": tech,
-        "description": bullets[:5] or inferred["description"],
+        "description": bullets[:5],
     }
 
 
@@ -152,17 +157,35 @@ def _heuristic_project(
     names: list[str],
     locale: str,
 ) -> dict[str, list[str]]:
+    del locale
     stack = _stack_from_names(names)
-    bullets = _readme_bullets(readme)
+    bullets = _readme_bullets(readme, name)
     if description.strip():
-        bullets = split_resume_lines(description) + bullets
-    if not bullets:
-        bullets = (
-            [f"{name} 的主要功能"]
-            if locale.startswith("zh")
-            else [f"Primary features of {name}"]
-        )
+        bullets = _usable_bullets(description, name) + bullets
     return {"tech_stack": stack, "description": bullets[:5]}
+
+
+def _usable_bullets(values: Any, name: str) -> list[str]:
+    return [
+        line
+        for line in split_resume_lines(values)
+        if _usable_bullet(line, name)
+    ]
+
+
+def _usable_bullet(text: str, name: str) -> bool:
+    cleaned = text.strip()
+    if len(cleaned) < 8:
+        return False
+    if _FILLER_BULLET_RE.search(cleaned):
+        return False
+    slug = re.sub(r"[\W_]+", "", name).lower()
+    compact = re.sub(r"[\W_]+", "", cleaned).lower()
+    if slug and (compact == slug or compact.startswith(slug) and len(compact) <= len(slug) + 6):
+        return False
+    if cleaned.lower() in {"readme", "overview", "introduction", "features"}:
+        return False
+    return True
 
 
 def _stack_from_names(names: list[str]) -> list[str]:
@@ -194,7 +217,7 @@ def _limit_stack(values: list[Any]) -> list[str]:
     return out
 
 
-def _readme_bullets(readme: str) -> list[str]:
+def _readme_bullets(readme: str, name: str) -> list[str]:
     lines: list[str] = []
     for raw in readme.splitlines():
         text = raw.strip()
@@ -202,11 +225,10 @@ def _readme_bullets(readme: str) -> list[str]:
             continue
         if text.startswith("#"):
             heading = text.lstrip("#").strip()
-            if heading and heading.lower() not in {"readme", "overview"}:
+            if _usable_bullet(heading, name):
                 lines.append(heading)
             continue
-        cleaned = split_resume_lines([text])
-        lines.extend(cleaned)
+        lines.extend(_usable_bullets([text], name))
         if len(lines) >= 5:
             break
     return lines[:5]
@@ -230,6 +252,8 @@ async def _complete_project_copy(
         "tech_stack: 3-5 language/framework names only, no library laundry list. "
         "description: 3-5 bullets; each is an application feature and which "
         "tech delivered that feature. No dates. No paragraph. "
+        "Never invent filler such as 'Primary features of {name}'. "
+        "If the README does not support a feature, omit it. "
         f"Locale: {locale}. Repo: {name}. "
         f"Description: {description[:300]}. "
         f"Files: {', '.join(names[:40])}. "
@@ -238,7 +262,7 @@ async def _complete_project_copy(
     target = f"{url.rstrip('/')}/v1/chat/completions"
     headers = _agent_headers(getattr(settings, "agent_internal_token", ""))
     try:
-        async with httpx.AsyncClient(timeout=3) as client:
+        async with httpx.AsyncClient(timeout=45) as client:
             response = await client.post(
                 target,
                 headers=headers,
