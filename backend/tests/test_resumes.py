@@ -254,6 +254,49 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
 
 
 @pytest.mark.asyncio
+async def test_long_resume_pdf_continues_on_a_second_page(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            slug="long-en",
+            projects=[
+                {
+                    "name": f"Project {index}",
+                    "start": "2024-01",
+                    "end": "2024-12",
+                    "tech_stack": ["Python"],
+                    "description": [
+                        f"Delivered measurable outcome {index}-{line}."
+                        for line in range(8)
+                    ],
+                }
+                for index in range(12)
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    generated = await client.post(
+        f"/api/owner/resumes/{created.json()['id']}/generate",
+        headers=headers,
+    )
+    assert generated.status_code == 200
+    pdf = await client.get(
+        f"/api/owner/resumes/{created.json()['id']}/pdf",
+        headers=headers,
+    )
+    reader = PdfReader(io_bytes(pdf.content))
+    assert len(reader.pages) >= 2
+    text = "".join((page.extract_text() or "") for page in reader.pages)
+    assert "Project 0" in text
+    assert "Project 11" in text
+
+
+@pytest.mark.asyncio
 async def test_resume_title_follows_header_name(client, mailer, settings):
     token = await _owner_token(client, mailer, settings)
     headers = {"Authorization": f"Bearer {token}"}

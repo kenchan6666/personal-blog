@@ -101,6 +101,7 @@ _SECTION_TITLES = {
 def _section_titles(locale: str) -> dict[str, str]:
     return _SECTION_TITLES.get(locale, _SECTION_TITLES["en"])
 _BODY_SIZE = 9
+_PAGE_BOTTOM = 40
 
 _REGISTERED_FONT = ""
 
@@ -740,11 +741,22 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
     y = _PAGE_HEIGHT - 36
     page.setFillColorRGB(0.10, 0.09, 0.19)
 
+    def new_page() -> None:
+        nonlocal y
+        page.showPage()
+        page.setFillColorRGB(0.10, 0.09, 0.19)
+        y = _PAGE_HEIGHT - 36
+
+    def ensure_space(needed: float) -> None:
+        if y - needed < _PAGE_BOTTOM:
+            new_page()
+
     def text_width(value: str, size: float) -> float:
         return pdfmetrics.stringWidth(value, font, size)
 
     def draw_centered(value: str, size: float) -> None:
         nonlocal y
+        ensure_space(size + 4)
         page.setFont(font, size)
         page.drawString((_PAGE_WIDTH - text_width(value, size)) / 2, y, value)
         y -= size + 4
@@ -766,11 +778,13 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         nonlocal y
         page.setFont(font, size)
         for line in wrap(value, width, size) or [value]:
+            ensure_space(size + 4)
             page.drawString(x, y, line)
             y -= size + 4
 
     def section_title(title: str) -> None:
         nonlocal y
+        ensure_space(_TITLE_SIZE + 36)
         y -= 8
         page.setFont(font, _TITLE_SIZE)
         page.drawString(_LEFT, y, title)
@@ -782,6 +796,7 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
 
     def entry_row(left: str, right: str) -> None:
         nonlocal y
+        ensure_space(_BODY_SIZE + 5)
         page.setFont(font, _BODY_SIZE)
         page.drawString(_LEFT, y, left)
         if right:

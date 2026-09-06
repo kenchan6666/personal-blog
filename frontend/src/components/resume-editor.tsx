@@ -905,62 +905,70 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
               <p className="mb-3 text-sm text-[var(--danger)]">{error}</p>
             ) : null}
 
-            <p className="mb-2 text-sm font-semibold">{a.fieldResumeLayout}</p>
-            <div className="resume-layout-row mb-4">
-              {templates.map((item) => (
+            <CollapsibleBlock
+              id="layout"
+              title={a.fieldResumeLayout}
+              collapsed={Boolean(collapsed.layout)}
+              onToggle={toggleBlock}
+            >
+              <div className="resume-layout-row">
+                {templates.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`resume-layout-card${
+                      current.templateSlug === item.slug ? " is-active" : ""
+                    }`}
+                    onClick={() => {
+                      setCurrent({
+                        ...current,
+                        templateSlug: item.slug,
+                        extras: [
+                          ...(item.extras ?? []).map((def) => {
+                            const existing = current.extras.find(
+                              (extra) => extra.slug === def.slug,
+                            );
+                            return (
+                              existing ?? {
+                                slug: def.slug,
+                                title: def.title,
+                                lines: [],
+                                entries: [],
+                              }
+                            );
+                          }),
+                          ...current.extras.filter(
+                            (extra) =>
+                              !(item.extras ?? []).some(
+                                (def) => def.slug === extra.slug,
+                              ),
+                          ),
+                        ],
+                      });
+                    }}
+                  >
+                    <strong>
+                      {localizedTextFor(item.name, locale) || item.slug}
+                    </strong>
+                    <span className="resume-layout-bars">
+                      {item.sections.map((id) => (
+                        <span key={id}>{sectionLabel(id)}</span>
+                      ))}
+                    </span>
+                  </button>
+                ))}
                 <button
-                  key={item.id}
                   type="button"
-                  className={`resume-layout-card${
-                    current.templateSlug === item.slug ? " is-active" : ""
-                  }`}
+                  className="resume-layout-card is-new"
                   onClick={() => {
-                    setCurrent({
-                      ...current,
-                      templateSlug: item.slug,
-                      extras: [
-                        ...(item.extras ?? []).map((def) => {
-                          const existing = current.extras.find(
-                            (extra) => extra.slug === def.slug,
-                          );
-                          return (
-                            existing ?? {
-                              slug: def.slug,
-                              title: def.title,
-                              lines: [],
-                              entries: [],
-                            }
-                          );
-                        }),
-                        ...current.extras.filter(
-                          (extra) =>
-                            !(item.extras ?? []).some(
-                              (def) => def.slug === extra.slug,
-                            ),
-                        ),
-                      ],
-                    });
+                    setTemplateDraft(emptyOwnerResumeTemplate());
+                    setOpenTemplate(true);
                   }}
                 >
-                  <strong>{localizedTextFor(item.name, locale) || item.slug}</strong>
-                  <span className="resume-layout-bars">
-                    {item.sections.map((id) => (
-                      <span key={id}>{sectionLabel(id)}</span>
-                    ))}
-                  </span>
+                  {a.newLayout}
                 </button>
-              ))}
-              <button
-                type="button"
-                className="resume-layout-card is-new"
-                onClick={() => {
-                  setTemplateDraft(emptyOwnerResumeTemplate());
-                  setOpenTemplate(true);
-                }}
-              >
-                {a.newLayout}
-              </button>
-            </div>
+              </div>
+            </CollapsibleBlock>
 
             <label className="mb-3 block text-xs text-[var(--text-muted)]">
               {a.fieldResumeSlug}
@@ -1092,57 +1100,69 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
               </button>
             </div>
 
-            <div className="resume-import">
-              <p className="text-sm font-semibold">{a.importGithub}</p>
-              <input
-                className="field"
-                placeholder={a.fieldGithubRepo}
-                value={githubRepo}
-                onChange={(event) => setGithubRepo(event.target.value)}
-              />
-              <input
-                className="field"
-                placeholder={a.fieldGithubPath}
-                value={githubPath}
-                onChange={(event) => setGithubPath(event.target.value)}
-              />
-              <input
-                className="field"
-                placeholder={a.fieldGithubRef}
-                value={githubRef}
-                onChange={(event) => setGithubRef(event.target.value)}
-              />
-              <button
-                type="button"
-                className="btn-ghost"
-                disabled={saving}
-                onClick={async () => {
-                  const token = getSessionToken();
-                  if (!token) return;
-                  setSaving(true);
-                  try {
-                    const imported = await importOwnerResumeFromGithub(token, {
-                      fullName: githubRepo,
-                      path: githubPath,
-                      ref: githubRef,
-                      slug:
-                        current.slug ||
-                        slugify(current.header.name || current.title) ||
-                        "imported-resume",
-                    });
-                    setCurrent(imported);
-                    await reload(token);
-                    setMessage(a.saved);
-                  } catch {
-                    setError(a.errorGeneric);
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                {saving ? a.importing : a.importNow}
-              </button>
-            </div>
+            <CollapsibleBlock
+              id="import"
+              title={a.importGithub}
+              collapsed={Boolean(collapsed.import)}
+              onToggle={toggleBlock}
+            >
+              <div className="resume-import">
+                <label className="block text-xs text-[var(--text-muted)]">
+                  {a.fieldGithubRepo}
+                  <input
+                    className="field"
+                    value={githubRepo}
+                    onChange={(event) => setGithubRepo(event.target.value)}
+                  />
+                </label>
+                <label className="block text-xs text-[var(--text-muted)]">
+                  {a.fieldGithubPath}
+                  <input
+                    className="field"
+                    value={githubPath}
+                    onChange={(event) => setGithubPath(event.target.value)}
+                  />
+                </label>
+                <label className="block text-xs text-[var(--text-muted)]">
+                  {a.fieldGithubRef}
+                  <input
+                    className="field"
+                    value={githubRef}
+                    onChange={(event) => setGithubRef(event.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={saving}
+                  onClick={async () => {
+                    const token = getSessionToken();
+                    if (!token) return;
+                    setSaving(true);
+                    try {
+                      const imported = await importOwnerResumeFromGithub(token, {
+                        fullName: githubRepo,
+                        path: githubPath,
+                        ref: githubRef,
+                        slug:
+                          current.slug ||
+                          slugify(current.header.name || current.title) ||
+                          "imported-resume",
+                      });
+                      setCurrent(imported);
+                      await reload(token);
+                      setMessage(a.saved);
+                    } catch {
+                      setError(a.errorGeneric);
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  {saving ? a.importing : a.importNow}
+                </button>
+              </div>
+            </CollapsibleBlock>
           </CmsCard>
 
           <div className="resume-preview-col">

@@ -1,3 +1,6 @@
+"use client";
+
+import { useLayoutEffect, useRef, useState } from "react";
 import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
 import { isLocale } from "@/i18n/config";
 import type {
@@ -42,7 +45,7 @@ function filled(id: string, resume: PublicResume | OwnerResume) {
   return Boolean(extra && (extra.lines.length > 0 || extra.entries.length > 0));
 }
 
-export function ResumePaper({ resume, dict, sections, showEmpty }: Props) {
+function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
   const paperDict = isLocale(resume.locale)
     ? getDictionary(resume.locale).resume
     : dict.resume;
@@ -199,6 +202,50 @@ export function ResumePaper({ resume, dict, sections, showEmpty }: Props) {
         return <ExtraBlock key={id} extra={extra} />;
       })}
     </article>
+  );
+}
+
+export function ResumePaper(props: Props) {
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [pages, setPages] = useState(1);
+  const [pageHeight, setPageHeight] = useState(0);
+
+  useLayoutEffect(() => {
+    const node = measureRef.current;
+    if (!node) return undefined;
+    const update = () => {
+      const width = node.clientWidth;
+      if (!width) return;
+      const height = width * (297 / 210);
+      setPageHeight(height);
+      setPages(Math.max(1, Math.ceil(node.scrollHeight / height)));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [props.resume, props.sections, props.showEmpty, props.dict]);
+
+  return (
+    <div className="resume-preview-stack">
+      <div className="resume-paper-measure" ref={measureRef} aria-hidden>
+        <ResumePaperBody {...props} />
+      </div>
+      {Array.from({ length: pages }, (_, index) => (
+        <div key={index} className="resume-paper-page">
+          <div
+            className="resume-paper-shift"
+            style={{
+              transform: pageHeight
+                ? `translateY(-${index * pageHeight}px)`
+                : undefined,
+            }}
+          >
+            <ResumePaperBody {...props} />
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
