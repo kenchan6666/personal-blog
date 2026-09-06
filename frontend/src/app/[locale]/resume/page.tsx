@@ -35,26 +35,19 @@ export default async function ResumeIndexPage({
   const locale = raw as Locale;
   const dict = getDictionary(locale);
   const resumes = await fetchPublicResumes();
+  if (resumes.length === 0) notFound();
 
   return (
     <PageFrame title={dict.resume.title} lead={dict.resume.lead} narrow>
-      {resumes.length === 0 ? (
-        <p className="about-empty">{dict.resume.empty}</p>
-      ) : (
-        <ul className="grid gap-4">
-          {resumes.map((item) => (
-            <li key={item.slug}>
-              <Link
-                href={`/${locale}/resume/${item.slug}`}
-                className="tile block"
-              >
-                <strong>{item.title}</strong>
-                <span className="ml-3 text-[var(--text-muted)]">{item.locale}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="entry-grid">
+        {resumes.map((item) => (
+          <li key={item.slug}>
+            <Link href={`/${locale}/resume/${item.slug}`} className="tile block">
+              <strong>{item.title}</strong>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </PageFrame>
   );
 }

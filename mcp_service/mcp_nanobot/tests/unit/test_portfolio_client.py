@@ -82,6 +82,7 @@ def test_fragment_enables_publish_tool() -> None:
     tools = fragment["portfolio"]["enabledTools"]
     assert "portfolio_publish_content" in tools
     assert "portfolio_generate_resume" in tools
+    assert "portfolio_unpublish_resume" in tools
     assert "portfolio_import_resume_from_github" in tools
     assert "portfolio_add_resume_project_from_github" in tools
     assert "portfolio_push_resume_to_github" in tools

@@ -21,6 +21,7 @@ import {
   localizedText,
   localizedTextFor,
   publishOwnerResume,
+  unpublishOwnerResume,
   pushOwnerResumeToGithub,
   saveOwnerResume,
   saveOwnerResumeTemplate,
@@ -1405,7 +1406,10 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                       if (!token) return;
                       setSaving(true);
                       try {
-                        const next = await publishOwnerResume(token, current.id);
+                        const next =
+                          current.status === "published"
+                            ? await unpublishOwnerResume(token, current.id)
+                            : await publishOwnerResume(token, current.id);
                         setCurrent(next);
                         await reload(token);
                         setMessage(a.saved);
@@ -1416,7 +1420,9 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                       }
                     }}
                   >
-                    {a.publishToSite}
+                    {current.status === "published"
+                      ? a.unpublishFromSite
+                      : a.publishToSite}
                   </button>
                 ) : null}
                 {current.status === "published" && current.slug ? (

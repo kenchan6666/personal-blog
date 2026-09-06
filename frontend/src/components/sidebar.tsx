@@ -15,6 +15,7 @@ type Props = {
   onToggle: () => void;
   onNavigate: () => void;
   onGuide: () => void;
+  showResume?: boolean;
 };
 
 const links = [
@@ -45,6 +46,7 @@ export function Sidebar({
   onToggle,
   onNavigate,
   onGuide,
+  showResume = true,
 }: Props) {
   const pathname = usePathname();
   const [showAdmin, setShowAdmin] = useState(false);
@@ -104,7 +106,7 @@ export function Sidebar({
           </Link>
 
           <nav className="flex flex-1 flex-col gap-1">
-            {links.map((item) => {
+            {links.filter((item) => item.key !== "resume" || showResume).map((item) => {
               const href = `/${locale}${item.href}`;
               const active =
                 item.href === ""

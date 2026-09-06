@@ -37,6 +37,7 @@
       "portfolio_update_resume",
       "portfolio_generate_resume",
       "portfolio_publish_resume",
+      "portfolio_unpublish_resume",
       "portfolio_import_resume_from_github",
       "portfolio_add_resume_project_from_github",
       "portfolio_push_resume_to_github",

@@ -9,9 +9,10 @@ import { ThemeToggle } from "./theme-toggle";
 type Props = {
   locale: Locale;
   dict: Dictionary;
+  showResume?: boolean;
 };
 
-export function SiteChrome({ locale, dict }: Props) {
+export function SiteChrome({ locale, dict, showResume = true }: Props) {
   const pathname = usePathname();
   const admin = pathname.includes("/admin");
 
@@ -25,9 +26,11 @@ export function SiteChrome({ locale, dict }: Props) {
           <Link href={`/${locale}/about`} className="site-chrome-link">
             {dict.nav.about}
           </Link>
-          <Link href={`/${locale}/resume`} className="site-chrome-link">
-            {dict.nav.resume}
-          </Link>
+          {showResume ? (
+            <Link href={`/${locale}/resume`} className="site-chrome-link">
+              {dict.nav.resume}
+            </Link>
+          ) : null}
         </>
       )}
       <ThemeToggle dict={dict} />

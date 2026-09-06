@@ -1567,6 +1567,45 @@ html.is-locale-hold .article-page {
   color: var(--text-primary);
 }
 
+.resume-public {
+  margin-top: 0;
+}
+
+.resume-public .resume-paper {
+  padding: 0;
+}
+
+.resume-public .resume-paper-head {
+  display: none;
+}
+
+.resume-public .resume-paper h3 {
+  margin: 1.75rem 0 0.75rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+}
+
+.resume-public .resume-paper > section:first-of-type h3 {
+  margin-top: 0;
+}
+
+.resume-public .resume-entry-row {
+  font-size: 1rem;
+}
+
+.resume-public .resume-bullets {
+  padding-left: 1.2rem;
+}
+
+.resume-public .resume-bullets li {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
 .resume-paper-head {
   margin-bottom: 1.15rem;
   text-align: center;

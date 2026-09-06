@@ -1476,6 +1476,18 @@ export async function publishOwnerResume(
   return (await res.json()) as OwnerResume;
 }
 
+export async function unpublishOwnerResume(
+  token: string,
+  id: string,
+): Promise<OwnerResume> {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/unpublish`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as OwnerResume;
+}
+
 export async function pushOwnerResumeToGithub(
   token: string,
   id: string,

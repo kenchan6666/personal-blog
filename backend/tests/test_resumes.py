@@ -252,6 +252,16 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
     public_pdf = await client.get("/api/public/resumes/intern-en/pdf")
     assert public_pdf.status_code == 200
 
+    unpublished = await client.post(
+        f"/api/owner/resumes/{resume_id}/unpublish",
+        headers=headers,
+    )
+    assert unpublished.status_code == 200
+    assert unpublished.json()["status"] == "draft"
+    assert (await client.get("/api/public/resumes")).json() == []
+    assert (await client.get("/api/public/resumes/intern-en")).status_code == 404
+    assert (await client.get("/api/public/resumes/intern-en/pdf")).status_code == 404
+
 
 @pytest.mark.asyncio
 async def test_long_resume_pdf_continues_on_a_second_page(

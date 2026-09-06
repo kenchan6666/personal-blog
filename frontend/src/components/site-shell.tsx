@@ -30,6 +30,7 @@ export function SiteShell({ children }: Props) {
   const [brand, setBrand] = useState(() => publicBrand(dict.brand));
   const [open, setOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [hasResume, setHasResume] = useState<boolean | null>(null);
   const closeGuide = useCallback(() => setGuideOpen(false), []);
 
   useEffect(() => {
@@ -45,11 +46,17 @@ export function SiteShell({ children }: Props) {
         if (!ignore && site) setBrand(brandForShell(next, site));
       })
       .catch(() => {});
+    fetch("/api/public/resumes", { signal: ctrl.signal })
+      .then((res) => (res.ok ? (res.json() as Promise<unknown[]>) : []))
+      .then((rows) => {
+        if (!ignore) setHasResume(Array.isArray(rows) && rows.length > 0);
+      })
+      .catch(() => {});
     return () => {
       ignore = true;
       ctrl.abort();
     };
-  }, [locale]);
+  }, [locale, pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +93,7 @@ export function SiteShell({ children }: Props) {
         locale={locale}
         dict={shellDict}
         open={open}
+        showResume={hasResume !== false}
         onToggle={() => setOpen((v) => !v)}
         onNavigate={() => setOpen(false)}
         onGuide={() => {
@@ -100,7 +108,7 @@ export function SiteShell({ children }: Props) {
         onClose={closeGuide}
       />
 
-      <SiteChrome locale={locale} dict={shellDict} />
+      <SiteChrome locale={locale} dict={shellDict} showResume={hasResume !== false} />
       <main className="site-main">{children}</main>
     </div>
   );

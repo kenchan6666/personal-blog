@@ -354,6 +354,18 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         await current_store().save(resume)
         return resume.to_owner_dict()
 
+    @app.post("/api/owner/resumes/{resume_id}/unpublish")
+    async def owner_unpublish_resume(
+        resume_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        resume = await current_store().get(Resume, resume_id)
+        if resume is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
+        resume.status = "draft"
+        await current_store().save(resume)
+        return resume.to_owner_dict()
+
     @app.post("/api/owner/resumes/{resume_id}/push-github")
     async def owner_push_resume_github(
         resume_id: PydanticObjectId,

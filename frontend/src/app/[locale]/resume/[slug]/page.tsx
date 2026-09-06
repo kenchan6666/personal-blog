@@ -3,7 +3,7 @@ import { PageFrame } from "@/components/page-frame";
 import { ResumePaper } from "@/components/resume-paper";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { fetchPublicResume } from "@/lib/api";
+import { fetchPublicResume, fetchPublicResumes } from "@/lib/api";
 import { pageMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +45,10 @@ export default async function ResumeDetailPage({
     notFound();
   }
 
+  const resumes = await fetchPublicResumes();
+  const contact = [resume.header.phone, resume.header.email, resume.header.city]
+    .filter(Boolean)
+    .join(" · ");
   const api =
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
   const pdfHref = resume.pdfUrl
@@ -53,12 +57,17 @@ export default async function ResumeDetailPage({
 
   return (
     <PageFrame
-      title={dict.resume.title}
-      lead={resume.summary[0] || dict.resume.lead}
+      title={resume.header.name || resume.title || dict.resume.title}
+      lead={contact || undefined}
+      back={
+        resumes.length > 1
+          ? { href: `/${locale}/resume`, label: dict.nav.resume }
+          : undefined
+      }
       narrow
     >
       <div className="mb-5 flex flex-wrap gap-3">
-        <a className="btn-cta" href={pdfHref}>
+        <a className="btn-ghost" href={pdfHref}>
           {dict.resume.download}
         </a>
       </div>
@@ -66,6 +75,7 @@ export default async function ResumeDetailPage({
         resume={resume}
         dict={dict}
         sections={resume.sections}
+        paged={false}
       />
     </PageFrame>
   );

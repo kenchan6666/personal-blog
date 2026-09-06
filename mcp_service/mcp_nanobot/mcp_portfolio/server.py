@@ -322,6 +322,7 @@ def create_server() -> FastMCP:
                         "portfolio_create_resume",
                         "portfolio_generate_resume",
                         "portfolio_publish_resume",
+                        "portfolio_unpublish_resume",
                         "portfolio_add_resume_project_from_github",
                         "portfolio_push_resume_to_github",
                         "portfolio_ensure_cv_repo",
@@ -745,6 +746,15 @@ def create_server() -> FastMCP:
         current = _resume_by_id(identifier)
         return api.request(
             "POST", f"/api/owner/resumes/{current['id']}/publish"
+        )
+
+    @server.tool()
+    def portfolio_unpublish_resume(identifier: str) -> dict[str, Any]:
+        """Take a Resume off the public site. The public page stays gone until the Owner publishes again."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        return api.request(
+            "POST", f"/api/owner/resumes/{current['id']}/unpublish"
         )
 
     @server.tool()

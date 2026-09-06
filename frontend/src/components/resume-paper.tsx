@@ -15,6 +15,7 @@ type Props = {
   dict: Dictionary;
   sections?: string[];
   showEmpty?: boolean;
+  paged?: boolean;
 };
 
 const BUILTIN: ResumeSectionId[] = [
@@ -209,11 +210,13 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
 }
 
 export function ResumePaper(props: Props) {
+  const paged = props.paged !== false;
   const measureRef = useRef<HTMLDivElement>(null);
   const [pages, setPages] = useState(1);
   const [pageHeight, setPageHeight] = useState(0);
 
   useLayoutEffect(() => {
+    if (!paged) return undefined;
     const node = measureRef.current;
     if (!node) return undefined;
     const update = () => {
@@ -227,7 +230,15 @@ export function ResumePaper(props: Props) {
     const observer = new ResizeObserver(update);
     observer.observe(node);
     return () => observer.disconnect();
-  }, [props.resume, props.sections, props.showEmpty, props.dict]);
+  }, [paged, props.resume, props.sections, props.showEmpty, props.dict]);
+
+  if (!paged) {
+    return (
+      <div className="resume-public page-panel glass">
+        <ResumePaperBody {...props} />
+      </div>
+    );
+  }
 
   return (
     <div className="resume-preview-stack">
