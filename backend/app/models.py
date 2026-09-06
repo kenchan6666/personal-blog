@@ -466,6 +466,9 @@ class Resume(Document):
     github_repo: str = ""
     github_json_path: str = ""
     github_pdf_path: str = ""
+    updated_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
     class Settings:
         name = "resumes"
@@ -497,6 +500,7 @@ class Resume(Document):
             "githubRepo": self.github_repo,
             "githubJsonPath": self.github_json_path,
             "githubPdfPath": self.github_pdf_path,
+            "updatedAt": self.updated_at.isoformat() if self.updated_at else "",
         }
 
     def to_public_dict(self) -> dict[str, Any]:
@@ -506,6 +510,7 @@ class Resume(Document):
         payload.pop("githubRepo", None)
         payload.pop("githubJsonPath", None)
         payload.pop("githubPdfPath", None)
+        payload.pop("updatedAt", None)
         return payload
 
 

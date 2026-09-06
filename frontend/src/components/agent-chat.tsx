@@ -433,6 +433,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
             ? `当前内容：${context.value}`
             : `当前三语内容：${JSON.stringify(context.value)}`,
           "除非明确要求写入网站，否则只给建议或可插入正文。",
+          "多条内容必须换行分隔，一条一行，不要写成一段。",
         ].join("\n")
       : "";
 

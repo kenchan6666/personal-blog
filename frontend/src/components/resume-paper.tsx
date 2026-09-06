@@ -31,6 +31,17 @@ function range(start: string, end: string) {
   return [start, end].filter(Boolean).join(" – ");
 }
 
+function ResumeBullets({ lines }: { lines: string[] }) {
+  if (!lines.length) return null;
+  return (
+    <ul className="resume-bullets">
+      {lines.map((line, index) => (
+        <li key={`${index}-${line}`}>{line}</li>
+      ))}
+    </ul>
+  );
+}
+
 function filled(id: string, resume: PublicResume | OwnerResume) {
   if (id === "summary") return resume.summary.length > 0;
   if (id === "education") return resume.education.length > 0;
@@ -78,9 +89,7 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
           return (
             <section key={id}>
               <h3>{r.sectionSummary}</h3>
-              {resume.summary.map((line) => (
-                <p key={line}>{line}</p>
-              ))}
+              <ResumeBullets lines={resume.summary} />
             </section>
           );
         }
@@ -127,9 +136,7 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
                     <span>{item.role}</span>
                     <span>{item.city}</span>
                   </div>
-                  {item.description.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
+                  <ResumeBullets lines={item.description} />
                 </div>
               ))}
             </section>
@@ -148,9 +155,7 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
                   {item.tech_stack.length > 0 ? (
                     <p>({item.tech_stack.join(", ")})</p>
                   ) : null}
-                  {item.description.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
+                  <ResumeBullets lines={item.description} />
                 </div>
               ))}
             </section>
@@ -166,9 +171,7 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
                     <strong>{item.organization}</strong>
                     <span>{range(item.start, item.end)}</span>
                   </div>
-                  {item.description.map((line) => (
-                    <p key={line}>{line}</p>
-                  ))}
+                  <ResumeBullets lines={item.description} />
                 </div>
               ))}
             </section>
@@ -253,9 +256,7 @@ function ExtraBlock({ extra }: { extra: ResumeExtra }) {
   return (
     <section>
       <h3>{extra.title || extra.slug}</h3>
-      {extra.lines.map((line) => (
-        <p key={line}>{line}</p>
-      ))}
+      <ResumeBullets lines={extra.lines} />
       {extra.entries.map((item) => (
         <div key={`${item.organization}-${item.start}`} className="resume-entry">
           <div className="resume-entry-row">
@@ -266,9 +267,7 @@ function ExtraBlock({ extra }: { extra: ResumeExtra }) {
             <span>{item.role}</span>
             <span>{item.city}</span>
           </div>
-          {item.description.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
+          <ResumeBullets lines={item.description} />
         </div>
       ))}
     </section>

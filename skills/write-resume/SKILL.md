@@ -19,7 +19,7 @@ description: Write or rewrite one-page Resume copy. Use when drafting a CV, fill
 
 ## 栏目
 
-每条要点用 **动词 + 内容 + 方法 + 结果**。一行一件事，能量化就量化。
+每条要点用 **动词 + 内容 + 方法 + 结果**。一行一件事，能量化就量化。写入 `summary[]` / `description[]` 必须是数组，不要一段话。技术栈只写语言和框架，不要列一长串库。从 GitHub 导入的项目要点写应用功能，以及哪个技术完成哪个主要功能。
 
 | 栏目 | 字段 | 写什么 |
 | --- | --- | --- |
@@ -28,7 +28,7 @@ description: Write or rewrite one-page Resume copy. Use when drafting a CV, fill
 | education | institution, field, degree, start, end, city, honor, related_courses | 学校与学位为主；课程只留和投递相关的 |
 | internship | organization, role, start, end, city, description[] | 职责用要点，不用「负责日常事务」 |
 | work | workExperiences[]，字段同实习 | 全职/兼职工作经验；与 internships 分开存 |
-| projects | name, start, end, tech_stack[], description[] | 做出了什么、用什么、结果是什么；栈放 tech_stack |
+| projects | name, start, end, tech_stack[], description[] | 做出了什么、用什么、结果是什么；栈放 tech_stack。从 GitHub 加项目用 `portfolio_add_resume_project_from_github`：自动填名称、短技术栈和功能要点，日期留给 Owner |
 | activities | 同实习条目 | 社团/志愿；没有就空着，不要硬凑 |
 | skillsOthers | skills[], languages[] | 真用过的技能；语言写程度 |
 | extras | title, lines[], entries[] | 证书、奖项等自订段；title 是印在纸上的栏目标题 |

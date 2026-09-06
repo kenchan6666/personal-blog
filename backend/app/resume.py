@@ -34,11 +34,14 @@ from app.models import (
     ResumeProject,
     ResumeTemplate,
     empty_localized,
+    utc_now,
 )
 from app.owner_actor import force_draft_if_service
 from app.store import current_store, new_document
 
 _SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+_BULLET_PREFIX_RE = re.compile(r"^(?:[-*•●◦]|\d+[.)])\s+")
+_SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？；;!?])\s+|(?<=\.)\s+(?=[A-Z\u4e00-\u9fff])")
 _MONTHS = (
     "Jan",
     "Feb",
@@ -53,6 +56,52 @@ _MONTHS = (
     "Nov",
     "Dec",
 )
+def split_resume_lines(values: Any) -> list[str]:
+    if values is None:
+        return []
+    chunks = [values] if isinstance(values, str) else list(values)
+    lines: list[str] = []
+    for chunk in chunks:
+        text = str(chunk).replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not text:
+            continue
+        parts = [part.strip() for part in text.split("\n") if part.strip()]
+        if len(parts) <= 1 and "\n" not in text:
+            parts = [
+                part.strip()
+                for part in _SENTENCE_SPLIT_RE.split(text)
+                if part.strip()
+            ] or [text]
+        for part in parts:
+            cleaned = _BULLET_PREFIX_RE.sub("", part).strip()
+            if cleaned:
+                lines.append(cleaned)
+    return lines
+
+
+def _experience_rows(raw: list[Any]) -> list[ResumeExperience]:
+    rows: list[ResumeExperience] = []
+    for item in raw:
+        data = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+        data["description"] = split_resume_lines(data.get("description") or [])
+        rows.append(ResumeExperience.model_validate(data))
+    return rows
+
+
+def _project_rows(raw: list[Any]) -> list[ResumeProject]:
+    rows: list[ResumeProject] = []
+    for item in raw:
+        data = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+        data["description"] = split_resume_lines(data.get("description") or [])
+        data["tech_stack"] = [
+            str(part).strip()
+            for part in (data.get("tech_stack") or [])
+            if str(part).strip()
+        ]
+        rows.append(ResumeProject.model_validate(data))
+    return rows
+
+
 _CJK_FONT_CANDIDATES = (
     Path(r"C:\Windows\Fonts\msyh.ttc"),
     Path(r"C:\Windows\Fonts\msyh.ttf"),
@@ -587,11 +636,9 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
     resume.header = ResumeHeader.model_validate(header)
     incoming_title = str(body.get("title") or "").strip()
     resume.title = resume.header.name.strip() or incoming_title or resume.title or resume.slug
-    resume.summary = [
-        str(line).strip()
-        for line in (body["summary"] if "summary" in body else resume.summary)
-        if str(line).strip()
-    ]
+    resume.summary = split_resume_lines(
+        body["summary"] if "summary" in body else resume.summary
+    )
     resume.education = [
         ResumeEducation.model_validate(item)
         for item in (
@@ -600,38 +647,26 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
             else [item.model_dump() for item in resume.education]
         )
     ]
-    resume.internships = [
-        ResumeExperience.model_validate(item)
-        for item in (
-            body["internships"]
-            if "internships" in body
-            else [item.model_dump() for item in resume.internships]
-        )
-    ]
-    resume.work_experiences = [
-        ResumeExperience.model_validate(item)
-        for item in (
-            body["workExperiences"]
-            if "workExperiences" in body
-            else [item.model_dump() for item in resume.work_experiences]
-        )
-    ]
-    resume.projects = [
-        ResumeProject.model_validate(item)
-        for item in (
-            body["projects"]
-            if "projects" in body
-            else [item.model_dump() for item in resume.projects]
-        )
-    ]
-    resume.activities = [
-        ResumeExperience.model_validate(item)
-        for item in (
-            body["activities"]
-            if "activities" in body
-            else [item.model_dump() for item in resume.activities]
-        )
-    ]
+    resume.internships = _experience_rows(
+        body["internships"]
+        if "internships" in body
+        else [item.model_dump() for item in resume.internships]
+    )
+    resume.work_experiences = _experience_rows(
+        body["workExperiences"]
+        if "workExperiences" in body
+        else [item.model_dump() for item in resume.work_experiences]
+    )
+    resume.projects = _project_rows(
+        body["projects"]
+        if "projects" in body
+        else [item.model_dump() for item in resume.projects]
+    )
+    resume.activities = _experience_rows(
+        body["activities"]
+        if "activities" in body
+        else [item.model_dump() for item in resume.activities]
+    )
     resume.skills = [
         str(item).strip()
         for item in (body["skills"] if "skills" in body else resume.skills)
@@ -645,19 +680,33 @@ def apply_resume_body(resume: Resume, body: dict[str, Any]) -> None:
             else [item.model_dump() for item in resume.languages]
         )
     ]
-    resume.extras = [
-        ResumeExtra.model_validate(item)
-        for item in (
-            body["extras"]
-            if "extras" in body
-            else [item.model_dump() for item in resume.extras]
-        )
-    ]
+    extras: list[ResumeExtra] = []
+    for item in (
+        body["extras"]
+        if "extras" in body
+        else [item.model_dump() for item in resume.extras]
+    ):
+        data = item.model_dump() if hasattr(item, "model_dump") else dict(item)
+        data["lines"] = split_resume_lines(data.get("lines") or [])
+        data["entries"] = [
+            row.model_dump()
+            for row in _experience_rows(data.get("entries") or [])
+        ]
+        extras.append(ResumeExtra.model_validate(data))
+    resume.extras = extras
+    resume.updated_at = utc_now()
 
 
 def resume_vault_json(resume: Resume) -> bytes:
     payload = resume.to_owner_dict()
-    for key in ("id", "pdfUrl", "githubRepo", "githubJsonPath", "githubPdfPath"):
+    for key in (
+        "id",
+        "pdfUrl",
+        "githubRepo",
+        "githubJsonPath",
+        "githubPdfPath",
+        "updatedAt",
+    ):
         payload.pop(key, None)
     return json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
 
@@ -782,6 +831,9 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
             page.drawString(x, y, line)
             y -= size + 4
 
+    def draw_bullet(value: str) -> None:
+        draw_wrapped(f"• {value}", _BODY, _BODY_SIZE, width)
+
     def section_title(title: str) -> None:
         nonlocal y
         ensure_space(_TITLE_SIZE + 36)
@@ -820,19 +872,19 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
     def draw_extra(extra: ResumeExtra) -> None:
         section_title((extra.title or extra.slug).upper())
         for line in extra.lines:
-            draw_wrapped(line, _BODY, _BODY_SIZE, width)
+            draw_bullet(line)
         for item in extra.entries:
             entry_row(item.organization or item.role, format_range(item.start, item.end))
             if item.role and item.organization:
                 entry_row(item.role, item.city)
             for line in item.description:
-                draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                draw_bullet(line)
 
     for section in template.sections:
         if section == "summary" and resume.summary:
             section_title(titles[section])
             for line in resume.summary:
-                draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                draw_bullet(line)
         elif section == "education" and resume.education:
             section_title(titles[section])
             for item in resume.education:
@@ -854,14 +906,14 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                 entry_row(item.organization, format_range(item.start, item.end))
                 entry_row(item.role, item.city)
                 for line in item.description:
-                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                    draw_bullet(line)
         elif section == "work" and resume.work_experiences:
             section_title(titles[section])
             for item in resume.work_experiences:
                 entry_row(item.organization, format_range(item.start, item.end))
                 entry_row(item.role, item.city)
                 for line in item.description:
-                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                    draw_bullet(line)
         elif section == "projects" and resume.projects:
             section_title(titles[section])
             for item in resume.projects:
@@ -874,14 +926,14 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                         width,
                     )
                 for line in item.description:
-                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                    draw_bullet(line)
         elif section == "activities" and resume.activities:
             section_title(titles[section])
             for item in resume.activities:
                 entry_row(item.organization, format_range(item.start, item.end))
                 entry_row(item.role, item.city)
                 for line in item.description:
-                    draw_wrapped(line, _BODY, _BODY_SIZE, width)
+                    draw_bullet(line)
         elif section == "skillsOthers" and (resume.skills or resume.languages):
             section_title(titles[section])
             if resume.skills:

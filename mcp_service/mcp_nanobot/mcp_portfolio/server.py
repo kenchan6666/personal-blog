@@ -322,6 +322,7 @@ def create_server() -> FastMCP:
                         "portfolio_create_resume",
                         "portfolio_generate_resume",
                         "portfolio_publish_resume",
+                        "portfolio_add_resume_project_from_github",
                         "portfolio_push_resume_to_github",
                         "portfolio_ensure_cv_repo",
                     ],
@@ -744,6 +745,43 @@ def create_server() -> FastMCP:
         current = _resume_by_id(identifier)
         return api.request(
             "POST", f"/api/owner/resumes/{current['id']}/publish"
+        )
+
+    @server.tool()
+    def portfolio_add_resume_project_from_github(
+        identifier: str,
+        full_name: str,
+    ) -> dict[str, Any]:
+        """Analyze an authorized GitHub repo and append one Resume project. Fills name, a short tech_stack, and feature bullets. Leaves start/end empty for the Owner to fill."""
+        api.require_write()
+        current = _resume_by_id(identifier)
+        analyzed = api.request(
+            "POST",
+            "/api/owner/resumes/analyze-github-project",
+            json={
+                "fullName": full_name,
+                "locale": current.get("locale") or "en",
+            },
+        )
+        projects = list(current.get("projects") or [])
+        projects.append(
+            {
+                "name": analyzed.get("name") or full_name.split("/")[-1],
+                "start": "",
+                "end": "",
+                "tech_stack": analyzed.get("tech_stack") or [],
+                "description": analyzed.get("description") or [],
+            }
+        )
+        payload = _merge(current, {"projects": projects})
+        payload.pop("id", None)
+        payload.pop("pdfUrl", None)
+        payload.pop("updatedAt", None)
+        payload = _guard_status_on_update(current, payload)
+        return api.request(
+            "PUT",
+            f"/api/owner/resumes/{current['id']}",
+            json=payload,
         )
 
     @server.tool()

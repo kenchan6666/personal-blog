@@ -1257,6 +1257,7 @@ export type OwnerResume = {
   githubRepo?: string;
   githubJsonPath?: string;
   githubPdfPath?: string;
+  updatedAt?: string;
 };
 
 export type PublicResumeCard = {
@@ -1388,7 +1389,12 @@ function resumePayload(
   resume: OwnerResume,
 ): Omit<
   OwnerResume,
-  "id" | "pdfUrl" | "githubRepo" | "githubJsonPath" | "githubPdfPath"
+  | "id"
+  | "pdfUrl"
+  | "githubRepo"
+  | "githubJsonPath"
+  | "githubPdfPath"
+  | "updatedAt"
 > {
   const {
     id: _id,
@@ -1396,6 +1402,7 @@ function resumePayload(
     githubRepo: _repo,
     githubJsonPath: _json,
     githubPdfPath: _pdfPath,
+    updatedAt: _updated,
     ...rest
   } = resume;
   return rest;
@@ -1479,6 +1486,29 @@ export async function pushOwnerResumeToGithub(
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as ResumeGithubPush;
+}
+
+export async function analyzeOwnerResumeGithubProject(
+  token: string,
+  body: { fullName: string; locale: string },
+): Promise<{ name: string; tech_stack: string[]; description: string[] }> {
+  const res = await fetch(
+    `${API_BASE}/api/owner/resumes/analyze-github-project`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    },
+  );
+  if (!res.ok) throw new Error(await parseError(res));
+  return (await res.json()) as {
+    name: string;
+    tech_stack: string[];
+    description: string[];
+  };
 }
 
 export async function importOwnerResumeFromGithub(

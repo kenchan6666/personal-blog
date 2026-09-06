@@ -514,3 +514,77 @@ def io_bytes(data: bytes):
     from io import BytesIO
 
     return BytesIO(data)
+
+
+def test_split_resume_lines_breaks_blobs_and_bullets():
+    from app.resume import split_resume_lines
+
+    assert split_resume_lines(["- Built the site\n- Shipped the API"]) == [
+        "Built the site",
+        "Shipped the API",
+    ]
+    assert split_resume_lines("Track food. Ship reminders.") == [
+        "Track food.",
+        "Ship reminders.",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_resume_save_splits_blob_copy_and_stamps_updated_at(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            summary=["- Built the site\n- Shipped the API"],
+            projects=[
+                {
+                    "name": "Pantry pal",
+                    "start": "",
+                    "end": "",
+                    "tech_stack": ["Python", "Flask"],
+                    "description": ["Track food. Ship reminders."],
+                }
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    body = created.json()
+    assert body["summary"] == ["Built the site", "Shipped the API"]
+    assert body["projects"][0]["description"] == [
+        "Track food.",
+        "Ship reminders.",
+    ]
+    assert body["updatedAt"]
+
+
+@pytest.mark.asyncio
+async def test_analyze_github_project_fills_stack_without_dates(
+    client, mailer, settings, github, app
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    blocked = await client.post(
+        "/api/owner/resumes/analyze-github-project",
+        json={"fullName": "kenchan6666/personal-blog", "locale": "en"},
+        headers=headers,
+    )
+    assert blocked.status_code == 409
+
+    await app.state.redis.set("github:owner_token", "gho_test")
+    analyzed = await client.post(
+        "/api/owner/resumes/analyze-github-project",
+        json={"fullName": "kenchan6666/personal-blog", "locale": "en"},
+        headers=headers,
+    )
+    assert analyzed.status_code == 200
+    body = analyzed.json()
+    assert body["name"] == "personal-blog"
+    assert "start" not in body
+    assert "end" not in body
+    assert "Python" in body["tech_stack"]
+    assert body["description"]
+    assert all(isinstance(item, str) and item for item in body["description"])

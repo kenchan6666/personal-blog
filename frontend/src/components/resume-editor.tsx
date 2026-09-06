@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { getDictionary, type Dictionary } from "@/i18n/dictionaries";
-import { isLocale, type Locale } from "@/i18n/config";
+import { isLocale, localeLabels, type Locale } from "@/i18n/config";
 import {
+  analyzeOwnerResumeGithubProject,
   createOwnerResume,
   createOwnerResumeTemplate,
   deleteOwnerResume,
   deleteOwnerResumeTemplate,
   emptyOwnerResume,
   emptyOwnerResumeTemplate,
+  fetchOwnerGitHubRepos,
   fetchOwnerResumeTemplates,
   fetchOwnerResumes,
   generateOwnerResume,
@@ -25,7 +27,9 @@ import {
   type OwnerResume,
   type OwnerResumeTemplate,
   type ResumeSectionId,
+  type SourceRepo,
 } from "@/lib/api";
+import { splitResumeLines } from "@/lib/resume-lines";
 import { AgentField } from "./agent-field";
 import { CmsCard, StatusPill } from "./cms-card";
 import { CmsConfirm } from "./cms-confirm";
@@ -104,10 +108,17 @@ function slugify(value: string) {
 }
 
 function linesOf(value: string) {
-  return value
-    .split("\n")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return splitResumeLines(value);
+}
+
+function formatUpdated(value: string | undefined, locale: Locale) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
 
 function commasOf(value: string) {
@@ -135,6 +146,11 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
   const [githubRepo, setGithubRepo] = useState("");
   const [githubPath, setGithubPath] = useState("");
   const [githubRef, setGithubRef] = useState("");
+  const [pickGithubOpen, setPickGithubOpen] = useState(false);
+  const [githubRepos, setGithubRepos] = useState<SourceRepo[]>([]);
+  const [githubReady, setGithubReady] = useState(false);
+  const [repoQuery, setRepoQuery] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [extraTitle, setExtraTitle] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const currentRef = useRef<OwnerResume | null>(null);
@@ -207,6 +223,78 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
     "projects",
     "skillsOthers",
   ];
+  const filteredRepos = useMemo(() => {
+    const q = repoQuery.trim().toLowerCase();
+    if (!q) return githubRepos;
+    return githubRepos.filter(
+      (repo) =>
+        repo.fullName.toLowerCase().includes(q) ||
+        (repo.description ?? "").toLowerCase().includes(q),
+    );
+  }, [githubRepos, repoQuery]);
+
+  async function openGithubPicker() {
+    const token = getSessionToken();
+    if (!token) return;
+    setRepoQuery("");
+    setPickGithubOpen(true);
+    try {
+      const repos = await fetchOwnerGitHubRepos(token);
+      setGithubReady(repos !== null);
+      setGithubRepos(repos ?? []);
+    } catch {
+      setGithubReady(false);
+      setGithubRepos([]);
+    }
+  }
+
+  async function addProjectFromRepo(repo: SourceRepo) {
+    if (!current) return;
+    const token = getSessionToken();
+    const entry = {
+      name: repo.name,
+      start: "",
+      end: "",
+      tech_stack: [] as string[],
+      description: [] as string[],
+    };
+    setCurrent({ ...current, projects: [...current.projects, entry] });
+    setPickGithubOpen(false);
+    setCollapsed((state) => ({ ...state, projects: false }));
+    if (!token) return;
+    setAnalyzing(true);
+    try {
+      const analyzed = await analyzeOwnerResumeGithubProject(token, {
+        fullName: repo.fullName,
+        locale: current.locale,
+      });
+      setCurrent((prev) => {
+        if (!prev) return prev;
+        const projects = [...prev.projects];
+        const index = [...projects]
+          .reverse()
+          .findIndex(
+            (item) =>
+              item.name === repo.name &&
+              !item.tech_stack.length &&
+              !item.description.length,
+          );
+        const actual = index < 0 ? -1 : projects.length - 1 - index;
+        if (actual < 0) return prev;
+        projects[actual] = {
+          ...projects[actual],
+          name: analyzed.name || repo.name,
+          tech_stack: analyzed.tech_stack,
+          description: analyzed.description,
+        };
+        return { ...prev, projects };
+      });
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   async function persistResume(next: OwnerResume, silent = false) {
     const token = getSessionToken();
@@ -563,27 +651,37 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
           collapsed={folded}
           onToggle={toggleBlock}
           action={
-            <button
-              type="button"
-              className="btn-ghost text-sm"
-              onClick={() =>
-                setCurrent({
-                  ...current,
-                  projects: [
-                    ...current.projects,
-                    {
-                      name: "",
-                      start: "",
-                      end: "",
-                      tech_stack: [],
-                      description: [],
-                    },
-                  ],
-                })
-              }
-            >
-              {a.addProject}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                onClick={() =>
+                  setCurrent({
+                    ...current,
+                    projects: [
+                      ...current.projects,
+                      {
+                        name: "",
+                        start: "",
+                        end: "",
+                        tech_stack: [],
+                        description: [],
+                      },
+                    ],
+                  })
+                }
+              >
+                {a.addProject}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={analyzing}
+                onClick={() => void openGithubPicker()}
+              >
+                {a.addProjectGithub}
+              </button>
+            </div>
           }
         >
           {current.projects.map((item, index) => (
@@ -847,6 +945,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
 
   return (
     <div className="resume-workspace">
+      <div className="resume-docs">
       <CmsCard
         title={a.resumeDocuments}
         action={
@@ -882,11 +981,22 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                         draftLabel={a.statusDraft}
                       />
                     </span>
-                    <span className="resume-layout-mini">
-                      {(itemLayout?.sections ?? sections).map((id) => (
-                        <i key={id} title={sectionLabel(id)} />
-                      ))}
+                    <span className="resume-pick-meta">
+                      {[
+                        itemLayout
+                          ? localizedTextFor(itemLayout.name, locale)
+                          : "",
+                        localeLabels[item.locale] ?? item.locale,
+                        formatUpdated(item.updatedAt, locale),
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
+                    {item.summary[0] ? (
+                      <span className="resume-pick-headline">
+                        {item.summary[0]}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );
@@ -894,9 +1004,11 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
           </ul>
         )}
       </CmsCard>
+      </div>
 
       {current ? (
         <div className="resume-edit-grid">
+          <div className="resume-form-col">
           <CmsCard title={current.title || current.header.name || a.newResume}>
             {message ? (
               <p className="mb-3 text-sm text-[var(--success)]">{message}</p>
@@ -1164,6 +1276,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
               </div>
             </CollapsibleBlock>
           </CmsCard>
+          </div>
 
           <div className="resume-preview-col">
             <CmsCard
@@ -1296,6 +1409,61 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
           </div>
         </div>
       ) : null}
+
+      <CmsModal
+        open={pickGithubOpen}
+        title={a.addProjectGithub}
+        closeLabel={a.close}
+        onClose={() => setPickGithubOpen(false)}
+        footer={
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => setPickGithubOpen(false)}
+          >
+            {a.close}
+          </button>
+        }
+      >
+        {!githubReady ? (
+          <p className="text-sm text-[var(--text-muted)]">
+            {a.githubDisconnectedHint}
+          </p>
+        ) : (
+          <>
+            <label className="mb-3 block text-xs text-[var(--text-muted)]">
+              {a.fieldRepos}
+              <input
+                className="field"
+                value={repoQuery}
+                onChange={(event) => setRepoQuery(event.target.value)}
+              />
+            </label>
+            {filteredRepos.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">
+                {a.noMatchingRepos}
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {filteredRepos.map((repo) => (
+                  <li key={repo.fullName}>
+                    <button
+                      type="button"
+                      className="tile w-full text-left"
+                      onClick={() => void addProjectFromRepo(repo)}
+                    >
+                      <strong>{repo.name}</strong>
+                      <span className="ml-2 font-mono text-xs text-[var(--text-muted)]">
+                        {repo.fullName}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </CmsModal>
 
       <CmsModal
         open={openTemplate}

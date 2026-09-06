@@ -41,6 +41,7 @@ from app.resume import (
     vault_seed_templates,
     write_cv_template_file,
 )
+from app.resume_github import analyze_github_project
 from app.store import current_store, new_document
 
 GITHUB_TOKEN_KEY = "github:owner_token"
@@ -80,6 +81,11 @@ class ResumeGithubImportBody(BaseModel):
     slug: str = ""
     title: str = ""
     templateSlug: str = ""
+
+
+class ResumeGithubProjectBody(BaseModel):
+    fullName: str
+    locale: str = "en"
 
 
 def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
@@ -427,6 +433,24 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
             content=path.read_bytes(),
             media_type="application/pdf",
             headers={"Content-Disposition": f'inline; filename="{resume.slug}.pdf"'},
+        )
+
+    @app.post("/api/owner/resumes/analyze-github-project")
+    async def owner_analyze_resume_github_project(
+        body: ResumeGithubProjectBody,
+        _: str = Depends(require_owner),
+    ) -> dict[str, Any]:
+        access = await owner_token()
+        if not access:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="github_not_connected"
+            )
+        return await analyze_github_project(
+            github=app.state.github,
+            access_token=access,
+            full_name=body.fullName,
+            locale=body.locale,
+            settings=app.state.settings,
         )
 
     @app.post("/api/owner/resumes/import-github")

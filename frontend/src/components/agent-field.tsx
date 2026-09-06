@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { splitResumeLines } from "@/lib/resume-lines";
 import { AgentChat } from "./agent-chat";
 import { CmsModal } from "./cms-modal";
 
@@ -29,7 +30,9 @@ export function AgentField({
   async function insertText(text: string) {
     const run = ++insertionRun.current;
     setAgentOpen(false);
-    const clean = text.trim();
+    const clean = multiline
+      ? splitResumeLines(text).join("\n")
+      : text.trim();
     for (let index = 1; index <= clean.length; index += 1) {
       if (insertionRun.current !== run) return;
       onChange(clean.slice(0, index));

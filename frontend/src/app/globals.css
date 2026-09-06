@@ -1621,21 +1621,34 @@ html.is-locale-hold .article-page {
   gap: 1.25rem;
 }
 
-@media (min-width: 1080px) {
-  .resume-edit-grid {
-    grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.9fr);
-    align-items: start;
-  }
+.resume-bullets {
+  margin: 0.25rem 0 0;
+  padding-left: 1.15rem;
+}
 
-  .resume-preview-col {
-    position: sticky;
-    top: 1rem;
-  }
+.resume-bullets li {
+  margin: 0.18rem 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
 }
 
 .resume-pick {
   display: grid;
   gap: 0.55rem;
+}
+
+.resume-pick-meta,
+.resume-pick-headline {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.resume-pick-headline {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .resume-layout-mini {
@@ -2369,6 +2382,90 @@ html.is-locale-hold .article-page {
   height: auto;
   flex: 1 1 0;
   flex-direction: column;
+}
+
+@media (min-width: 1080px) {
+  html:has(.admin-dashboard-shell.is-resume),
+  html:has(.admin-dashboard-shell.is-resume) body {
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .site-root:has(.admin-dashboard-shell.is-resume) {
+    height: 100dvh;
+  }
+
+  .site-root:has(.admin-dashboard-shell.is-resume),
+  .site-main:has(.admin-dashboard-shell.is-resume),
+  .admin-page:has(.admin-dashboard-shell.is-resume) {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .site-main:has(.admin-dashboard-shell.is-resume),
+  .admin-page:has(.admin-dashboard-shell.is-resume) {
+    flex: 1 1 0;
+    height: auto;
+  }
+
+  .admin-page:has(.admin-dashboard-shell.is-resume) {
+    justify-content: flex-start;
+    align-items: stretch;
+    padding-top: max(3.5rem, calc(2.75rem + env(safe-area-inset-top)));
+    padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
+  }
+
+  .admin-dashboard-shell.is-resume {
+    display: flex;
+    max-width: min(92rem, 100%);
+    width: 100%;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+  }
+
+  .admin-dashboard-shell.is-resume .admin-dash-head,
+  .admin-dashboard-shell.is-resume .admin-tab-bar {
+    flex: 0 0 auto;
+  }
+
+  .admin-dashboard-shell.is-resume .admin-tab-panel,
+  .admin-dashboard-shell.is-resume .admin-tab-panel > div {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+  }
+
+  .admin-dashboard-shell.is-resume .resume-workspace {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .admin-dashboard-shell.is-resume .resume-docs {
+    flex: 0 1 auto;
+    max-height: 12rem;
+    overflow: auto;
+  }
+
+  .admin-dashboard-shell.is-resume .resume-edit-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.9fr);
+    align-items: stretch;
+    min-height: 0;
+    flex: 1 1 0;
+    overflow: hidden;
+  }
+
+  .admin-dashboard-shell.is-resume .resume-form-col,
+  .admin-dashboard-shell.is-resume .resume-preview-col {
+    min-height: 0;
+    overflow: auto;
+  }
 }
 
 .admin-tab-panel {
