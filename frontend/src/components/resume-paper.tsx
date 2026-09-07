@@ -260,7 +260,6 @@ export function ResumePaper(props: Props) {
             className="resume-paper-shift"
             style={{
               transform: `scale(${scale}) translateY(-${index * pageHeight}px)`,
-              transformOrigin: "top left",
             }}
           >
             <ResumePaperBody {...props} />

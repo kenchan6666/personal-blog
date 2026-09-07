@@ -63,7 +63,7 @@ export default async function ResumeDetailPage({
       narrow
     >
       <div className="mb-5 flex flex-wrap gap-3">
-        <a className="btn-ghost" href={pdfHref}>
+        <a className="btn-ghost" href={pdfHref} download={`${resume.slug}.pdf`}>
           {dict.resume.download}
         </a>
       </div>

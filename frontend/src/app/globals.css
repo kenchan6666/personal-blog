@@ -1537,6 +1537,7 @@ html.is-locale-hold .article-page {
   display: grid;
   gap: 1rem;
   position: relative;
+  overflow-x: clip;
 }
 
 .resume-paper-measure {
@@ -1546,6 +1547,7 @@ html.is-locale-hold .article-page {
   width: 210mm;
   visibility: hidden;
   pointer-events: none;
+  z-index: -1;
 }
 
 .resume-paper-page {
@@ -1560,7 +1562,11 @@ html.is-locale-hold .article-page {
 }
 
 .resume-paper-shift {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 210mm;
+  transform-origin: top left;
 }
 
 .resume-paper {

@@ -188,7 +188,7 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         return Response(
             content=path.read_bytes(),
             media_type="application/pdf",
-            headers={"Content-Disposition": f'inline; filename="{row.slug}.pdf"'},
+            headers={"Content-Disposition": f'attachment; filename="{row.slug}.pdf"'},
         )
 
     @app.get("/api/owner/resume-templates")
