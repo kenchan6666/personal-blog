@@ -209,26 +209,35 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
   );
 }
 
+const PAGE_RATIO = 297 / 210;
+
 export function ResumePaper(props: Props) {
   const paged = props.paged !== false;
   const measureRef = useRef<HTMLDivElement>(null);
+  const stackRef = useRef<HTMLDivElement>(null);
   const [pages, setPages] = useState(1);
   const [pageHeight, setPageHeight] = useState(0);
+  const [scale, setScale] = useState(1);
 
   useLayoutEffect(() => {
     if (!paged) return undefined;
     const node = measureRef.current;
+    const stack = stackRef.current;
     if (!node) return undefined;
     const update = () => {
-      const width = node.clientWidth;
-      if (!width) return;
-      const height = width * (297 / 210);
-      setPageHeight(height);
-      setPages(Math.max(1, Math.ceil(node.scrollHeight / height)));
+      const a4Width = node.clientWidth;
+      if (!a4Width) return;
+      const a4PageHeight = a4Width * PAGE_RATIO;
+      setPageHeight(a4PageHeight);
+      setPages(Math.max(1, Math.ceil(node.scrollHeight / a4PageHeight)));
+      if (stack?.clientWidth) {
+        setScale(stack.clientWidth / a4Width);
+      }
     };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(node);
+    if (stack) observer.observe(stack);
     return () => observer.disconnect();
   }, [paged, props.resume, props.sections, props.showEmpty, props.dict]);
 
@@ -241,7 +250,7 @@ export function ResumePaper(props: Props) {
   }
 
   return (
-    <div className="resume-preview-stack">
+    <div className="resume-preview-stack" ref={stackRef}>
       <div className="resume-paper-measure" ref={measureRef} aria-hidden>
         <ResumePaperBody {...props} />
       </div>
@@ -250,9 +259,8 @@ export function ResumePaper(props: Props) {
           <div
             className="resume-paper-shift"
             style={{
-              transform: pageHeight
-                ? `translateY(-${index * pageHeight}px)`
-                : undefined,
+              transform: `scale(${scale}) translateY(-${index * pageHeight}px)`,
+              transformOrigin: "top left",
             }}
           >
             <ResumePaperBody {...props} />

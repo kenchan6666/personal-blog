@@ -1543,7 +1543,7 @@ html.is-locale-hold .article-page {
   position: absolute;
   left: 0;
   top: 0;
-  width: 100%;
+  width: 210mm;
   visibility: hidden;
   pointer-events: none;
 }
@@ -1551,6 +1551,7 @@ html.is-locale-hold .article-page {
 .resume-paper-page {
   position: relative;
   overflow: hidden;
+  width: 100%;
   aspect-ratio: 210 / 297;
   border-radius: var(--radius-panel);
   border: 1px solid var(--glass-border);
@@ -1559,7 +1560,7 @@ html.is-locale-hold .article-page {
 }
 
 .resume-paper-shift {
-  width: 100%;
+  width: 210mm;
 }
 
 .resume-paper {

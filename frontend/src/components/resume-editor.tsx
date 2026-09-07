@@ -18,6 +18,7 @@ import {
   generateOwnerResume,
   getSessionToken,
   importOwnerResumeFromGithub,
+  downloadOwnerResumePdf,
   localizedText,
   localizedTextFor,
   publishOwnerResume,
@@ -1364,6 +1365,28 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                 >
                   {saving ? a.generatingPdf : a.generatePdf}
                 </button>
+                {current.id && current.pdfUrl ? (
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={saving}
+                    onClick={async () => {
+                      const token = getSessionToken();
+                      if (!token || !current.id) return;
+                      try {
+                        await downloadOwnerResumePdf(
+                          token,
+                          current.id,
+                          `${current.slug || "resume"}.pdf`,
+                        );
+                      } catch {
+                        setError(a.errorGeneric);
+                      }
+                    }}
+                  >
+                    {dict.resume.download}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="btn-ghost"

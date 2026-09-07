@@ -1464,6 +1464,28 @@ export async function generateOwnerResume(
   return (await res.json()) as OwnerResume;
 }
 
+export function publicResumePdfPath(slug: string) {
+  return `/api/public/resumes/${encodeURIComponent(slug)}/pdf`;
+}
+
+export async function downloadOwnerResumePdf(
+  token: string,
+  id: string,
+  filename: string,
+) {
+  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/pdf`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename.endsWith(".pdf") ? filename : `${filename}.pdf`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export async function publishOwnerResume(
   token: string,
   id: string,
