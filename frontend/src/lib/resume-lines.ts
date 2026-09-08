@@ -48,6 +48,49 @@ export function parseParagraphs(value: string | string[]): string[] {
     .filter(Boolean);
 }
 
+export function pastedDescription(text: string): {
+  style: ResumeDescriptionStyle;
+  lines: string[];
+} {
+  const trimmed = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+  if (!trimmed) return { style: "paragraph", lines: [] };
+
+  const nonempty = trimmed
+    .split("\n")
+    .map((row) => row.trim())
+    .filter(Boolean);
+  const marked = nonempty.filter((row) => BULLET.test(row));
+  if (
+    marked.length >= 2 ||
+    (nonempty.length >= 1 &&
+      marked.length === nonempty.length &&
+      BULLET.test(nonempty[0]))
+  ) {
+    return {
+      style: "bullets",
+      lines: nonempty
+        .map((row) => row.replace(BULLET, "").trim())
+        .filter(Boolean),
+    };
+  }
+
+  const lines = trimmed
+    .split(/\n\s*\n/)
+    .map((block) =>
+      block
+        .split("\n")
+        .map((row) => row.trim())
+        .filter(Boolean)
+        .join(" "),
+    )
+    .filter(Boolean);
+  return { style: "paragraph", lines };
+}
+
+export function isListPlaceholder(value: string): boolean {
+  return fromBulletEditorValue(value).length === 0;
+}
+
 export function toBulletEditorValue(lines: string[]): string {
   if (!lines.length) return BULLET_MARK;
   return lines.map((line) => `${BULLET_MARK}${line}`).join("\n");

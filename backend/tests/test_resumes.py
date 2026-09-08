@@ -565,8 +565,7 @@ async def test_resume_save_splits_blob_copy_and_stamps_updated_at(
     body = created.json()
     assert body["summary"] == ["Built the site", "Shipped the API"]
     assert body["projects"][0]["description"] == [
-        "Track food.",
-        "Ship reminders.",
+        "Track food. Ship reminders.",
     ]
     assert body["updatedAt"]
 

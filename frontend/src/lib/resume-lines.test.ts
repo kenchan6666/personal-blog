@@ -4,6 +4,7 @@ import {
   applyWordListEnter,
   fromBulletEditorValue,
   parseParagraphs,
+  pastedDescription,
   toBulletEditorValue,
 } from "./resume-lines";
 
@@ -37,5 +38,33 @@ describe("resume description parsing", () => {
       fromBulletEditorValue(toBulletEditorValue(lines)),
       lines,
     );
+  });
+});
+
+describe("pasted resume description", () => {
+  it("keeps a copied paragraph as a paragraph", () => {
+    const pasted = pastedDescription(
+      "Track food items and expiry dates. Remind the household before milk goes off.",
+    );
+    assert.equal(pasted.style, "paragraph");
+    assert.deepEqual(pasted.lines, [
+      "Track food items and expiry dates. Remind the household before milk goes off.",
+    ]);
+  });
+
+  it("joins word-wrapped lines instead of turning them into bullets", () => {
+    const pasted = pastedDescription(
+      "Track food items and expiry dates.\nRemind the household before milk goes off.",
+    );
+    assert.equal(pasted.style, "paragraph");
+    assert.deepEqual(pasted.lines, [
+      "Track food items and expiry dates. Remind the household before milk goes off.",
+    ]);
+  });
+
+  it("keeps an explicit list as bullets", () => {
+    const pasted = pastedDescription("- Track food\n- Remind the household");
+    assert.equal(pasted.style, "bullets");
+    assert.deepEqual(pasted.lines, ["Track food", "Remind the household"]);
   });
 });

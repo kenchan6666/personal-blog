@@ -5,7 +5,9 @@ import {
   applyWordListEnter,
   descriptionStyle,
   fromBulletEditorValue,
+  isListPlaceholder,
   parseParagraphs,
+  pastedDescription,
   splitResumeLines,
   toBulletEditorValue,
   type ResumeDescriptionStyle,
@@ -144,6 +146,21 @@ export function ResumeDescriptionField({
             focused.current = false;
           }}
           onChange={(event) => emit(event.target.value, style)}
+          onPaste={(event) => {
+            const pasted = event.clipboardData.getData("text/plain");
+            if (!pasted) return;
+            const node = event.currentTarget;
+            const start = node.selectionStart ?? 0;
+            const end = node.selectionEnd ?? 0;
+            const replacingAll =
+              isListPlaceholder(node.value) ||
+              (start === 0 && end === node.value.length);
+            if (!replacingAll) return;
+            event.preventDefault();
+            const next = pastedDescription(pasted);
+            onChange(next.lines, next.style);
+            setDraft(editorValue(next.lines, next.style));
+          }}
           onKeyDown={(event) => {
             if (
               style !== "bullets" ||

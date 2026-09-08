@@ -97,6 +97,18 @@ def _paragraph_lines(values: Any) -> list[str]:
     return [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
 
 
+def _explicit_lines(values: Any) -> list[str]:
+    chunks = [values] if isinstance(values, str) else list(values or [])
+    lines: list[str] = []
+    for chunk in chunks:
+        text = str(chunk).replace("\r\n", "\n").replace("\r", "\n")
+        for part in text.split("\n"):
+            cleaned = _BULLET_PREFIX_RE.sub("", part).strip()
+            if cleaned:
+                lines.append(cleaned)
+    return lines
+
+
 def _project_rows(raw: list[Any]) -> list[ResumeProject]:
     rows: list[ResumeProject] = []
     for item in raw:
@@ -111,7 +123,7 @@ def _project_rows(raw: list[Any]) -> list[ResumeProject]:
         if data["description_style"] == "paragraph":
             data["description"] = _paragraph_lines(data.get("description") or [])
         else:
-            data["description"] = split_resume_lines(data.get("description") or [])
+            data["description"] = _explicit_lines(data.get("description") or [])
         data["tech_stack"] = [
             str(part).strip()
             for part in (data.get("tech_stack") or [])

@@ -291,7 +291,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
       end: "",
       tech_stack: [] as string[],
       description: [] as string[],
-      description_style: "bullets" as const,
+      description_style: "paragraph" as const,
     };
     const index = current.projects.length;
     setCurrent({ ...current, projects: [...current.projects, entry] });
@@ -695,7 +695,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                         end: "",
                         tech_stack: [],
                         description: [],
-                        description_style: "bullets",
+                        description_style: "paragraph",
                       },
                     ],
                   })
