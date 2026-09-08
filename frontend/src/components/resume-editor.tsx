@@ -36,6 +36,7 @@ import { AgentField } from "./agent-field";
 import { CmsCard, StatusPill } from "./cms-card";
 import { CmsConfirm } from "./cms-confirm";
 import { CmsModal } from "./cms-modal";
+import { ResumeDescriptionField } from "./resume-description-field";
 import { ResumeLayoutStudio } from "./resume-layout-studio";
 import { ResumePaper } from "./resume-paper";
 
@@ -270,7 +271,11 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
       setCurrent((prev) => {
         if (!prev || !prev.projects[index]) return prev;
         const projects = [...prev.projects];
-        projects[index] = { ...projects[index], description: linesOf(next) };
+        projects[index] = {
+          ...projects[index],
+          description: linesOf(next),
+          description_style: "bullets",
+        };
         return { ...prev, projects };
       });
       await new Promise((resolve) => window.setTimeout(resolve, 8));
@@ -286,6 +291,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
       end: "",
       tech_stack: [] as string[],
       description: [] as string[],
+      description_style: "bullets" as const,
     };
     const index = current.projects.length;
     setCurrent({ ...current, projects: [...current.projects, entry] });
@@ -689,6 +695,7 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                         end: "",
                         tech_stack: [],
                         description: [],
+                        description_style: "bullets",
                       },
                     ],
                   })
@@ -759,17 +766,20 @@ export function ResumeEditor({ locale, dict, active = true }: Props) {
                   setCurrent({ ...current, projects });
                 }}
               />
-              <AgentField
+              <ResumeDescriptionField
                 label={a.fieldBulletLines}
-                value={item.description.join("\n")}
-                multiline
+                proseLabel={a.fieldProse}
+                listLabel={a.fieldList}
+                lines={item.description}
+                style={item.description_style}
                 closeLabel={a.close}
                 pending={analyzingIndex === index}
-                onChange={(value) => {
+                onChange={(description, description_style) => {
                   const projects = [...current.projects];
                   projects[index] = {
                     ...item,
-                    description: linesOf(value),
+                    description,
+                    description_style,
                   };
                   setCurrent({ ...current, projects });
                 }}

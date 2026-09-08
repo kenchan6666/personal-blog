@@ -402,6 +402,7 @@ class ResumeProject(BaseModel):
     end: str = ""
     tech_stack: list[str] = Field(default_factory=list)
     description: list[str] = Field(default_factory=list)
+    description_style: str = "bullets"
 
 
 class ResumeLanguage(BaseModel):

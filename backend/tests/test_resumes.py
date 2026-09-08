@@ -572,6 +572,51 @@ async def test_resume_save_splits_blob_copy_and_stamps_updated_at(
 
 
 @pytest.mark.asyncio
+async def test_project_paragraph_stays_one_block_in_json_and_pdf(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    paragraph = (
+        "Track food items and expiry dates. Remind the household before milk goes off."
+    )
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            slug="prose-en",
+            projects=[
+                {
+                    "name": "Pantry pal",
+                    "start": "2024-05",
+                    "end": "2024-06",
+                    "tech_stack": ["Python"],
+                    "description_style": "paragraph",
+                    "description": [paragraph],
+                }
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    project = created.json()["projects"][0]
+    assert project["description_style"] == "paragraph"
+    assert project["description"] == [paragraph]
+
+    generated = await client.post(
+        f"/api/owner/resumes/{created.json()['id']}/generate",
+        headers=headers,
+    )
+    assert generated.status_code == 200
+    pdf = await client.get(
+        f"/api/owner/resumes/{created.json()['id']}/pdf",
+        headers=headers,
+    )
+    text = PdfReader(io_bytes(pdf.content)).pages[0].extract_text() or ""
+    assert "Track food items and expiry dates." in text
+    assert "• Track food items and expiry dates." not in text
+
+
+@pytest.mark.asyncio
 async def test_analyze_github_project_fills_stack_without_dates(
     client, mailer, settings, github, app
 ):

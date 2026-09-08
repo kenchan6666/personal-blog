@@ -1222,12 +1222,15 @@ export type ResumeExperience = {
   description: string[];
 };
 
+export type ResumeDescriptionStyle = "bullets" | "paragraph";
+
 export type ResumeProject = {
   name: string;
   start: string;
   end: string;
   tech_stack: string[];
   description: string[];
+  description_style?: ResumeDescriptionStyle;
 };
 
 export type ResumeLanguage = {

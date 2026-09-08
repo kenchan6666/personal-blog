@@ -88,11 +88,30 @@ def _experience_rows(raw: list[Any]) -> list[ResumeExperience]:
     return rows
 
 
+def _paragraph_lines(values: Any) -> list[str]:
+    chunks = [values] if isinstance(values, str) else list(values or [])
+    text = "\n".join(str(chunk) for chunk in chunks)
+    text = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not text:
+        return []
+    return [part.strip() for part in re.split(r"\n\s*\n", text) if part.strip()]
+
+
 def _project_rows(raw: list[Any]) -> list[ResumeProject]:
     rows: list[ResumeProject] = []
     for item in raw:
         data = item.model_dump() if hasattr(item, "model_dump") else dict(item)
-        data["description"] = split_resume_lines(data.get("description") or [])
+        style = str(
+            data.get("description_style") or data.get("descriptionStyle") or "bullets"
+        )
+        data.pop("descriptionStyle", None)
+        data["description_style"] = (
+            "paragraph" if style == "paragraph" else "bullets"
+        )
+        if data["description_style"] == "paragraph":
+            data["description"] = _paragraph_lines(data.get("description") or [])
+        else:
+            data["description"] = split_resume_lines(data.get("description") or [])
         data["tech_stack"] = [
             str(part).strip()
             for part in (data.get("tech_stack") or [])
@@ -811,16 +830,34 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         y -= size + 4
 
     def wrap(value: str, width: float, size: float) -> list[str]:
+        def fit_token(token: str) -> list[str]:
+            if text_width(token, size) <= width:
+                return [token]
+            rows: list[str] = []
+            current = ""
+            for char in token:
+                trial = current + char
+                if current and text_width(trial, size) > width:
+                    rows.append(current)
+                    current = char
+                else:
+                    current = trial
+            if current:
+                rows.append(current)
+            return rows or [token]
+
         words = value.split()
         if not words:
             return []
-        lines = [words[0]]
+        lines = fit_token(words[0])
         for word in words[1:]:
-            trial = f"{lines[-1]} {word}"
+            pieces = fit_token(word)
+            trial = f"{lines[-1]} {pieces[0]}"
             if text_width(trial, size) <= width:
                 lines[-1] = trial
+                lines.extend(pieces[1:])
             else:
-                lines.append(word)
+                lines.extend(pieces)
         return lines
 
     def draw_wrapped(value: str, x: float, size: float, width: float) -> None:
@@ -925,8 +962,13 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                         _BODY_SIZE,
                         width,
                     )
-                for line in item.description:
-                    draw_bullet(line)
+                if item.description_style == "paragraph":
+                    for para in item.description:
+                        for piece in para.split("\n"):
+                            draw_wrapped(piece, _LEFT, _BODY_SIZE, width)
+                else:
+                    for line in item.description:
+                        draw_bullet(line)
         elif section == "activities" and resume.activities:
             section_title(titles[section])
             for item in resume.activities:

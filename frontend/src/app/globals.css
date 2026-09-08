@@ -1534,8 +1534,6 @@ html.is-locale-hold .article-page {
 }
 
 .resume-preview-stack {
-  display: grid;
-  gap: 1rem;
   position: relative;
   overflow-x: clip;
 }
@@ -1550,11 +1548,26 @@ html.is-locale-hold .article-page {
   z-index: -1;
 }
 
+.resume-preview-fit {
+  position: relative;
+  width: 100%;
+}
+
+.resume-preview-a4-col {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  gap: 1rem;
+  width: 210mm;
+  transform-origin: top left;
+}
+
 .resume-paper-page {
   position: relative;
   overflow: hidden;
-  width: 100%;
-  aspect-ratio: 210 / 297;
+  width: 210mm;
+  height: 297mm;
   border-radius: var(--radius-panel);
   border: 1px solid var(--glass-border);
   background: var(--glass);
@@ -1566,12 +1579,23 @@ html.is-locale-hold .article-page {
   left: 0;
   top: 0;
   width: 210mm;
-  transform-origin: top left;
 }
 
 .resume-paper {
   padding: 1.75rem 1.5rem 2rem;
   color: var(--text-primary);
+}
+
+.resume-paper-a4 {
+  box-sizing: border-box;
+  width: 210mm;
+  padding: 36pt 36pt 40pt 35pt;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+.resume-prose {
+  white-space: pre-wrap;
 }
 
 .resume-public {
@@ -1608,6 +1632,12 @@ html.is-locale-hold .article-page {
 }
 
 .resume-public .resume-bullets li {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.resume-public .resume-prose {
   color: var(--text-primary);
   font-size: 1rem;
   line-height: 1.65;
@@ -1692,6 +1722,46 @@ html.is-locale-hold .article-page {
   margin: 0.18rem 0;
   color: var(--text-muted);
   font-size: 0.92rem;
+}
+
+.resume-paper-a4 {
+  font-size: 9pt;
+  line-height: 13pt;
+}
+
+.resume-paper-a4 .resume-paper-head {
+  margin-bottom: 10pt;
+}
+
+.resume-paper-a4 .resume-paper-head h2 {
+  margin: 0 0 4pt;
+  font-size: 14pt;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 18pt;
+}
+
+.resume-paper-a4 .resume-paper-head p,
+.resume-paper-a4 p,
+.resume-paper-a4 .resume-entry-row,
+.resume-paper-a4 .resume-bullets li,
+.resume-paper-a4 .resume-prose {
+  margin: 0 0 4pt;
+  font-size: 9pt;
+  line-height: 13pt;
+}
+
+.resume-paper-a4 h3 {
+  margin: 8pt 0 6pt;
+  padding-bottom: 2pt;
+  font-size: 10pt;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.resume-paper-a4 .resume-entry {
+  margin-bottom: 8pt;
 }
 
 .resume-pick {

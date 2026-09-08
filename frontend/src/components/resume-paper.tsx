@@ -9,6 +9,7 @@ import type {
   ResumeExtra,
   ResumeSectionId,
 } from "@/lib/api";
+import { descriptionStyle } from "@/lib/resume-lines";
 
 type Props = {
   resume: PublicResume | OwnerResume;
@@ -16,6 +17,7 @@ type Props = {
   sections?: string[];
   showEmpty?: boolean;
   paged?: boolean;
+  a4?: boolean;
 };
 
 const BUILTIN: ResumeSectionId[] = [
@@ -43,6 +45,28 @@ function ResumeBullets({ lines }: { lines: string[] }) {
   );
 }
 
+function ResumeCopy({
+  lines,
+  style,
+}: {
+  lines: string[];
+  style?: string;
+}) {
+  if (!lines.length) return null;
+  if (descriptionStyle(style) === "paragraph") {
+    return (
+      <>
+        {lines.map((line, index) => (
+          <p key={`${index}-${line}`} className="resume-prose">
+            {line}
+          </p>
+        ))}
+      </>
+    );
+  }
+  return <ResumeBullets lines={lines} />;
+}
+
 function filled(id: string, resume: PublicResume | OwnerResume) {
   if (id === "summary") return resume.summary.length > 0;
   if (id === "education") return resume.education.length > 0;
@@ -57,7 +81,7 @@ function filled(id: string, resume: PublicResume | OwnerResume) {
   return Boolean(extra && (extra.lines.length > 0 || extra.entries.length > 0));
 }
 
-function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
+function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
   const paperDict = isLocale(resume.locale)
     ? getDictionary(resume.locale).resume
     : dict.resume;
@@ -75,7 +99,7 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
   });
 
   return (
-    <article className="resume-paper">
+    <article className={a4 ? "resume-paper resume-paper-a4" : "resume-paper"}>
       <header className="resume-paper-head">
         <h2>{header.name || resume.title || " "}</h2>
         <p>{[header.phone, header.email].filter(Boolean).join(" · ")}</p>
@@ -156,7 +180,10 @@ function ResumePaperBody({ resume, dict, sections, showEmpty }: Props) {
                   {item.tech_stack.length > 0 ? (
                     <p>({item.tech_stack.join(", ")})</p>
                   ) : null}
-                  <ResumeBullets lines={item.description} />
+                  <ResumeCopy
+                    lines={item.description}
+                    style={item.description_style}
+                  />
                 </div>
               ))}
             </section>
@@ -231,7 +258,7 @@ export function ResumePaper(props: Props) {
       setPageHeight(a4PageHeight);
       setPages(Math.max(1, Math.ceil(node.scrollHeight / a4PageHeight)));
       if (stack?.clientWidth) {
-        setScale(stack.clientWidth / a4Width);
+        setScale(Math.min(1, stack.clientWidth / a4Width));
       }
     };
     update();
@@ -249,23 +276,33 @@ export function ResumePaper(props: Props) {
     );
   }
 
+  const fitHeight =
+    pages * pageHeight * scale + Math.max(0, pages - 1) * 16 * scale;
+
   return (
     <div className="resume-preview-stack" ref={stackRef}>
       <div className="resume-paper-measure" ref={measureRef} aria-hidden>
-        <ResumePaperBody {...props} />
+        <ResumePaperBody {...props} a4 />
       </div>
-      {Array.from({ length: pages }, (_, index) => (
-        <div key={index} className="resume-paper-page">
-          <div
-            className="resume-paper-shift"
-            style={{
-              transform: `scale(${scale}) translateY(-${index * pageHeight}px)`,
-            }}
-          >
-            <ResumePaperBody {...props} />
-          </div>
+      <div className="resume-preview-fit" style={{ height: fitHeight || undefined }}>
+        <div
+          className="resume-preview-a4-col"
+          style={{ transform: `scale(${scale})` }}
+        >
+          {Array.from({ length: pages }, (_, index) => (
+            <div key={index} className="resume-paper-page">
+              <div
+                className="resume-paper-shift"
+                style={{
+                  transform: `translateY(-${index * 297}mm)`,
+                }}
+              >
+                <ResumePaperBody {...props} a4 />
+              </div>
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
     </div>
   );
 }
