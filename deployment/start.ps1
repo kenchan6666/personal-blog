@@ -82,6 +82,34 @@ function WaitHttp([string]$Url, [int]$Tries = 60) {
     return $false
 }
 
+function DiskIsTight {
+    $paths = @("/", "/var/lib/docker", "/var/lib/containerd")
+    foreach ($path in $paths) {
+        try {
+            $line = & df -Pk $path 2>$null | Select-Object -Skip 1 | Select-Object -First 1
+            if (-not $line) { continue }
+            $avail = [int64](-split $line.Trim())[3]
+            if ($avail -lt 3145728) { return $true }
+        } catch {
+            continue
+        }
+    }
+    return $false
+}
+
+function ReclaimDockerDisk {
+    Write-Host "reclaiming unused Docker layers (running images and named volumes are kept)..."
+    & docker container prune -f | Out-Null
+    & docker image prune -f | Out-Null
+    & docker builder prune -f | Out-Null
+    if (DiskIsTight) {
+        Write-Host "less than 3GiB free — dropping unused images and all build cache"
+        & docker builder prune -af | Out-Null
+        & docker image prune -af | Out-Null
+    }
+    & docker system df
+}
+
 function RunProdUp($Root, $Dir) {
     EnsureProdEnv $Dir
     $runtime = Join-Path $Dir "nginx-runtime"
@@ -89,7 +117,13 @@ function RunProdUp($Root, $Dir) {
     Copy-Item (Join-Path $Dir "nginx\http.conf") (Join-Path $runtime "default.conf") -Force
 
     Write-Host "starting production stack (nginx :80/:443)..."
-    ComposeProd $Root $Dir @("up", "-d", "--build")
+    ReclaimDockerDisk
+    Write-Host "building images one at a time to keep peak disk use down..."
+    $env:COMPOSE_PARALLEL_LIMIT = "1"
+    ComposeProd $Root $Dir @("build", "api")
+    ComposeProd $Root $Dir @("build", "agent")
+    ComposeProd $Root $Dir @("build", "web")
+    ComposeProd $Root $Dir @("up", "-d")
     if (WaitHttp "http://127.0.0.1/api/health" 45) {
         Write-Host "health: http://127.0.0.1/api/health"
         if (-not (IssueLetsEncrypt $Root $Dir)) {

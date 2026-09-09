@@ -27,11 +27,24 @@ bash deployment/start.sh --prod
 
 The script copies `deployment/env.example` to `deployment/.env` on first run. Edit that file (see checklist below) and run the same command again if you change secrets.
 
-Equivalent compose:
+Equivalent compose (build one image at a time; a parallel `--build` can fill a small VM disk):
 
 ```bash
 cp deployment/env.example deployment/.env
-docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d --build
+docker compose -f docker-compose.prod.yml --env-file deployment/.env build api
+docker compose -f docker-compose.prod.yml --env-file deployment/.env build agent
+docker compose -f docker-compose.prod.yml --env-file deployment/.env build web
+docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d
+```
+
+If a rebuild fails with `ENOSPC` / `no space left on device`, the Docker host is full — usually leftover build cache, not the app. Named volumes (Mongo, Qdrant, agent data) stay. Reclaim, then rebuild:
+
+```bash
+docker container prune -f
+docker image prune -f
+docker builder prune -af
+df -h
+docker system df
 ```
 
 Then open `http://<host>/zh-Hant`. Health: `http://<host>/api/health`.

@@ -64,6 +64,34 @@ compose_prod() {
   docker compose -f "$ROOT/docker-compose.prod.yml" --env-file "$DIR/.env" "$@"
 }
 
+df_avail_kb() {
+  df -Pk "$1" 2>/dev/null | awk 'NR==2 {print $4}'
+}
+
+disk_is_tight() {
+  local avail path
+  for path in / /var/lib/docker /var/lib/containerd; do
+    avail="$(df_avail_kb "$path")"
+    if [ -n "$avail" ] && [ "$avail" -lt 3145728 ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+reclaim_docker_disk() {
+  echo "reclaiming unused Docker layers (running images and named volumes are kept)…"
+  docker container prune -f || true
+  docker image prune -f || true
+  docker builder prune -f || true
+  if disk_is_tight; then
+    echo "less than 3GiB free — dropping unused images and all build cache"
+    docker builder prune -af || true
+    docker image prune -af || true
+  fi
+  docker system df || true
+}
+
 compose_deps() {
   docker compose -f "$ROOT/docker-compose.yml" "$@"
 }
@@ -148,7 +176,12 @@ start_prod() {
   cp "$DIR/nginx/http.conf" "$DIR/nginx-runtime/default.conf"
 
   echo "starting production stack (nginx :80/:443)…"
-  compose_prod up -d --build
+  reclaim_docker_disk
+  echo "building images one at a time to keep peak disk use down…"
+  COMPOSE_PARALLEL_LIMIT=1 compose_prod build api
+  COMPOSE_PARALLEL_LIMIT=1 compose_prod build agent
+  COMPOSE_PARALLEL_LIMIT=1 compose_prod build web
+  compose_prod up -d
   if wait_http "http://127.0.0.1/api/health" 45; then
     echo "health: http://127.0.0.1/api/health"
     issue_letsencrypt || echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
