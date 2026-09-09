@@ -245,7 +245,9 @@ issue_letsencrypt() {
 }
 
 stop_prod() {
-  ensure_prod_env
+  if [ ! -f "$DIR/.env" ]; then
+    ensure_prod_env
+  fi
   compose_prod down
   echo "production stack stopped"
 }

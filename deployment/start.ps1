@@ -183,7 +183,13 @@ function IssueLetsEncrypt($Root, $Dir) {
 }
 
 function RunProdDown($Root, $Dir) {
-    ComposeProd $Root $Dir @("down")
+    $envFile = Join-Path $Dir ".env"
+    if (-not (Test-Path $envFile)) {
+        EnsureProdEnv $Dir
+    }
+    $compose = Join-Path $Root "docker-compose.prod.yml"
+    & docker compose -f $compose --env-file $envFile @("down")
+    if ($LASTEXITCODE -ne 0) { throw "docker compose (prod) failed" }
     Write-Host "production stack stopped"
 }
 

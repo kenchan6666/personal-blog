@@ -45,6 +45,8 @@ def main() -> int:
         used.add(value)
         text = upsert(text, key, value)
         filled.append(key)
+    if not filled and path.exists():
+        return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     if filled:
