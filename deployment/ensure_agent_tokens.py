@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import secrets
+import tempfile
 from pathlib import Path
 
 KEYS = ("AGENT_INTERNAL_TOKEN", "AGENT_SERVICE_TOKEN")
@@ -48,7 +50,19 @@ def main() -> int:
     if not filled and path.exists():
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    fd, tmp_name = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
     if filled:
         print(f"generated {', '.join(filled)} in {path}")
     return 0
