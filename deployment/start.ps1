@@ -126,13 +126,15 @@ function RunProdUp($Root, $Dir) {
     ComposeProd $Root $Dir @("up", "-d")
     if (WaitHttp "http://127.0.0.1/api/health" 45) {
         Write-Host "health: http://127.0.0.1/api/health"
-        if (-not (IssueLetsEncrypt $Root $Dir)) {
-            Write-Host "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443)."
-        }
-        Write-Host "ready: http://127.0.0.1/zh-Hant"
     } else {
         Write-Host "containers are up; health check timed out. logs:"
         ComposeProd $Root $Dir @("logs", "--tail", "40", "api", "web", "nginx")
+    }
+    if (EnableTls $Root $Dir) {
+        Write-Host "ready: https (port 443)"
+    } else {
+        Write-Host "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443)."
+        Write-Host "ready: http://127.0.0.1/zh-Hant"
     }
 }
 
@@ -140,6 +142,28 @@ function HostFromOrigin([string]$Origin) {
     $hostName = $Origin.Trim()
     $hostName = $hostName -replace '^https?://', ''
     return $hostName.TrimEnd('/')
+}
+
+function TlsCertExists($Root, $Dir) {
+    $compose = Join-Path $Root "docker-compose.prod.yml"
+    $envFile = Join-Path $Dir ".env"
+    & docker compose -f $compose --env-file $envFile exec -T nginx test -f /etc/letsencrypt/live/site/fullchain.pem
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & docker compose -f $compose --env-file $envFile exec -T nginx test -f /etc/letsencrypt/live/site/privkey.pem
+    return ($LASTEXITCODE -eq 0)
+}
+
+function EnableTls($Root, $Dir) {
+    if (TlsCertExists $Root $Dir) {
+        Copy-Item (Join-Path $Dir "nginx\ssl.conf") (Join-Path $Dir "nginx-runtime\default.conf") -Force
+        ComposeProd $Root $Dir @("exec", "-T", "nginx", "nginx", "-s", "reload")
+        if ($LASTEXITCODE -ne 0) {
+            ComposeProd $Root $Dir @("restart", "nginx")
+        }
+        Write-Host "TLS restored from existing Let's Encrypt cert"
+        return $true
+    }
+    return (IssueLetsEncrypt $Root $Dir)
 }
 
 function IssueLetsEncrypt($Root, $Dir) {

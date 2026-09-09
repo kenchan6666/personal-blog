@@ -184,11 +184,15 @@ start_prod() {
   compose_prod up -d
   if wait_http "http://127.0.0.1/api/health" 45; then
     echo "health: http://127.0.0.1/api/health"
-    issue_letsencrypt || echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
-    echo "ready: http://127.0.0.1/zh-Hant"
   else
     echo "containers are up; health check timed out. logs:"
     compose_prod logs --tail 40 api web nginx
+  fi
+  if enable_tls; then
+    echo "ready: https (port 443)"
+  else
+    echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
+    echo "ready: http://127.0.0.1/zh-Hant"
   fi
 }
 
@@ -198,6 +202,21 @@ host_from_origin() {
   origin="${origin#https://}"
   origin="${origin%/}"
   printf '%s' "$origin"
+}
+
+tls_cert_exists() {
+  compose_prod exec -T nginx test -f /etc/letsencrypt/live/site/fullchain.pem \
+    && compose_prod exec -T nginx test -f /etc/letsencrypt/live/site/privkey.pem
+}
+
+enable_tls() {
+  if tls_cert_exists; then
+    cp "$DIR/nginx/ssl.conf" "$DIR/nginx-runtime/default.conf"
+    compose_prod exec -T nginx nginx -s reload || compose_prod restart nginx
+    echo "TLS restored from existing Let's Encrypt cert"
+    return 0
+  fi
+  issue_letsencrypt
 }
 
 issue_letsencrypt() {
