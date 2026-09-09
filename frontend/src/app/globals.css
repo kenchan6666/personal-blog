@@ -3968,8 +3968,9 @@ html[data-theme="dark"] .ambient-orb {
   min-height: 0;
   max-width: 100%;
   height: min(calc(100dvh - 12rem), 52rem);
-  grid-template-columns: minmax(12rem, 0.72fr) minmax(24rem, 1.8fr) minmax(16rem, 0.95fr);
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr) minmax(14rem, 20rem);
   grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "conversations chat knowledge";
   gap: 0.85rem;
 }
 
@@ -3997,7 +3998,20 @@ html[data-theme="dark"] .ambient-orb {
   height: 100%;
 }
 
-.agent-mobile-nav {
+.agent-workspace > .agent-conversations {
+  grid-area: conversations;
+}
+
+.agent-workspace > .agent-chat {
+  grid-area: chat;
+}
+
+.agent-workspace > .agent-knowledge {
+  grid-area: knowledge;
+}
+
+.agent-mobile-nav,
+.agent-sheet-backdrop {
   display: none;
 }
 
@@ -4340,13 +4354,11 @@ html[data-theme="dark"] .ambient-orb {
 
 @media (max-width: 1180px) {
   .agent-workspace:not(.is-compact) {
-    grid-template-columns: minmax(11rem, 0.65fr) minmax(0, 1.55fr);
-    grid-template-rows: minmax(0, 1fr) minmax(12rem, 0.42fr);
-  }
-
-  .agent-knowledge {
-    grid-column: 1 / -1;
-    max-height: none;
+    grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(11rem, 0.34fr);
+    grid-template-areas:
+      "conversations chat"
+      "knowledge knowledge";
   }
 }
 
