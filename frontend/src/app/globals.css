@@ -1589,7 +1589,8 @@ html.is-locale-hold .article-page {
 .resume-paper-a4 {
   box-sizing: border-box;
   width: 210mm;
-  padding: 36pt 36pt 40pt 35pt;
+  padding: 50pt;
+  color: #1f1f1f;
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
 }
@@ -1724,21 +1725,36 @@ html.is-locale-hold .article-page {
   font-size: 0.92rem;
 }
 
+.resume-meta {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.resume-label {
+  font-weight: 700;
+  color: inherit;
+}
+
 .resume-paper-a4 {
-  font-size: 9pt;
+  font-size: 10pt;
   line-height: 13pt;
 }
 
 .resume-paper-a4 .resume-paper-head {
-  margin-bottom: 10pt;
+  margin-bottom: 8pt;
 }
 
 .resume-paper-a4 .resume-paper-head h2 {
-  margin: 0 0 4pt;
-  font-size: 14pt;
+  margin: 0 0 2pt;
+  font-size: 18pt;
   font-weight: 700;
   letter-spacing: 0;
-  line-height: 18pt;
+  line-height: 22pt;
+  color: #1f1f1f;
+}
+
+.resume-paper-a4 .resume-contact {
+  color: #525252;
 }
 
 .resume-paper-a4 .resume-paper-head p,
@@ -1746,22 +1762,34 @@ html.is-locale-hold .article-page {
 .resume-paper-a4 .resume-entry-row,
 .resume-paper-a4 .resume-bullets li,
 .resume-paper-a4 .resume-prose {
-  margin: 0 0 4pt;
-  font-size: 9pt;
+  margin: 0 0 1pt;
+  font-size: 10pt;
   line-height: 13pt;
+  color: #1f1f1f;
+}
+
+.resume-paper-a4 .resume-meta {
+  color: #525252;
 }
 
 .resume-paper-a4 h3 {
-  margin: 8pt 0 6pt;
-  padding-bottom: 2pt;
+  margin: 9pt 0 4pt;
+  padding-bottom: 1.5pt;
+  border-bottom: 0.6pt solid #2c2c2c;
   font-size: 10pt;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: #1f1f1f;
 }
 
 .resume-paper-a4 .resume-entry {
-  margin-bottom: 8pt;
+  margin-bottom: 6pt;
+}
+
+.resume-paper-a4 .resume-bullets {
+  margin: 1pt 0 0;
+  padding-left: 12pt;
 }
 
 .resume-pick {

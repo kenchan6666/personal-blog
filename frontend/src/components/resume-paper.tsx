@@ -102,8 +102,11 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
     <article className={a4 ? "resume-paper resume-paper-a4" : "resume-paper"}>
       <header className="resume-paper-head">
         <h2>{header.name || resume.title || " "}</h2>
-        <p>{[header.phone, header.email].filter(Boolean).join(" · ")}</p>
-        {header.city ? <p>{header.city}</p> : null}
+        <p className="resume-contact">
+          {[header.phone, header.email, header.city, ...(header.links ?? [])]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
       </header>
       {order.map((id) => {
         if (!showEmpty && !filled(id, resume)) return null;
@@ -114,7 +117,11 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
           return (
             <section key={id}>
               <h3>{r.sectionSummary}</h3>
-              <ResumeBullets lines={resume.summary} />
+              {resume.summary.map((line, index) => (
+                <p key={`${index}-${line}`} className="resume-prose">
+                  {line}
+                </p>
+              ))}
             </section>
           );
         }
@@ -126,17 +133,20 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                 <div key={`${item.institution}-${item.start}`} className="resume-entry">
                   <div className="resume-entry-row">
                     <strong>{item.institution}</strong>
-                    <span>{range(item.start, item.end)}</span>
+                    <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
                   <div className="resume-entry-row">
                     <span>
-                      {[item.field, item.degree].filter(Boolean).join(" ")}
+                      {[item.degree, item.field].filter(Boolean).join(", ")}
                     </span>
-                    <span>{item.city}</span>
+                    <span className="resume-meta">{item.city}</span>
                   </div>
                   {item.honor ? <p>{item.honor}</p> : null}
                   {item.related_courses.length > 0 ? (
-                    <p>{item.related_courses.join(", ")}</p>
+                    <p>
+                      <strong className="resume-label">{r.courseworkLabel}</strong>{" "}
+                      {item.related_courses.join(", ")}
+                    </p>
                   ) : null}
                 </div>
               ))}
@@ -155,11 +165,11 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                 <div key={`${item.organization}-${item.start}`} className="resume-entry">
                   <div className="resume-entry-row">
                     <strong>{item.organization}</strong>
-                    <span>{range(item.start, item.end)}</span>
+                    <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
                   <div className="resume-entry-row">
                     <span>{item.role}</span>
-                    <span>{item.city}</span>
+                    <span className="resume-meta">{item.city}</span>
                   </div>
                   <ResumeBullets lines={item.description} />
                 </div>
@@ -174,12 +184,17 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
               {resume.projects.map((item) => (
                 <div key={`${item.name}-${item.start}`} className="resume-entry">
                   <div className="resume-entry-row">
-                    <strong>{item.name}</strong>
-                    <span>{range(item.start, item.end)}</span>
+                    <strong>
+                      {item.name}
+                      {item.tech_stack.length > 0 ? (
+                        <span className="resume-meta">
+                          {" "}
+                          | {item.tech_stack.join(", ")}
+                        </span>
+                      ) : null}
+                    </strong>
+                    <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
-                  {item.tech_stack.length > 0 ? (
-                    <p>({item.tech_stack.join(", ")})</p>
-                  ) : null}
                   <ResumeCopy
                     lines={item.description}
                     style={item.description_style}
@@ -197,7 +212,11 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                 <div key={`${item.organization}-${item.role}`} className="resume-entry">
                   <div className="resume-entry-row">
                     <strong>{item.organization}</strong>
-                    <span>{range(item.start, item.end)}</span>
+                    <span className="resume-meta">{range(item.start, item.end)}</span>
+                  </div>
+                  <div className="resume-entry-row">
+                    <span>{item.role}</span>
+                    <span className="resume-meta">{item.city}</span>
                   </div>
                   <ResumeBullets lines={item.description} />
                 </div>
@@ -209,12 +228,10 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
           return (
             <section key={id}>
               <h3>{r.sectionSkills}</h3>
-              {resume.skills.length > 0 ? (
-                <p>Skills: {resume.skills.join(", ")}</p>
-              ) : null}
+              {resume.skills.length > 0 ? <p>{resume.skills.join(", ")}</p> : null}
               {resume.languages.length > 0 ? (
                 <p>
-                  Languages:{" "}
+                  <strong className="resume-label">{r.languagesLabel}</strong>{" "}
                   {resume.languages
                     .map((item) =>
                       item.level ? `${item.name} (${item.level})` : item.name,
@@ -316,11 +333,11 @@ function ExtraBlock({ extra }: { extra: ResumeExtra }) {
         <div key={`${item.organization}-${item.start}`} className="resume-entry">
           <div className="resume-entry-row">
             <strong>{item.organization}</strong>
-            <span>{range(item.start, item.end)}</span>
+            <span className="resume-meta">{range(item.start, item.end)}</span>
           </div>
           <div className="resume-entry-row">
             <span>{item.role}</span>
-            <span>{item.city}</span>
+            <span className="resume-meta">{item.city}</span>
           </div>
           <ResumeBullets lines={item.description} />
         </div>

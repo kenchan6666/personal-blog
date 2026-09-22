@@ -126,7 +126,9 @@ const zhHant = {
     sectionWork: "工作經驗",
     sectionProjects: "項目經歷",
     sectionActivities: "活動經歷",
-    sectionSkills: "技能／證書及其他",
+    sectionSkills: "技能",
+    languagesLabel: "語言",
+    courseworkLabel: "相關課程",
   },
   search: {
     title: "搜尋",
@@ -557,7 +559,9 @@ const en = {
     sectionWork: "Work Experience",
     sectionProjects: "Projects",
     sectionActivities: "Activities",
-    sectionSkills: "Skills / certificates",
+    sectionSkills: "Skills",
+    languagesLabel: "Languages",
+    courseworkLabel: "Coursework",
   },
   search: {
     title: "Search",
@@ -978,7 +982,9 @@ const zhHans = {
     sectionWork: "工作经验",
     sectionProjects: "项目经历",
     sectionActivities: "活动经历",
-    sectionSkills: "技能／证书及其他",
+    sectionSkills: "技能",
+    languagesLabel: "语言",
+    courseworkLabel: "相关课程",
   },
   search: {
     title: "搜索",

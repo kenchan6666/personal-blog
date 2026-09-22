@@ -236,6 +236,13 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
     assert "Chan YatNam" in text
     assert "EDUCATION" in text
     assert "Pantry pal" in text
+    assert "PROJECTS" in text
+    assert "SKILLS" in text
+    assert "Coursework" in text
+    assert "Languages" in text
+    assert "CERTIFICATIONS & OTHERS" not in text
+    assert "(Python, Flask)" not in text
+    assert "• Seeking a programming internship." not in text
 
     published = await client.post(
         f"/api/owner/resumes/{resume_id}/publish",

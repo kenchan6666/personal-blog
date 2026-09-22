@@ -10,7 +10,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.ttfonts import TTFError, TTFont
 from reportlab.pdfgen import canvas
 
 from app.github import (
@@ -142,10 +142,10 @@ _CJK_FONT_CANDIDATES = (
 )
 
 _PAGE_WIDTH, _PAGE_HEIGHT = A4
-_LEFT = 35
-_BODY = 50
-_DATE_RIGHT = 521
-_NAME_SIZE = 14
+_MARGIN = 50
+_LEFT = _MARGIN
+_RIGHT = _PAGE_WIDTH - _MARGIN
+_NAME_SIZE = 18
 _TITLE_SIZE = 10
 _SECTION_TITLES = {
     "en": {
@@ -153,9 +153,9 @@ _SECTION_TITLES = {
         "education": "EDUCATION",
         "internship": "INTERNSHIP",
         "work": "WORK EXPERIENCE",
-        "projects": "PROJECT EXPERIENCE",
+        "projects": "PROJECTS",
         "activities": "ACTIVITIES",
-        "skillsOthers": "SKILLS, CERTIFICATIONS & OTHERS",
+        "skillsOthers": "SKILLS",
     },
     "zh-Hant": {
         "summary": "個人總結",
@@ -164,7 +164,7 @@ _SECTION_TITLES = {
         "work": "工作經驗",
         "projects": "項目經歷",
         "activities": "活動經歷",
-        "skillsOthers": "技能／證書及其他",
+        "skillsOthers": "技能",
     },
     "zh-Hans": {
         "summary": "个人总结",
@@ -173,17 +173,29 @@ _SECTION_TITLES = {
         "work": "工作经验",
         "projects": "项目经历",
         "activities": "活动经历",
-        "skillsOthers": "技能／证书及其他",
+        "skillsOthers": "技能",
     },
 }
 
 
 def _section_titles(locale: str) -> dict[str, str]:
     return _SECTION_TITLES.get(locale, _SECTION_TITLES["en"])
-_BODY_SIZE = 9
-_PAGE_BOTTOM = 40
+
+
+_FIELD_LABELS = {
+    "en": {"languages": "Languages", "courses": "Coursework"},
+    "zh-Hant": {"languages": "語言", "courses": "相關課程"},
+    "zh-Hans": {"languages": "语言", "courses": "相关课程"},
+}
+_BODY_SIZE = 10
+_LEADING = 13
+_PAGE_BOTTOM = _MARGIN
+_INK = (0.12, 0.12, 0.12)
+_MUTED = (0.32, 0.32, 0.32)
+_RULE = (0.22, 0.22, 0.22)
 
 _REGISTERED_FONT = ""
+_REGISTERED_BOLD = ""
 
 
 def ensure_resume_dir(path: str | Path) -> Path:
@@ -793,12 +805,16 @@ def format_range(start: str, end: str) -> str:
     left = format_month(start)
     right = format_month(end) or "Present"
     if left and right:
-        return f"{left} - {right}"
+        return f"{left} – {right}"
     return left or right
 
 
+def _field_labels(locale: str) -> dict[str, str]:
+    return _FIELD_LABELS.get(locale, _FIELD_LABELS["en"])
+
+
 def _body_font() -> str:
-    global _REGISTERED_FONT
+    global _REGISTERED_FONT, _REGISTERED_BOLD
     if _REGISTERED_FONT:
         return _REGISTERED_FONT
     for path in _CJK_FONT_CANDIDATES:
@@ -806,50 +822,65 @@ def _body_font() -> str:
             continue
         try:
             pdfmetrics.registerFont(TTFont("ResumeBody", str(path), subfontIndex=0))
+            bold_name = "ResumeBody"
+            try:
+                pdfmetrics.registerFont(
+                    TTFont("ResumeBold", str(path), subfontIndex=1)
+                )
+                bold_name = "ResumeBold"
+            except (OSError, TTFError, ValueError):
+                bold_name = "ResumeBody"
             _REGISTERED_FONT = "ResumeBody"
+            _REGISTERED_BOLD = bold_name
             return _REGISTERED_FONT
-        except Exception:
+        except (OSError, TTFError, ValueError):
             continue
     _REGISTERED_FONT = "Helvetica"
+    _REGISTERED_BOLD = "Helvetica-Bold"
     return _REGISTERED_FONT
+
+
+def _bold_font() -> str:
+    _body_font()
+    return _REGISTERED_BOLD or _REGISTERED_FONT
 
 
 def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
     buffer = io.BytesIO()
     page = canvas.Canvas(buffer, pagesize=A4)
     font = _body_font()
-    y = _PAGE_HEIGHT - 36
-    page.setFillColorRGB(0.10, 0.09, 0.19)
+    bold = _bold_font()
+    content_width = _RIGHT - _LEFT
+    y = _PAGE_HEIGHT - _MARGIN - 14
+    page.setFillColorRGB(*_INK)
 
     def new_page() -> None:
         nonlocal y
         page.showPage()
-        page.setFillColorRGB(0.10, 0.09, 0.19)
-        y = _PAGE_HEIGHT - 36
+        page.setFillColorRGB(*_INK)
+        y = _PAGE_HEIGHT - _MARGIN - 14
 
     def ensure_space(needed: float) -> None:
         if y - needed < _PAGE_BOTTOM:
             new_page()
 
-    def text_width(value: str, size: float) -> float:
-        return pdfmetrics.stringWidth(value, font, size)
+    def text_width(value: str, size: float, face: str | None = None) -> float:
+        return pdfmetrics.stringWidth(value, face or font, size)
 
-    def draw_centered(value: str, size: float) -> None:
-        nonlocal y
-        ensure_space(size + 4)
-        page.setFont(font, size)
-        page.drawString((_PAGE_WIDTH - text_width(value, size)) / 2, y, value)
-        y -= size + 4
+    def wrap(value: str, width: float, size: float, face: str | None = None) -> list[str]:
+        use = face or font
 
-    def wrap(value: str, width: float, size: float) -> list[str]:
+        def measure(token: str) -> float:
+            return pdfmetrics.stringWidth(token, use, size)
+
         def fit_token(token: str) -> list[str]:
-            if text_width(token, size) <= width:
+            if measure(token) <= width:
                 return [token]
             rows: list[str] = []
             current = ""
             for char in token:
                 trial = current + char
-                if current and text_width(trial, size) > width:
+                if current and measure(trial) > width:
                     rows.append(current)
                     current = char
                 else:
@@ -865,67 +896,162 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         for word in words[1:]:
             pieces = fit_token(word)
             trial = f"{lines[-1]} {pieces[0]}"
-            if text_width(trial, size) <= width:
+            if measure(trial) <= width:
                 lines[-1] = trial
                 lines.extend(pieces[1:])
             else:
                 lines.extend(pieces)
         return lines
 
-    def draw_wrapped(value: str, x: float, size: float, width: float) -> None:
+    def draw_centered(value: str, size: float, *, face: str | None = None) -> None:
         nonlocal y
+        use = face or font
+        for line in wrap(value, content_width, size, use) or [value]:
+            ensure_space(_LEADING)
+            page.setFillColorRGB(*_INK)
+            page.setFont(use, size)
+            page.drawString((_PAGE_WIDTH - text_width(line, size, use)) / 2, y, line)
+            y -= size + 2
+
+    def draw_wrapped(
+        value: str,
+        x: float,
+        size: float,
+        width: float,
+        *,
+        muted: bool = False,
+    ) -> None:
+        nonlocal y
+        page.setFillColorRGB(*(_MUTED if muted else _INK))
         page.setFont(font, size)
         for line in wrap(value, width, size) or [value]:
-            ensure_space(size + 4)
+            ensure_space(_LEADING)
             page.drawString(x, y, line)
-            y -= size + 4
+            y -= _LEADING
 
     def draw_bullet(value: str) -> None:
-        draw_wrapped(f"• {value}", _BODY, _BODY_SIZE, width)
+        nonlocal y
+        indent = 11
+        lines = wrap(value, content_width - indent, _BODY_SIZE) or [value]
+        for index, line in enumerate(lines):
+            ensure_space(_LEADING)
+            page.setFillColorRGB(*_INK)
+            page.setFont(font, _BODY_SIZE)
+            if index == 0:
+                page.drawString(_LEFT, y, "•")
+            page.drawString(_LEFT + indent, y, line)
+            y -= _LEADING
 
     def section_title(title: str) -> None:
         nonlocal y
-        ensure_space(_TITLE_SIZE + 36)
+        ensure_space(_TITLE_SIZE + 20)
         y -= 8
-        page.setFont(font, _TITLE_SIZE)
+        page.setFillColorRGB(*_INK)
+        page.setFont(bold, _TITLE_SIZE)
         page.drawString(_LEFT, y, title)
-        y -= 6
-        page.setStrokeColorRGB(0.35, 0.27, 0.55)
-        page.setLineWidth(0.6)
-        page.line(_LEFT, y, _PAGE_WIDTH - 36, y)
-        y -= 14
+        y -= 3
+        page.setStrokeColorRGB(*_RULE)
+        page.setLineWidth(0.45)
+        page.line(_LEFT, y, _RIGHT, y)
+        y -= 8
 
-    def entry_row(left: str, right: str) -> None:
+    def column_line(left: str, right: str, *, emphasize: bool = False) -> None:
         nonlocal y
-        ensure_space(_BODY_SIZE + 5)
+        if not left and not right:
+            return
+        face = bold if emphasize else font
+        right_text = right.strip()
+        right_w = text_width(right_text, _BODY_SIZE) + 12 if right_text else 0
+        first_width = max(72, content_width - right_w)
+        lines = wrap(left, first_width, _BODY_SIZE, face) or ([left] if left else [""])
+        ensure_space(_LEADING)
+        page.setFillColorRGB(*_INK)
+        page.setFont(face, _BODY_SIZE)
+        if lines[0]:
+            page.drawString(_LEFT, y, lines[0])
+        if right_text:
+            page.setFillColorRGB(*_MUTED)
+            page.setFont(font, _BODY_SIZE)
+            page.drawRightString(_RIGHT, y, right_text)
+        y -= _LEADING
+        for extra in lines[1:]:
+            ensure_space(_LEADING)
+            page.setFillColorRGB(*_INK)
+            page.setFont(face, _BODY_SIZE)
+            page.drawString(_LEFT, y, extra)
+            y -= _LEADING
+
+    def project_head(name: str, stack: str, dates: str) -> None:
+        nonlocal y
+        ensure_space(_LEADING)
+        date_w = text_width(dates, _BODY_SIZE) + 12 if dates else 0
+        limit = _RIGHT - date_w
+        page.setFillColorRGB(*_INK)
+        page.setFont(bold, _BODY_SIZE)
+        page.drawString(_LEFT, y, name)
+        name_w = text_width(name, _BODY_SIZE, bold)
+        inline = f"  |  {stack}" if stack else ""
+        spilled = False
+        if inline and _LEFT + name_w + text_width(inline, _BODY_SIZE) <= limit:
+            page.setFillColorRGB(*_MUTED)
+            page.setFont(font, _BODY_SIZE)
+            page.drawString(_LEFT + name_w, y, inline)
+        elif inline:
+            spilled = True
+        if dates:
+            page.setFillColorRGB(*_MUTED)
+            page.setFont(font, _BODY_SIZE)
+            page.drawRightString(_RIGHT, y, dates)
+        y -= _LEADING
+        if spilled:
+            page.setFillColorRGB(*_MUTED)
+            draw_wrapped(stack, _LEFT, _BODY_SIZE, content_width, muted=True)
+
+    def labeled(label: str, value: str) -> None:
+        nonlocal y
+        if not value:
+            return
+        ensure_space(_LEADING)
+        page.setFillColorRGB(*_INK)
+        page.setFont(bold, _BODY_SIZE)
+        page.drawString(_LEFT, y, label)
+        gap = text_width(label, _BODY_SIZE, bold) + 8
         page.setFont(font, _BODY_SIZE)
-        page.drawString(_LEFT, y, left)
-        if right:
-            page.drawRightString(_DATE_RIGHT + 36, y, right)
-        y -= _BODY_SIZE + 5
+        lines = wrap(value, content_width - gap, _BODY_SIZE) or [value]
+        page.drawString(_LEFT + gap, y, lines[0])
+        y -= _LEADING
+        for extra in lines[1:]:
+            ensure_space(_LEADING)
+            page.setFont(font, _BODY_SIZE)
+            page.drawString(_LEFT + gap, y, extra)
+            y -= _LEADING
 
     header = resume.header
-    draw_centered(header.name or resume.title or "Resume", _NAME_SIZE)
-    contact = "  |  ".join(part for part in (header.phone, header.email) if part)
+    draw_centered(header.name or resume.title or "Resume", _NAME_SIZE, face=bold)
+    y -= 2
+    contact = "  ·  ".join(
+        part
+        for part in (header.phone, header.email, header.city, *header.links)
+        if part
+    )
     if contact:
-        draw_centered(contact, _BODY_SIZE)
-    if header.city:
-        draw_centered(header.city, _BODY_SIZE)
-    for link in header.links:
-        if link:
-            draw_centered(link, _BODY_SIZE)
+        draw_centered(contact, 9)
 
     titles = _section_titles(resume.locale)
-    width = _PAGE_WIDTH - _BODY - 40
+    labels = _field_labels(resume.locale)
 
     def draw_extra(extra: ResumeExtra) -> None:
         section_title((extra.title or extra.slug).upper())
         for line in extra.lines:
             draw_bullet(line)
         for item in extra.entries:
-            entry_row(item.organization or item.role, format_range(item.start, item.end))
+            column_line(
+                item.organization or item.role,
+                format_range(item.start, item.end),
+                emphasize=True,
+            )
             if item.role and item.organization:
-                entry_row(item.role, item.city)
+                column_line(item.role, item.city)
             for line in item.description:
                 draw_bullet(line)
 
@@ -933,71 +1059,84 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
         if section == "summary" and resume.summary:
             section_title(titles[section])
             for line in resume.summary:
-                draw_bullet(line)
+                draw_wrapped(line, _LEFT, _BODY_SIZE, content_width)
         elif section == "education" and resume.education:
             section_title(titles[section])
             for item in resume.education:
-                entry_row(item.institution, format_range(item.start, item.end))
-                subtitle = " ".join(part for part in (item.field, item.degree) if part)
-                entry_row(subtitle, item.city)
+                column_line(
+                    item.institution,
+                    format_range(item.start, item.end),
+                    emphasize=True,
+                )
+                subtitle = ", ".join(part for part in (item.degree, item.field) if part)
+                column_line(subtitle, item.city)
                 if item.honor:
-                    draw_wrapped(item.honor, _LEFT, _BODY_SIZE, width)
+                    draw_wrapped(item.honor, _LEFT, _BODY_SIZE, content_width)
                 if item.related_courses:
-                    draw_wrapped(
-                        "Related course: " + ", ".join(item.related_courses),
-                        _LEFT,
-                        _BODY_SIZE,
-                        width,
-                    )
+                    labeled(labels["courses"], ", ".join(item.related_courses))
+                y -= 2
         elif section == "internship" and resume.internships:
             section_title(titles[section])
             for item in resume.internships:
-                entry_row(item.organization, format_range(item.start, item.end))
-                entry_row(item.role, item.city)
+                column_line(
+                    item.organization,
+                    format_range(item.start, item.end),
+                    emphasize=True,
+                )
+                column_line(item.role, item.city)
                 for line in item.description:
                     draw_bullet(line)
+                y -= 2
         elif section == "work" and resume.work_experiences:
             section_title(titles[section])
             for item in resume.work_experiences:
-                entry_row(item.organization, format_range(item.start, item.end))
-                entry_row(item.role, item.city)
+                column_line(
+                    item.organization,
+                    format_range(item.start, item.end),
+                    emphasize=True,
+                )
+                column_line(item.role, item.city)
                 for line in item.description:
                     draw_bullet(line)
+                y -= 2
         elif section == "projects" and resume.projects:
             section_title(titles[section])
             for item in resume.projects:
-                entry_row(item.name, format_range(item.start, item.end))
-                if item.tech_stack:
-                    draw_wrapped(
-                        "(" + ", ".join(item.tech_stack) + ")",
-                        _LEFT,
-                        _BODY_SIZE,
-                        width,
-                    )
+                project_head(
+                    item.name,
+                    ", ".join(item.tech_stack),
+                    format_range(item.start, item.end),
+                )
                 if item.description_style == "paragraph":
                     for para in item.description:
                         for piece in para.split("\n"):
-                            draw_wrapped(piece, _LEFT, _BODY_SIZE, width)
+                            draw_wrapped(piece, _LEFT, _BODY_SIZE, content_width)
                 else:
                     for line in item.description:
                         draw_bullet(line)
+                y -= 2
         elif section == "activities" and resume.activities:
             section_title(titles[section])
             for item in resume.activities:
-                entry_row(item.organization, format_range(item.start, item.end))
-                entry_row(item.role, item.city)
+                column_line(
+                    item.organization,
+                    format_range(item.start, item.end),
+                    emphasize=True,
+                )
+                column_line(item.role, item.city)
                 for line in item.description:
                     draw_bullet(line)
+                y -= 2
         elif section == "skillsOthers" and (resume.skills or resume.languages):
             section_title(titles[section])
             if resume.skills:
-                draw_wrapped("Skills: " + ", ".join(resume.skills), _LEFT, _BODY_SIZE, width)
+                draw_wrapped(", ".join(resume.skills), _LEFT, _BODY_SIZE, content_width)
             if resume.languages:
                 langs = ", ".join(
                     f"{item.name} ({item.level})" if item.level else item.name
                     for item in resume.languages
                 )
-                draw_wrapped("Languages: " + langs, _LEFT, _BODY_SIZE, width)
+                labeled(labels["languages"], langs)
         else:
             extra = next(
                 (item for item in resume.extras if item.slug == section),

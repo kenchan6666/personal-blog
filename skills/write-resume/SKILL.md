@@ -1,36 +1,50 @@
 ---
 name: write-resume
-description: Write or rewrite one-page Resume copy. Use when drafting a CV, filling or polishing summary, education, internship, work, projects, activities, skills, or extras, or the Owner asks to 写履历 / 改简历 / 改 CV bullets.
+description: Write or rewrite one-page Resume copy in XYZ bullets. Use when drafting a CV, filling or polishing summary, education, internship, work, projects, activities, skills, or extras, or the Owner asks to 写履历 / 改简历 / 改 CV.
 ---
 
 # Write Resume
 
-纸上只印 `header.name`。不要另写一份 title；后台列表名保存时等于姓名。Resume 不是 About。
+纸上只印 `header.name`。后台列表名保存时等于姓名。Resume 不是 About。
+
+经历和项目的每一条都是 **XYZ**：做成了 X，用 Y 衡量，靠 Z 做到。Z 是方法，技术名词出现在方法里，不当前半句的主语。一行一条，写入数组。
 
 ## Steps
 
 1. `portfolio_list_resumes` 或 `portfolio_get_resume`，看现有栏目和版式。
-2. 取证：`portfolio_list_knowledge`，必要时读已发布 Project / About。只写已确认事实。
-3. 按下面栏目公式起草，一页为限。
+2. 取证：`portfolio_list_knowledge`，必要时读已发布 Project / About，或已授权仓库。只写已确认事实。数字只来自证据；没有数字就写仓库或经历里看得到的范围（模块、数据种类、谁在用），留下空位给 Owner 补真实数字。
+3. 按栏目起草。一页：最近一段 3–5 条，更早的 2–3 条，每个项目 2–4 条。最硬的结果放该段第一条。
 4. `portfolio_update_resume` 只传改动的字段。
 5. 同一轮把已确认事实写入「关于我」RAG。Owner 没说发布就不要 `portfolio_publish_resume`。
 
-完成：目标栏目已写入，且没有虚构经历、数字或职称。
+完成：目标栏目已写入；每条要点以具体动词开头，同一行里有结果或范围；没有人称代词；没有虚构经历、数字或职称。
+
+## XYZ
+
+句式：`动词 + 交付物 + 结果或范围 + 方法`。已结束的经历用过去时，仍在做的用现在时。每条 1–2 行。
+
+- 工作：Cut checkout errors 18% by rebuilding the payment retry path in Go.
+- 项目：Shipped expiry reminders for a shared pantry, covering milk and produce, with Flask.
+- 证据不够写成「Built a pantry tracker in Flask that stores items and expiry dates」——范围来自仓库，百分比留空。
+
+`tech_stack` 只放 3–5 个语言或框架，印在项目标题同一行。要点里只在方法处点名完成该结果的那一项。`skills[]` 是逗号清单，不写句子。
+
+Summary 是 2–3 句：身份、方向、最硬的一条证据。每句是数组的一项。
+
+从 GitHub 加项目用 `portfolio_add_resume_project_from_github`：名称、短技术栈和 XYZ 要点自动填，日期留给 Owner。导入后若要点仍像功能说明，按本页重写再 `portfolio_update_resume`。
 
 ## 栏目
 
-每条要点用 **动词 + 内容 + 方法 + 结果**。一行一件事，能量化就量化。写入 `summary[]` / `description[]` 必须是数组，不要一段话。技术栈只写语言和框架，不要列一长串库。从 GitHub 导入的项目要点写应用功能，以及哪个技术完成哪个主要功能。
-
 | 栏目 | 字段 | 写什么 |
 | --- | --- | --- |
-| header | name, phone, email, city | 姓名印在纸顶；联系方式各一行，不写段落 |
-| summary | `summary[]` | 2–3 句：身份、方向、最硬的一条证据。不要目标空话 |
-| education | institution, field, degree, start, end, city, honor, related_courses | 学校与学位为主；课程只留和投递相关的 |
-| internship | organization, role, start, end, city, description[] | 职责用要点，不用「负责日常事务」 |
-| work | workExperiences[]，字段同实习 | 全职/兼职工作经验；与 internships 分开存 |
-| projects | name, start, end, tech_stack[], description[] | 做出了什么、用什么、结果是什么；栈放 tech_stack。从 GitHub 加项目用 `portfolio_add_resume_project_from_github`：自动填名称、短技术栈和功能要点，日期留给 Owner |
-| activities | 同实习条目 | 社团/志愿；没有就空着，不要硬凑 |
+| header | name, phone, email, city, links | 每个联系方式一个短字段 |
+| summary | `summary[]` | 2–3 句 |
+| education | institution, field, degree, start, end, city, honor, related_courses | 学校与学位；课程只留和投递相关的 |
+| internship | organization, role, start, end, city, description[] | XYZ 要点 |
+| work | workExperiences[]，字段同实习 | 全职/兼职；与 internships 分开存 |
+| projects | name, start, end, tech_stack[], description[] | 标题是作品名；栈在 tech_stack；要点是交付 |
+| activities | 同实习 | 社团/志愿；没有就空着 |
 | skillsOthers | skills[], languages[] | 真用过的技能；语言写程度 |
-| extras | title, lines[], entries[] | 证书、奖项等自订段；title 是印在纸上的栏目标题 |
+| extras | title, lines[], entries[] | 证书、奖项；title 印在纸上 |
 
-自订栏目用 extras，不要塞进 About。版式先 `portfolio_list_resume_templates`，按投递类型换 `templateSlug`。只有 `classic-a4` 不可改；其余是 `cv` 仓 `template/{slug}.json`，改名或栏目用 `portfolio_update_resume_template`。不要另存一份和 classic-a4 栏目完全相同的版式。
+版式先 `portfolio_list_resume_templates`，按投递类型换 `templateSlug`。只有 `classic-a4` 不可改；其余是 `cv` 仓 `template/{slug}.json`，改名或栏目用 `portfolio_update_resume_template`。自订栏目用 extras。

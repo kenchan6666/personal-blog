@@ -247,13 +247,16 @@ async def _complete_project_copy(
     if not url:
         return None
     prompt = (
-        "Fill a resume project from this GitHub repo. Reply with JSON only: "
+        "Fill one resume project from this GitHub repo. Reply with JSON only: "
         '{"tech_stack":["..."],"description":["..."]}. '
-        "tech_stack: 3-5 language/framework names only, no library laundry list. "
-        "description: 3-5 bullets; each is an application feature and which "
-        "tech delivered that feature. No dates. No paragraph. "
-        "Never invent filler such as 'Primary features of {name}'. "
-        "If the README does not support a feature, omit it. "
+        "tech_stack: 3-5 language or framework names for the project title line. "
+        "description: 2-4 XYZ bullets. Each bullet is: verb + what shipped + "
+        "scope or result + the method. Start with a concrete verb "
+        "(Built, Shipped, Cut, Designed). Put tech in the method, not as the subject. "
+        "One line each. No personal pronouns. No dates. "
+        "Use only facts in the README or file names. "
+        "If a number is not in the source, state the scope you can see and skip the number. "
+        "Drop a bullet the source does not support. "
         f"Locale: {locale}. Repo: {name}. "
         f"Description: {description[:300]}. "
         f"Files: {', '.join(names[:40])}. "

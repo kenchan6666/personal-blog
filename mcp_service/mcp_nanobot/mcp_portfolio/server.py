@@ -762,7 +762,7 @@ def create_server() -> FastMCP:
         identifier: str,
         full_name: str,
     ) -> dict[str, Any]:
-        """Analyze an authorized GitHub repo and append one Resume project. Fills name, a short tech_stack, and feature bullets. Leaves start/end empty for the Owner to fill."""
+        """Analyze an authorized GitHub repo and append one Resume project. Fills name, a short tech_stack, and XYZ bullets. Leaves start/end empty for the Owner to fill."""
         api.require_write()
         current = _resume_by_id(identifier)
         analyzed = api.request(
