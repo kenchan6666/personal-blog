@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Dictionary } from "@/i18n/dictionaries";
+import type { Locale } from "@/i18n/config";
 import {
   createAgentConversation,
   createAgentKnowledge,
   deleteAgentConversation,
   deleteAgentKnowledge,
+  fetchOwnerResumeTemplates,
+  fetchOwnerResumes,
   getAgentConversation,
   getSessionToken,
   listAgentConversations,
@@ -21,10 +25,12 @@ import {
   type AgentKnowledgeInput,
   type AgentStreamEvent,
   type Localized,
+  type OwnerResume,
 } from "@/lib/api";
 import { messagesWithThinking, type ChatMessage } from "@/lib/agent-thinking";
 import { CmsModal } from "./cms-modal";
 import { MarkdownBody } from "./markdown-body";
+import { ResumePaper } from "./resume-paper";
 
 export type AgentInsertTarget = keyof Localized | "text";
 
@@ -32,7 +38,20 @@ type Props = {
   compact?: boolean;
   context?: { label: string; value: Localized | string };
   onInsert?: (locale: AgentInsertTarget, text: string) => void;
+  preview?: { locale: Locale; dict: Dictionary };
 };
+
+const RESUME_TURN =
+  /(?:更新|改好|重写|改一下).{0,16}(?:CV|cv|简历|履历)|(?:CV|cv|简历|履历).{0,12}(?:更新|改好|重写)/;
+const RESUME_TOOL = /读取履历|写入履历|写入项目|生成 PDF/;
+
+function latestResume(rows: OwnerResume[]) {
+  return (
+    [...rows].sort((a, b) =>
+      (b.updatedAt || "").localeCompare(a.updatedAt || ""),
+    )[0] ?? null
+  );
+}
 
 type MobileSheet = "" | "conversations" | "knowledge";
 
@@ -82,7 +101,12 @@ function pinChangedKnowledge(
   ];
 }
 
-export function AgentChat({ compact = false, context, onInsert }: Props) {
+export function AgentChat({
+  compact = false,
+  context,
+  onInsert,
+  preview,
+}: Props) {
   const [conversations, setConversations] = useState<
     AgentConversationSummary[]
   >([]);
@@ -109,6 +133,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [agentActivity, setAgentActivity] = useState("");
   const [toolActivity, setToolActivity] = useState("");
   const [toolSteps, setToolSteps] = useState<string[]>([]);
+  const [stepsMessageId, setStepsMessageId] = useState("");
+  const [resumeWatch, setResumeWatch] = useState(false);
+  const [liveResume, setLiveResume] = useState<OwnerResume | null>(null);
+  const [liveSections, setLiveSections] = useState<string[] | undefined>();
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumePulse, setResumePulse] = useState(false);
   const [recentKnowledgeIds, setRecentKnowledgeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -135,6 +165,8 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   async function openConversation(token: string, id: string) {
     const conversation = await getAgentConversation(token, id);
     setActiveId(id);
+    setResumeWatch(false);
+    setLiveResume(null);
     setThinking(Boolean(conversation.thinking));
     setMessages(
       messagesWithThinking(conversation.messages, conversation.thinking),
@@ -278,6 +310,34 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     };
   }, [thinking, sending, activeId, compact]);
 
+  async function refreshLiveResume() {
+    const token = getSessionToken();
+    if (!token || !preview) return;
+    setResumeLoading(true);
+    try {
+      const [rows, templates] = await Promise.all([
+        fetchOwnerResumes(token),
+        fetchOwnerResumeTemplates(token),
+      ]);
+      const next = latestResume(rows);
+      setLiveResume((current) => {
+        if (current && next && current.updatedAt !== next.updatedAt) {
+          window.setTimeout(() => {
+            setResumePulse(true);
+            window.setTimeout(() => setResumePulse(false), 700);
+          }, 0);
+        }
+        return next;
+      });
+      const template = templates.find((item) => item.slug === next?.templateSlug);
+      setLiveSections(template?.sections ?? next?.sections);
+    } catch {
+      /* keep the paper that is already on screen */
+    } finally {
+      setResumeLoading(false);
+    }
+  }
+
   function handleStreamEvent(event: AgentStreamEvent) {
     if (event.type === "tool_activity") {
       setToolActivity(event.label);
@@ -286,6 +346,10 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
           ? current
           : [...current, event.label],
       );
+      if (RESUME_TOOL.test(event.label)) {
+        setResumeWatch(true);
+        void refreshLiveResume();
+      }
       return;
     }
     if (event.type !== "knowledge_updated") return;
@@ -429,6 +493,12 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setError("");
     setToolActivity("");
     setToolSteps([]);
+    setStepsMessageId(assistantId);
+    const watchingResume = Boolean(preview) && RESUME_TURN.test(text);
+    if (watchingResume) {
+      setResumeWatch(true);
+      void refreshLiveResume();
+    }
     setThinking(true);
     setSending(true);
     const controller = new AbortController();
@@ -468,6 +538,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         throw new Error("这一轮没有收到完整回复，请再发一次。");
       }
       setThinking(false);
+      if (watchingResume) await refreshLiveResume();
       await Promise.all([
         refreshConversations(token),
         compact
@@ -725,7 +796,27 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
         </aside>
       ) : null}
 
-      <div className="agent-chat">
+      <div className={`agent-chat${resumeWatch && preview ? " is-watching-resume" : ""}`}>
+        {resumeWatch && preview ? (
+          <aside
+            className={`agent-resume-live${resumePulse ? " is-updated" : ""}`}
+            aria-label="履历预览"
+            aria-busy={resumeLoading}
+          >
+            <p className="eyebrow">履历</p>
+            {liveResume ? (
+              <ResumePaper
+                resume={liveResume}
+                dict={preview.dict}
+                sections={liveSections}
+              />
+            ) : (
+              <p className="agent-resume-live-pending">
+                {resumeLoading ? "正在读取履历…" : "还没有履历"}
+              </p>
+            )}
+          </aside>
+        ) : null}
         <div className="agent-chat-intro">
           <span
             className={`agent-orb${livePhase ? ` is-${livePhase}` : ""}`}
@@ -799,9 +890,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
               ) : null}
               {message.role === "assistant" ? (
                 <>
-                  {awaitingTurn &&
-                  message.id === liveAssistant?.id &&
-                  toolSteps.length ? (
+                  {message.id === stepsMessageId && toolSteps.length ? (
                     <ol className="agent-tool-steps" aria-label="正在进行的步骤">
                       {toolSteps.map((step, stepIndex) => (
                         <li

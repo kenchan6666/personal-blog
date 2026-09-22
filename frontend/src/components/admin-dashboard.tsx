@@ -99,7 +99,7 @@ function AdminTabs({ locale, dict, email, onLogout }: Props & { email: string; o
       >
         {tab === "agent" ? (
           <div>
-            <AgentChat />
+            <AgentChat preview={{ locale, dict }} />
           </div>
         ) : null}
         {tab === "github" ? (

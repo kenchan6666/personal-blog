@@ -3992,6 +3992,75 @@ html[data-theme="dark"] .ambient-orb {
   backdrop-filter: blur(var(--glass-blur));
 }
 
+.agent-chat.is-watching-resume {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 38%);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "intro paper"
+    "messages paper"
+    "insert paper"
+    "composer paper";
+}
+
+.agent-chat.is-watching-resume .agent-chat-intro {
+  grid-area: intro;
+}
+
+.agent-chat.is-watching-resume .agent-messages {
+  grid-area: messages;
+}
+
+.agent-chat.is-watching-resume .agent-insert-row,
+.agent-chat.is-watching-resume .agent-error {
+  grid-area: insert;
+}
+
+.agent-chat.is-watching-resume .agent-composer {
+  grid-area: composer;
+}
+
+.agent-resume-live {
+  grid-area: paper;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.85rem 0.9rem 1.1rem;
+  border-left: 1px solid var(--hairline);
+  background: color-mix(in srgb, var(--panel-fill-strong) 55%, transparent);
+}
+
+.agent-resume-live .eyebrow {
+  margin-bottom: 0.55rem;
+}
+
+.agent-resume-live-pending {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.agent-resume-live.is-updated .resume-paper {
+  animation: agent-status-enter 420ms ease-out both;
+}
+
+@media (max-width: 900px) {
+  .agent-chat.is-watching-resume {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(8rem, 36vh) minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "intro"
+      "paper"
+      "messages"
+      "insert"
+      "composer";
+  }
+
+  .agent-resume-live {
+    border-left: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+}
+
 .agent-workspace.is-compact .agent-chat {
   min-height: 0;
   height: 100%;
@@ -5382,6 +5451,7 @@ html[data-theme="dark"] .ambient-orb {
   .agent-live-activity,
   .agent-live-activity i,
   .agent-tool-steps li,
+  .agent-resume-live.is-updated .resume-paper,
   .agent-status-bars i,
   .agent-thinking i,
   .agent-stream-caret,
