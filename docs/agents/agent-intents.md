@@ -49,7 +49,7 @@
 | 评论 | `portfolio_list_comments` / `portfolio_comment_action` | 审核/回复须明确要求 |
 | RAG | `portfolio_list_knowledge` / `remember_knowledge` / `update_knowledge` | 改站点或需要身份事实 |
 | 列/读履历 | `portfolio_list_resumes` / `portfolio_get_resume` | 已有 Resume；写正文前先读 |
-| 写履历栏目 | `portfolio_update_resume` | summary / education / internship / projects / activities / skills / extras；先读 `skills/write-resume/SKILL.md` |
+| 写履历栏目 | `portfolio_update_resume` | 单栏只改点名的字段；「更新一下我的 CV」走 skill 整页：分析现有履历并写回，再 `portfolio_generate_resume` |
 | 从 GitHub 加履历项目 | `portfolio_add_resume_project_from_github` | 自动填名称、短技术栈和 XYZ 要点；日期留给 Owner |
 | 版式 | `portfolio_list/get/create/update_resume_template` | 换栏目顺序；除 classic-a4 外写入 `cv/template/{slug}.json`，可改名 |
 | 出 PDF | `portfolio_generate_resume` | 按版式重画一页 A4 |

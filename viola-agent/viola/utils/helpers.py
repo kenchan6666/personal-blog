@@ -603,8 +603,8 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
 
     added: list[str] = []
 
-    def _write(src, dest: Path):
-        managed = dest.name in _MANAGED_WORKSPACE_TEMPLATES
+    def _write(src, dest: Path, *, overwrite: bool = False):
+        managed = overwrite or dest.name in _MANAGED_WORKSPACE_TEMPLATES
         if dest.exists() and not managed:
             return
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -620,6 +620,19 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
     _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
     _write(None, workspace / "memory" / "history.jsonl")
     (workspace / "skills").mkdir(exist_ok=True)
+    skills_root = tpl / "skills"
+    if skills_root.is_dir():
+        for skill_dir in skills_root.iterdir():
+            if not skill_dir.is_dir():
+                continue
+            src = skill_dir / "SKILL.md"
+            if not src.is_file():
+                continue
+            _write(
+                src,
+                workspace / "skills" / skill_dir.name / "SKILL.md",
+                overwrite=True,
+            )
 
     if added and not silent:
         from rich.console import Console

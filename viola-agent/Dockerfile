@@ -25,6 +25,7 @@ RUN mkdir -p viola bridge && touch viola/__init__.py && \
 # Copy the full source and install. Keep an empty bridge/ so hatchling's
 # force-include succeeds without shipping the WhatsApp Node tree.
 COPY viola-agent/viola/ viola/
+COPY skills/write-resume/SKILL.md viola/templates/skills/write-resume/SKILL.md
 COPY viola-agent/main.py ./
 RUN mkdir -p bridge && \
     rm -rf /app/viola/skills/github && \
