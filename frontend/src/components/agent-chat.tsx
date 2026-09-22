@@ -154,6 +154,7 @@ export function AgentChat({
   const knowledgeListRef = useRef<HTMLDivElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const workSurfaceRef = useRef<"resume" | "knowledge" | "">("");
   const activityTimerRef = useRef<number | null>(null);
   const knowledgeRevealTimerRef = useRef<number | null>(null);
 
@@ -168,6 +169,7 @@ export function AgentChat({
     setActiveId(id);
     setResumeWatch(false);
     setResumePane(false);
+    workSurfaceRef.current = "";
     setLiveResume(null);
     setThinking(Boolean(conversation.thinking));
     setMessages(
@@ -341,6 +343,31 @@ export function AgentChat({
     }
   }
 
+  function revealSide() {
+    if (compact) return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setMobileSheet("knowledge");
+    }
+  }
+
+  function showResumeWork() {
+    workSurfaceRef.current = "resume";
+    setResumeWatch(true);
+    setResumePane(true);
+    revealSide();
+    void refreshLiveResume();
+  }
+
+  function showKnowledgeWork() {
+    if (workSurfaceRef.current === "resume") {
+      revealSide();
+      return;
+    }
+    workSurfaceRef.current = "knowledge";
+    setResumePane(false);
+    revealSide();
+  }
+
   function handleStreamEvent(event: AgentStreamEvent) {
     if (event.type === "tool_activity") {
       setToolActivity(event.label);
@@ -349,11 +376,8 @@ export function AgentChat({
           ? current
           : [...current, event.label],
       );
-      if (RESUME_TOOL.test(event.label)) {
-        setResumeWatch(true);
-        setResumePane(true);
-        void refreshLiveResume();
-      }
+      if (RESUME_TOOL.test(event.label)) showResumeWork();
+      else if (event.label.startsWith("关于我")) showKnowledgeWork();
       return;
     }
     if (event.type !== "knowledge_updated") return;
@@ -364,7 +388,7 @@ export function AgentChat({
     setAgentActivity(
       changed ? `已同步到“关于我” · ${changed.title}` : "“关于我”已同步",
     );
-    if (!compact) setMobileSheet("knowledge");
+    showKnowledgeWork();
     if (activityTimerRef.current !== null) {
       window.clearTimeout(activityTimerRef.current);
     }
@@ -498,12 +522,9 @@ export function AgentChat({
     setToolActivity("");
     setToolSteps([]);
     setStepsMessageId(assistantId);
+    workSurfaceRef.current = "";
     const watchingResume = Boolean(preview) && RESUME_TURN.test(text);
-    if (watchingResume) {
-      setResumeWatch(true);
-      setResumePane(true);
-      void refreshLiveResume();
-    }
+    if (watchingResume) showResumeWork();
     setThinking(true);
     setSending(true);
     const controller = new AbortController();
@@ -726,11 +747,11 @@ export function AgentChat({
             [
               ["conversations", "会话"],
               ["", "对话"],
-              ["knowledge", "关于我"],
+              ["knowledge", resumePane && preview ? "履历" : "关于我"],
             ] as const
           ).map(([pane, label]) => (
             <button
-              key={label}
+              key={pane || "chat"}
               type="button"
               className={mobileSheet === pane ? "is-active" : ""}
               onClick={() =>
@@ -1095,6 +1116,10 @@ export function AgentChat({
               )}
             </div>
           </div>
+          <div
+            key={resumePane && preview ? "resume" : "knowledge"}
+            className="agent-side-stage"
+          >
           {resumePane && preview ? (
             <div className="agent-knowledge-list">
               {liveResume ? (
@@ -1252,6 +1277,7 @@ export function AgentChat({
             })}
           </div>
           ) : null}
+          </div>
         </aside>
       ) : null}
 

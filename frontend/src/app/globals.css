@@ -4011,6 +4011,7 @@ html[data-theme="dark"] .ambient-orb {
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "conversations chat knowledge";
   gap: 0.85rem;
+  transition: grid-template-columns 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .agent-workspace.is-resume {
@@ -4019,6 +4020,14 @@ html[data-theme="dark"] .ambient-orb {
 
 .agent-knowledge-card .resume-paper {
   padding: 0.15rem 0.1rem 0.35rem;
+}
+
+.agent-side-stage {
+  display: flex;
+  flex: 1 1 0;
+  min-height: 0;
+  flex-direction: column;
+  animation: agent-knowledge-live 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .admin-dashboard-shell.is-agent .agent-workspace {
@@ -4406,6 +4415,11 @@ html[data-theme="dark"] .ambient-orb {
     grid-template-areas:
       "conversations chat"
       "knowledge knowledge";
+    transition: grid-template-rows 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .agent-workspace.is-resume:not(.is-compact) {
+    grid-template-rows: minmax(0, 1fr) minmax(16rem, 46vh);
   }
 }
 
@@ -4596,6 +4610,10 @@ html[data-theme="dark"] .ambient-orb {
     transform: translateX(110%);
   }
 
+  .agent-workspace.is-resume:not(.is-compact) > .agent-knowledge {
+    width: min(94vw, 28rem);
+  }
+
   .agent-workspace.is-conversations > .agent-conversations,
   .agent-workspace.is-knowledge > .agent-knowledge {
     transform: none;
@@ -4680,6 +4698,7 @@ html[data-theme="dark"] .ambient-orb {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .agent-workspace,
   .agent-workspace:not(.is-compact) > .agent-conversations,
   .agent-workspace:not(.is-compact) > .agent-knowledge {
     transition: none;
@@ -5395,6 +5414,8 @@ html[data-theme="dark"] .ambient-orb {
   .agent-live-activity,
   .agent-live-activity i,
   .agent-tool-steps li,
+  .agent-side-stage,
+  .agent-workspace,
   .agent-status-bars i,
   .agent-thinking i,
   .agent-stream-caret,
