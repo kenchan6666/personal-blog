@@ -54,6 +54,18 @@ def test_owner_tool_activity_uses_repo_and_file_names() -> None:
         )
         == "项目 · glass-api"
     )
+    assert (
+        format_owner_tool_label("mcp_portfolio_portfolio_get_resume", {"identifier": "ken"})
+        == "读取履历"
+    )
+    assert (
+        format_owner_tool_label("mcp_portfolio_portfolio_update_resume", {})
+        == "写入履历"
+    )
+    assert (
+        format_owner_tool_label("mcp_portfolio_portfolio_generate_resume", {})
+        == "生成 PDF"
+    )
 
 
 def test_tool_activity_sse_rewrites_to_short_label() -> None:

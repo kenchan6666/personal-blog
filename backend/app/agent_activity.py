@@ -87,6 +87,22 @@ def format_owner_tool_label(name: str, arguments: Any = None) -> str:
         return _join("关于我", identifier)
     if "list_knowledge" in key:
         return "关于我"
+    if "resume_template" in key:
+        return "履历版式"
+    if "generate_resume" in key:
+        return "生成 PDF"
+    if "add_resume_project" in key:
+        return "写入项目"
+    if "update_resume" in key:
+        return "写入履历"
+    if "get_resume" in key or "list_resume" in key:
+        return "读取履历"
+    if "publish_resume" in key:
+        return "发布履历"
+    if "unpublish_resume" in key:
+        return "取消发布"
+    if "push_resume" in key:
+        return "推送 CV"
     if "update_site" in key or "get_site" in key or key.endswith("overview"):
         return "站点"
     if "comment" in key:

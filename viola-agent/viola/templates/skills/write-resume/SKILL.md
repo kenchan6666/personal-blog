@@ -16,11 +16,11 @@ Owner 说「更新一下我的 CV」「更新 CV」「把 CV 改好」，且没�
 
 1. `portfolio_list_resumes`，再 `portfolio_get_resume`。只有一份就改那一份。多份时改 `updatedAt` 最近的一份，除非点了姓名或 slug。不先问是哪一份。
 2. 同一轮取证：`portfolio_list_knowledge`；`portfolio_list_content` 里已发布的 project 与 about。GitHub 已连接则 `portfolio_list_github_repos`，只对履历里已有的项目读 README。
-3. 重写 summary，以及实习、工作、项目、活动里每一条 description。姓名、电话、邮箱、城市、学校、专业、学位、机构、职务、日期、项目名、已有 `tech_stack` 保持原值。日期空着就留空。
-4. 一次 `portfolio_update_resume` 提交这些数组，然后 `portfolio_generate_resume`。
+3. 重写 summary，以及实习、工作、项目、活动里每一条 description。已有项目全部改写：每条 description 收成 2–4 条 XYZ，每条 1–2 行；功能说明和长段改成交付结果。姓名、电话、邮箱、城市、学校、专业、学位、机构、职务、日期、项目名、已有 `tech_stack` 保持原值。日期空着就留空。
+4. 一次 `portfolio_update_resume` 提交这些数组，其中包含改短后的 `projects`，然后 `portfolio_generate_resume`。
 5. 同一轮写入「关于我」：`portfolio_list_knowledge`，已有对应条目则 `portfolio_update_knowledge`，没有则 `portfolio_remember_knowledge`。教育用 category `education`，经历用 `experience`，项目用 `project`。内容只取刚写进履历的事实。发布和推仓留到 Owner 另说。
 
-完成：`portfolio_update_resume`、`portfolio_generate_resume` 和知识库写入都已返回。这两次履历调用返回之后，回复才说简历已更新，并只列改过的栏目。每条要点能指回第 2 步的材料。没有数字就保留原文里的范围，百分比留空。
+完成：`portfolio_update_resume`、`portfolio_generate_resume` 和知识库写入都已返回，且已有项目的 description 已改短。这两次履历调用返回之后，回复才说简历已更新，并只列改过的栏目。每条要点能指回第 2 步的材料。没有数字就保留原文里的范围，百分比留空。
 
 ## 单栏
 

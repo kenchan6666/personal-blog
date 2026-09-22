@@ -108,6 +108,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   const [deletingConversation, setDeletingConversation] = useState(false);
   const [agentActivity, setAgentActivity] = useState("");
   const [toolActivity, setToolActivity] = useState("");
+  const [toolSteps, setToolSteps] = useState<string[]>([]);
   const [recentKnowledgeIds, setRecentKnowledgeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -280,6 +281,11 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
   function handleStreamEvent(event: AgentStreamEvent) {
     if (event.type === "tool_activity") {
       setToolActivity(event.label);
+      setToolSteps((current) =>
+        current[current.length - 1] === event.label
+          ? current
+          : [...current, event.label],
+      );
       return;
     }
     if (event.type !== "knowledge_updated") return;
@@ -376,6 +382,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setSending(false);
     setThinking(false);
     setToolActivity("");
+    setToolSteps([]);
     if (!token || !activeId) return;
     try {
       const conversation = await stopOwnerAgentTurn(token, activeId);
@@ -421,6 +428,7 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
     setEditingIndex(null);
     setError("");
     setToolActivity("");
+    setToolSteps([]);
     setThinking(true);
     setSending(true);
     const controller = new AbortController();
@@ -790,7 +798,25 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                 <p className="agent-files">{message.files.join(" · ")}</p>
               ) : null}
               {message.role === "assistant" ? (
-                message.content ? (
+                <>
+                  {awaitingTurn &&
+                  message.id === liveAssistant?.id &&
+                  toolSteps.length ? (
+                    <ol className="agent-tool-steps" aria-label="正在进行的步骤">
+                      {toolSteps.map((step, stepIndex) => (
+                        <li
+                          key={`${step}-${stepIndex}`}
+                          className={
+                            stepIndex === toolSteps.length - 1 ? "is-current" : ""
+                          }
+                        >
+                          <i aria-hidden="true" />
+                          <span>{step}</span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
+                  {message.content ? (
                   <>
                     <MarkdownBody source={message.content} />
                     {awaitingTurn && message.id === liveAssistant?.id ? (
@@ -813,7 +839,8 @@ export function AgentChat({ compact = false, context, onInsert }: Props) {
                     <i />
                     <i />
                   </span>
-                ) : null
+                ) : null}
+                </>
               ) : editingIndex === index ? (
                 <textarea
                   className="agent-message-edit"

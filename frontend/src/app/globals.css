@@ -5037,6 +5037,37 @@ html[data-theme="dark"] .ambient-orb {
   opacity: 0.75;
 }
 
+.agent-tool-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 0.32rem;
+  margin: 0 0 0.75rem;
+  padding: 0;
+  list-style: none;
+}
+
+.agent-tool-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.3;
+  animation: agent-status-enter 220ms ease-out both;
+}
+
+.agent-tool-steps li.is-current {
+  color: var(--text);
+}
+
+.agent-tool-steps li i {
+  width: 0.38rem;
+  height: 0.38rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 .agent-live-activity.is-thinking,
 .agent-live-activity.is-streaming {
   min-width: 2.6rem;
@@ -5350,6 +5381,7 @@ html[data-theme="dark"] .ambient-orb {
   .agent-orb.is-streaming .agent-orb-core,
   .agent-live-activity,
   .agent-live-activity i,
+  .agent-tool-steps li,
   .agent-status-bars i,
   .agent-thinking i,
   .agent-stream-caret,
