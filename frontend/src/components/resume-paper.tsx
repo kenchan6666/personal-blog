@@ -102,11 +102,11 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
     <article className={a4 ? "resume-paper resume-paper-a4" : "resume-paper"}>
       <header className="resume-paper-head">
         <h2>{header.name || resume.title || " "}</h2>
-        <p className="resume-contact">
-          {[header.phone, header.email, header.city, ...(header.links ?? [])]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
+        {[header.phone, header.email, header.city].filter(Boolean).length > 0 ? (
+          <p className="resume-contact">
+            {[header.phone, header.email, header.city].filter(Boolean).join(" · ")}
+          </p>
+        ) : null}
       </header>
       {order.map((id) => {
         if (!showEmpty && !filled(id, resume)) return null;
@@ -135,17 +135,19 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                     <strong>{item.institution}</strong>
                     <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
-                  <div className="resume-entry-row">
-                    <span>
-                      {[item.degree, item.field].filter(Boolean).join(", ")}
-                    </span>
-                    <span className="resume-meta">{item.city}</span>
-                  </div>
+                  {[item.field, item.degree, item.city].some(Boolean) ? (
+                    <div className="resume-entry-row">
+                      <span>
+                        {[item.field, item.degree].filter(Boolean).join(", ")}
+                      </span>
+                      <span className="resume-meta">{item.city}</span>
+                    </div>
+                  ) : null}
                   {item.honor ? <p>{item.honor}</p> : null}
-                  {item.related_courses.length > 0 ? (
+                  {(item.related_courses ?? []).length > 0 ? (
                     <p>
                       <strong className="resume-label">{r.courseworkLabel}</strong>{" "}
-                      {item.related_courses.join(", ")}
+                      {(item.related_courses ?? []).join(", ")}
                     </p>
                   ) : null}
                 </div>
@@ -167,10 +169,12 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                     <strong>{item.organization}</strong>
                     <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
-                  <div className="resume-entry-row">
-                    <span>{item.role}</span>
-                    <span className="resume-meta">{item.city}</span>
-                  </div>
+                  {item.role || item.city ? (
+                    <div className="resume-entry-row">
+                      <span>{item.role}</span>
+                      <span className="resume-meta">{item.city}</span>
+                    </div>
+                  ) : null}
                   <ResumeBullets lines={item.description} />
                 </div>
               ))}
@@ -186,10 +190,10 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                   <div className="resume-entry-row">
                     <strong>
                       {item.name}
-                      {item.tech_stack.length > 0 ? (
+                      {(item.tech_stack ?? []).length > 0 ? (
                         <span className="resume-meta">
-                          {" "}
-                          | {item.tech_stack.join(", ")}
+                          {item.name ? " | " : ""}
+                          {(item.tech_stack ?? []).join(", ")}
                         </span>
                       ) : null}
                     </strong>
@@ -214,10 +218,12 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
                     <strong>{item.organization}</strong>
                     <span className="resume-meta">{range(item.start, item.end)}</span>
                   </div>
-                  <div className="resume-entry-row">
-                    <span>{item.role}</span>
-                    <span className="resume-meta">{item.city}</span>
-                  </div>
+                  {item.role || item.city ? (
+                    <div className="resume-entry-row">
+                      <span>{item.role}</span>
+                      <span className="resume-meta">{item.city}</span>
+                    </div>
+                  ) : null}
                   <ResumeBullets lines={item.description} />
                 </div>
               ))}
@@ -229,12 +235,15 @@ function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
             <section key={id}>
               <h3>{r.sectionSkills}</h3>
               {resume.skills.length > 0 ? <p>{resume.skills.join(", ")}</p> : null}
-              {resume.languages.length > 0 ? (
+              {resume.languages.some((item) => item.name || item.level) ? (
                 <p>
                   <strong className="resume-label">{r.languagesLabel}</strong>{" "}
                   {resume.languages
+                    .filter((item) => item.name || item.level)
                     .map((item) =>
-                      item.level ? `${item.name} (${item.level})` : item.name,
+                      item.name && item.level
+                        ? `${item.name} (${item.level})`
+                        : item.name || item.level,
                     )
                     .join(", ")}
                 </p>
@@ -332,13 +341,20 @@ function ExtraBlock({ extra }: { extra: ResumeExtra }) {
       {extra.entries.map((item) => (
         <div key={`${item.organization}-${item.start}`} className="resume-entry">
           <div className="resume-entry-row">
-            <strong>{item.organization}</strong>
+            <strong>{item.organization || item.role}</strong>
             <span className="resume-meta">{range(item.start, item.end)}</span>
           </div>
-          <div className="resume-entry-row">
-            <span>{item.role}</span>
-            <span className="resume-meta">{item.city}</span>
-          </div>
+          {item.role && item.organization ? (
+            <div className="resume-entry-row">
+              <span>{item.role}</span>
+              <span className="resume-meta">{item.city}</span>
+            </div>
+          ) : item.city ? (
+            <div className="resume-entry-row">
+              <span />
+              <span className="resume-meta">{item.city}</span>
+            </div>
+          ) : null}
           <ResumeBullets lines={item.description} />
         </div>
       ))}

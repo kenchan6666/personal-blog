@@ -236,6 +236,11 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
     assert "Chan YatNam" in text
     assert "EDUCATION" in text
     assert "Pantry pal" in text
+    assert "2022-06" in text
+    assert "2026-06" in text
+    assert "Jun 2022" not in text
+    assert "Present" not in text
+    assert "Computer Science, Bachelor" in text
     assert "PROJECTS" in text
     assert "SKILLS" in text
     assert "Coursework" in text

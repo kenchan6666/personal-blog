@@ -1680,8 +1680,19 @@ html.is-locale-hold .article-page {
 .resume-entry-row {
   display: flex;
   justify-content: space-between;
+  align-items: baseline;
   gap: 1rem;
   font-size: 0.92rem;
+}
+
+.resume-entry-row > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.resume-entry-row > :last-child:not(:first-child) {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .resume-entry-row strong {

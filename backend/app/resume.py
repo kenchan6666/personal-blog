@@ -42,20 +42,8 @@ from app.store import current_store, new_document
 _SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _BULLET_PREFIX_RE = re.compile(r"^(?:[-*•●◦]|\d+[.)])\s+")
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？；;!?])\s+|(?<=\.)\s+(?=[A-Z\u4e00-\u9fff])")
-_MONTHS = (
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-)
+
+
 def split_resume_lines(values: Any) -> list[str]:
     if values is None:
         return []
@@ -789,21 +777,9 @@ def parse_resume_import(payload: Any) -> dict[str, Any]:
     }
 
 
-def format_month(value: str) -> str:
-    text = (value or "").strip()
-    match = re.match(r"^(\d{4})-(\d{1,2})", text)
-    if not match:
-        return text
-    year = match.group(1)
-    month = int(match.group(2))
-    if 1 <= month <= 12:
-        return f"{_MONTHS[month - 1]} {year}"
-    return text
-
-
 def format_range(start: str, end: str) -> str:
-    left = format_month(start)
-    right = format_month(end) or "Present"
+    left = (start or "").strip()
+    right = (end or "").strip()
     if left and right:
         return f"{left} – {right}"
     return left or right
@@ -983,28 +959,44 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
 
     def project_head(name: str, stack: str, dates: str) -> None:
         nonlocal y
-        ensure_space(_LEADING)
         date_w = text_width(dates, _BODY_SIZE) + 12 if dates else 0
-        limit = _RIGHT - date_w
-        page.setFillColorRGB(*_INK)
-        page.setFont(bold, _BODY_SIZE)
-        page.drawString(_LEFT, y, name)
-        name_w = text_width(name, _BODY_SIZE, bold)
-        inline = f"  |  {stack}" if stack else ""
-        spilled = False
-        if inline and _LEFT + name_w + text_width(inline, _BODY_SIZE) <= limit:
+        first_width = max(72, content_width - date_w)
+        name_lines = wrap(name, first_width, _BODY_SIZE, bold) if name else []
+        first = name_lines[0] if name_lines else ""
+        first_w = text_width(first, _BODY_SIZE, bold) if first else 0
+        inline = f"  |  {stack}" if name and stack else ""
+        room = _LEFT + first_width
+        inline_fits = bool(
+            inline
+            and _LEFT + first_w + text_width(inline, _BODY_SIZE) <= room
+        )
+        ensure_space(_LEADING)
+        if first:
+            page.setFillColorRGB(*_INK)
+            page.setFont(bold, _BODY_SIZE)
+            page.drawString(_LEFT, y, first)
+        if inline_fits:
             page.setFillColorRGB(*_MUTED)
             page.setFont(font, _BODY_SIZE)
-            page.drawString(_LEFT + name_w, y, inline)
-        elif inline:
-            spilled = True
+            page.drawString(_LEFT + first_w, y, inline)
+        elif stack and not name:
+            fitted = wrap(stack, first_width, _BODY_SIZE) or [stack]
+            page.setFillColorRGB(*_MUTED)
+            page.setFont(font, _BODY_SIZE)
+            page.drawString(_LEFT, y, fitted[0])
+            stack = " ".join(fitted[1:])
         if dates:
             page.setFillColorRGB(*_MUTED)
             page.setFont(font, _BODY_SIZE)
             page.drawRightString(_RIGHT, y, dates)
         y -= _LEADING
-        if spilled:
-            page.setFillColorRGB(*_MUTED)
+        for extra in name_lines[1:]:
+            ensure_space(_LEADING)
+            page.setFillColorRGB(*_INK)
+            page.setFont(bold, _BODY_SIZE)
+            page.drawString(_LEFT, y, extra)
+            y -= _LEADING
+        if stack and not inline_fits:
             draw_wrapped(stack, _LEFT, _BODY_SIZE, content_width, muted=True)
 
     def labeled(label: str, value: str) -> None:
@@ -1030,9 +1022,7 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
     draw_centered(header.name or resume.title or "Resume", _NAME_SIZE, face=bold)
     y -= 2
     contact = "  ·  ".join(
-        part
-        for part in (header.phone, header.email, header.city, *header.links)
-        if part
+        part for part in (header.phone, header.email, header.city) if part
     )
     if contact:
         draw_centered(contact, 9)
@@ -1050,8 +1040,10 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                 format_range(item.start, item.end),
                 emphasize=True,
             )
-            if item.role and item.organization:
+            if item.organization and item.role:
                 column_line(item.role, item.city)
+            elif item.city and not item.organization:
+                column_line("", item.city)
             for line in item.description:
                 draw_bullet(line)
 
@@ -1068,7 +1060,7 @@ def render_resume_pdf(resume: Resume, template: ResumeTemplate) -> bytes:
                     format_range(item.start, item.end),
                     emphasize=True,
                 )
-                subtitle = ", ".join(part for part in (item.degree, item.field) if part)
+                subtitle = ", ".join(part for part in (item.field, item.degree) if part)
                 column_line(subtitle, item.city)
                 if item.honor:
                     draw_wrapped(item.honor, _LEFT, _BODY_SIZE, content_width)
