@@ -18,9 +18,9 @@ Owner 说「更新一下我的 CV」「更新 CV」「把 CV 改好」，且没�
 2. 同一轮取证：`portfolio_list_knowledge`；`portfolio_list_content` 里已发布的 project 与 about。GitHub 已连接则 `portfolio_list_github_repos`，只对履历里已有的项目读 README。
 3. 重写 summary，以及实习、工作、项目、活动里每一条 description。姓名、电话、邮箱、城市、学校、专业、学位、机构、职务、日期、项目名、已有 `tech_stack` 保持原值。日期空着就留空。
 4. 一次 `portfolio_update_resume` 提交这些数组，然后 `portfolio_generate_resume`。
-5. 同一轮把已确认事实写入「关于我」RAG。这句没说发布或推仓，就不调用发布或推仓工具。
+5. 同一轮写入「关于我」：`portfolio_list_knowledge`，已有对应条目则 `portfolio_update_knowledge`，没有则 `portfolio_remember_knowledge`。教育用 category `education`，经历用 `experience`，项目用 `project`。内容只取刚写进履历的事实。发布和推仓留到 Owner 另说。
 
-完成：正文已写回，PDF 已生成；回复只列改过的栏目。每条要点能指回第 2 步的材料。没有数字就保留原文里的范围，百分比留空。
+完成：`portfolio_update_resume`、`portfolio_generate_resume` 和知识库写入都已返回。回复只列改过的栏目。每条要点能指回第 2 步的材料。没有数字就保留原文里的范围，百分比留空。
 
 ## 单栏
 
@@ -30,9 +30,9 @@ Owner 点了某一个栏目时：
 2. 取证同上，只取和该栏目有关的材料。
 3. 按栏目公式起草。一页：最近一段 3–5 条，更早的 2–3 条，每个项目 2–4 条。最硬的结果放该段第一条。
 4. `portfolio_update_resume` 只传改动的字段，然后 `portfolio_generate_resume`。
-5. 同一轮同步 RAG。没说发布就不发布。
+5. 同一轮按整页第 5 步写入「关于我」。发布留到 Owner 另说。
 
-完成：该栏目已写入且 PDF 已更新；没有虚构经历、数字或职称。
+完成：该栏目已写入，PDF 已更新，知识库写入已返回。没有虚构经历、数字或职称。
 
 ## XYZ
 

@@ -27,6 +27,7 @@ from viola.utils.helpers import (
     truncate_text,
 )
 from viola.utils.inline_tools import (
+    looks_like_knowledge_sync_stall,
     looks_like_resume_skill_stall,
     looks_like_tool_preamble,
     recover_inline_tool_calls,
@@ -254,6 +255,7 @@ class AgentRunner:
         empty_content_retries = 0
         length_recovery_count = 0
         preamble_retries = 0
+        knowledge_retries = 0
         had_injections = False
         injection_cycles = 0
 
@@ -286,10 +288,18 @@ class AgentRunner:
             await hook.before_iteration(context)
             response = await self._request_model(spec, messages_for_model, hook, context)
             if not response.tool_calls:
+                knowledge_stall_now = looks_like_knowledge_sync_stall(response.content or "")
                 recovered = recover_inline_tool_calls(
                     response.content or "",
                     available_names=list(spec.tools.tool_names) if spec.tools else None,
                 )
+                if knowledge_stall_now and knowledge_retries:
+                    recovered = [
+                        call for call in recovered
+                        if "list_knowledge" not in call.name.casefold()
+                    ]
+                if knowledge_stall_now and recovered:
+                    knowledge_retries += 1
                 if recovered:
                     response.tool_calls = recovered
                     if response.finish_reason not in {"tool_calls", "stop"}:
@@ -469,6 +479,38 @@ class AgentRunner:
                     continue
 
             resume_stall = looks_like_resume_skill_stall(clean)
+            knowledge_stall = looks_like_knowledge_sync_stall(clean)
+            if (
+                not response.has_tool_calls
+                and knowledge_stall
+                and knowledge_retries < 2
+            ):
+                knowledge_retries += 1
+                logger.info(
+                    "Knowledge sync announced without a write on turn {} for {}; continuing",
+                    iteration,
+                    spec.session_key or "default",
+                )
+                if hook.wants_streaming():
+                    await hook.on_stream_end(context, resuming=True)
+                messages.append(build_assistant_message(
+                    clean,
+                    reasoning_content=response.reasoning_content,
+                    thinking_blocks=response.thinking_blocks,
+                ))
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "知识库写入还没发出。"
+                        "调用 portfolio_list_knowledge；已有对应条目就 portfolio_update_knowledge，"
+                        "没有就 portfolio_remember_knowledge。"
+                        "教育用 category education，经历用 experience，项目用 project。"
+                        "内容用履历里刚写过的事实，放进工具参数。"
+                    ),
+                })
+                await hook.after_iteration(context)
+                continue
+
             if (
                 not response.has_tool_calls
                 and (looks_like_tool_preamble(clean) or resume_stall)

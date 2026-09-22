@@ -45,6 +45,16 @@ _RESUME_SKILL_STALL = re.compile(
     r"|write-resume\s*(?:技能|SKILL)"
 )
 
+# A finished resume turn that only announces the knowledge write never calls MCP.
+_KNOWLEDGE_STALL = re.compile(
+    r"(?is)"
+    r"(?:我将|我会|我来|我來|现在将|現在將).{0,48}"
+    r"(?:同步|写入|寫入|更新).{0,32}(?:知识库|知識庫|关于我|關於我)"
+    r"|(?:首先|接下来|接下來|然后|然後)[，,：:\s]{0,4}"
+    r"(?:更新|写入|寫入|同步).{0,24}"
+    r"(?:教育|经历|經歷|项目|項目|技能|工作|实习|實習)"
+)
+
 _JSON_FENCE = re.compile(r"(?is)```(?:json|xml)?\s*([\s\S]*?)```")
 _XML_CALL = re.compile(r"(?is)<tool_call\b([^>]*)>([\s\S]*?)</tool_call>")
 
@@ -56,6 +66,11 @@ def looks_like_tool_preamble(text: str | None) -> bool:
 def looks_like_resume_skill_stall(text: str | None) -> bool:
     """True when the model stopped to read write-resume instead of calling MCP."""
     return bool(_RESUME_SKILL_STALL.search(text or ""))
+
+
+def looks_like_knowledge_sync_stall(text: str | None) -> bool:
+    """True when the model announces a knowledge write and stops before the tool call."""
+    return bool(_KNOWLEDGE_STALL.search(text or ""))
 
 
 def recover_inline_tool_calls(
@@ -94,6 +109,8 @@ def recover_inline_tool_calls(
         add("list_content", {"kind": "about"})
     if _RESUME_SKILL_STALL.search(text):
         add("list_resumes", {})
+        add("list_knowledge", {})
+    elif _KNOWLEDGE_STALL.search(text):
         add("list_knowledge", {})
 
     for match in _XML_CALL.finditer(text):
