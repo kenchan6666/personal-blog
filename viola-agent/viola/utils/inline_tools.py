@@ -45,6 +45,12 @@ _RESUME_SKILL_STALL = re.compile(
     r"|write-resume\s*(?:技能|SKILL)"
 )
 
+# The model often says the resume is saved before any resume write tool runs.
+_FALSE_RESUME_DONE = re.compile(
+    r"(?is)(?:已|已经|已經).{0,16}(?:更新|改好|写好|寫好|生成).{0,32}"
+    r"(?:简历|履历|履歷|CV|cv|PDF)"
+)
+
 # A finished resume turn that only announces the knowledge write never calls MCP.
 _KNOWLEDGE_STALL = re.compile(
     r"(?is)"
@@ -73,10 +79,21 @@ def looks_like_knowledge_sync_stall(text: str | None) -> bool:
     return bool(_KNOWLEDGE_STALL.search(text or ""))
 
 
+def looks_like_false_resume_done(text: str | None) -> bool:
+    """True when the model says the resume or PDF is already updated."""
+    return bool(_FALSE_RESUME_DONE.search(text or ""))
+
+
+def resume_write_finished(tool_names: list[str] | None) -> bool:
+    blob = " ".join(tool_names or []).casefold()
+    return "update_resume" in blob and "generate_resume" in blob
+
+
 def recover_inline_tool_calls(
     content: str | None,
     *,
     available_names: list[str] | None = None,
+    resume_written: bool = False,
 ) -> list[ToolCallRequest]:
     text = content or ""
     calls: list[ToolCallRequest] = []
@@ -107,7 +124,9 @@ def recover_inline_tool_calls(
         add("get_site", {})
     if _ANNOUNCED_ABOUT_LIST.search(text):
         add("list_content", {"kind": "about"})
-    if _RESUME_SKILL_STALL.search(text):
+    if _FALSE_RESUME_DONE.search(text) and not resume_written:
+        add("list_resumes", {})
+    elif _RESUME_SKILL_STALL.search(text):
         add("list_resumes", {})
         add("list_knowledge", {})
     elif _KNOWLEDGE_STALL.search(text):

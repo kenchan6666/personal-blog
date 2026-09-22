@@ -1,8 +1,10 @@
 from viola.utils.inline_tools import (
+    looks_like_false_resume_done,
     looks_like_knowledge_sync_stall,
     looks_like_resume_skill_stall,
     looks_like_tool_preamble,
     recover_inline_tool_calls,
+    resume_write_finished,
 )
 
 
@@ -95,18 +97,30 @@ def test_resume_skill_stall_opens_resume_tools() -> None:
     assert not looks_like_resume_skill_stall("已更新履历，改了项目经历和 summary。")
 
 
-def test_knowledge_sync_announcement_lists_knowledge() -> None:
+def test_false_resume_done_lists_resumes_until_written() -> None:
     text = (
         "好的，我已更新了你的简历和PDF。现在我将同步更新知识库中的相关信息。\n\n"
         "首先，更新教育背景："
     )
     calls = recover_inline_tool_calls(
         text,
-        available_names=["mcp_portfolio_portfolio_list_knowledge"],
+        available_names=[
+            "mcp_portfolio_portfolio_list_resumes",
+            "mcp_portfolio_portfolio_list_knowledge",
+        ],
     )
-    assert len(calls) == 1
-    assert calls[0].name == "mcp_portfolio_portfolio_list_knowledge"
-    assert calls[0].arguments == {}
+    assert [call.name for call in calls] == ["mcp_portfolio_portfolio_list_resumes"]
+    assert looks_like_false_resume_done(text)
+    assert not resume_write_finished(["mcp_portfolio_portfolio_list_knowledge"])
+    written = recover_inline_tool_calls(
+        text,
+        available_names=["mcp_portfolio_portfolio_list_knowledge"],
+        resume_written=True,
+    )
+    assert [call.name for call in written] == ["mcp_portfolio_portfolio_list_knowledge"]
+    assert resume_write_finished([
+        "mcp_portfolio_portfolio_update_resume",
+        "mcp_portfolio_portfolio_generate_resume",
+    ])
     assert looks_like_knowledge_sync_stall(text)
     assert not looks_like_knowledge_sync_stall("已把教育背景写入知识库。")
-    assert not looks_like_knowledge_sync_stall("已更新了你的简历和 PDF。")

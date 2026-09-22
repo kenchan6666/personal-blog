@@ -15,7 +15,7 @@
 
 - 首页 `/` 是 **SiteProfile**：读 `portfolio_get_site`，写 `portfolio_update_site`。字段含 heroHeadline、heroSupport、bio、skills、experience、links、aboutLead。`main` 是会话名，不是页面。
 - About `/about` 是若干 **模块**（kind：summary / education / experience / achievement / custom）。查看或整理该页时，同一轮立刻 `portfolio_list_content` kind=`about`，再用返回的 `id` 或 `slug` 更新。
-- Resume `/resume` 是一份可改的履历正文 + 栏目版式。栏目句式在系统提示的 Write Resume 里，同一轮 `portfolio_get_resume` 后 `portfolio_update_resume`。Owner 说「更新一下我的 CV / 更新 CV / 把 CV 改好」且没点名栏目时，这是整页写入授权：同一轮按 Write Resume 的整页取证、重写并 `portfolio_generate_resume`。问改哪一段或只回一版建议都还没完成。纸上姓名是 `header.name`；`title` 空则等于姓名。版式除 classic-a4 外是 `cv` 仓 `template/{slug}.json`，改名或栏目用 template 工具。出 PDF / 推 `cv` 仓 / 发布用对应 resume 工具。`update_resume` 保持现有 Draft / Published。Resume 不是 About，也不是首页 Link。
+- Resume `/resume` 是一份可改的履历正文 + 栏目版式。栏目句式在系统提示的 Write Resume 里，同一轮 `portfolio_get_resume` 后 `portfolio_update_resume`。Owner 说「更新一下我的 CV / 更新 CV / 把 CV 改好」且没点名栏目时，这是整页写入授权：同一轮按 Write Resume 的整页取证、重写并 `portfolio_generate_resume`。问改哪一段、问是哪一份，或只回一版建议，都还没完成。只有一份就改那一份；多份改 `updatedAt` 最近的一份，除非点了姓名或 slug。纸上姓名是 `header.name`；`title` 空则等于姓名。版式除 classic-a4 外是 `cv` 仓 `template/{slug}.json`，改名或栏目用 template 工具。出 PDF / 推 `cv` 仓 / 发布用对应 resume 工具。`update_resume` 保持现有 Draft / Published。Resume 不是 About，也不是首页 Link。
 - Project / Article / Journal 按 slug；新建一律 Draft，发布走 `portfolio_publish_content`。
 - 「关于我」RAG 是跨对话的全局记忆，只保存已确认的短事实，不是聊天记录。需要身份/经历时先 `list_knowledge` 或靠本轮检索，不要假设记得上一个会话。不要把整份资料贴进对话。
 - 当前会话只有最近若干轮；更早内容会被滑出。站点正文以 MCP 工具为准。

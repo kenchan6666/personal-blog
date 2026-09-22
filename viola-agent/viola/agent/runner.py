@@ -27,10 +27,12 @@ from viola.utils.helpers import (
     truncate_text,
 )
 from viola.utils.inline_tools import (
+    looks_like_false_resume_done,
     looks_like_knowledge_sync_stall,
     looks_like_resume_skill_stall,
     looks_like_tool_preamble,
     recover_inline_tool_calls,
+    resume_write_finished,
 )
 from viola.utils.prompt_templates import render_template
 from viola.utils.runtime import (
@@ -256,6 +258,7 @@ class AgentRunner:
         length_recovery_count = 0
         preamble_retries = 0
         knowledge_retries = 0
+        resume_write_retries = 0
         had_injections = False
         injection_cycles = 0
 
@@ -289,16 +292,25 @@ class AgentRunner:
             response = await self._request_model(spec, messages_for_model, hook, context)
             if not response.tool_calls:
                 knowledge_stall_now = looks_like_knowledge_sync_stall(response.content or "")
+                false_resume_done = looks_like_false_resume_done(response.content or "")
+                resume_written = resume_write_finished(tools_used)
+                listed_resumes = any("list_resumes" in name.casefold() for name in tools_used)
                 recovered = recover_inline_tool_calls(
                     response.content or "",
                     available_names=list(spec.tools.tool_names) if spec.tools else None,
+                    resume_written=resume_written,
                 )
-                if knowledge_stall_now and knowledge_retries:
+                if false_resume_done and not resume_written and listed_resumes:
+                    recovered = [
+                        call for call in recovered
+                        if "list_resumes" not in call.name.casefold()
+                    ]
+                if knowledge_stall_now and knowledge_retries and resume_written:
                     recovered = [
                         call for call in recovered
                         if "list_knowledge" not in call.name.casefold()
                     ]
-                if knowledge_stall_now and recovered:
+                if knowledge_stall_now and recovered and resume_written:
                     knowledge_retries += 1
                 if recovered:
                     response.tool_calls = recovered
@@ -480,9 +492,43 @@ class AgentRunner:
 
             resume_stall = looks_like_resume_skill_stall(clean)
             knowledge_stall = looks_like_knowledge_sync_stall(clean)
+            false_resume_done = looks_like_false_resume_done(clean)
+            resume_written = resume_write_finished(tools_used)
+            if (
+                not response.has_tool_calls
+                and false_resume_done
+                and not resume_written
+                and resume_write_retries < 2
+            ):
+                resume_write_retries += 1
+                logger.info(
+                    "Resume marked done before a write on turn {} for {}; continuing",
+                    iteration,
+                    spec.session_key or "default",
+                )
+                if hook.wants_streaming():
+                    await hook.on_stream_end(context, resuming=True)
+                messages.append(build_assistant_message(
+                    clean,
+                    reasoning_content=response.reasoning_content,
+                    thinking_blocks=response.thinking_blocks,
+                ))
+                messages.append({
+                    "role": "user",
+                    "content": (
+                        "履历正文还没写入。"
+                        "调用 portfolio_list_resumes，对 updatedAt 最近的一份 portfolio_get_resume，"
+                        "再 portfolio_update_resume 和 portfolio_generate_resume。"
+                        "只有一份就改那一份。知识库等 PDF 生成后再写。"
+                    ),
+                })
+                await hook.after_iteration(context)
+                continue
+
             if (
                 not response.has_tool_calls
                 and knowledge_stall
+                and resume_written
                 and knowledge_retries < 2
             ):
                 knowledge_retries += 1
