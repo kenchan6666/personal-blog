@@ -139,6 +139,7 @@ export function AgentChat({
   const [liveSections, setLiveSections] = useState<string[] | undefined>();
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumePulse, setResumePulse] = useState(false);
+  const [resumePane, setResumePane] = useState(false);
   const [recentKnowledgeIds, setRecentKnowledgeIds] = useState<Set<string>>(
     new Set(),
   );
@@ -166,6 +167,7 @@ export function AgentChat({
     const conversation = await getAgentConversation(token, id);
     setActiveId(id);
     setResumeWatch(false);
+    setResumePane(false);
     setLiveResume(null);
     setThinking(Boolean(conversation.thinking));
     setMessages(
@@ -323,6 +325,7 @@ export function AgentChat({
       setLiveResume((current) => {
         if (current && next && current.updatedAt !== next.updatedAt) {
           window.setTimeout(() => {
+            setResumePane(true);
             setResumePulse(true);
             window.setTimeout(() => setResumePulse(false), 700);
           }, 0);
@@ -348,6 +351,7 @@ export function AgentChat({
       );
       if (RESUME_TOOL.test(event.label)) {
         setResumeWatch(true);
+        setResumePane(true);
         void refreshLiveResume();
       }
       return;
@@ -497,6 +501,7 @@ export function AgentChat({
     const watchingResume = Boolean(preview) && RESUME_TURN.test(text);
     if (watchingResume) {
       setResumeWatch(true);
+      setResumePane(true);
       void refreshLiveResume();
     }
     setThinking(true);
@@ -712,8 +717,8 @@ export function AgentChat({
     <section
       ref={workspaceRef}
       className={`agent-workspace${compact ? " is-compact" : ""}${
-        mobileSheet ? ` is-${mobileSheet}` : ""
-      }`}
+        resumePane && preview ? " is-resume" : ""
+      }${mobileSheet ? ` is-${mobileSheet}` : ""}`}
     >
       {!compact ? (
         <nav className="agent-mobile-nav" aria-label="Agent 面板">
@@ -796,27 +801,7 @@ export function AgentChat({
         </aside>
       ) : null}
 
-      <div className={`agent-chat${resumeWatch && preview ? " is-watching-resume" : ""}`}>
-        {resumeWatch && preview ? (
-          <aside
-            className={`agent-resume-live${resumePulse ? " is-updated" : ""}`}
-            aria-label="履历预览"
-            aria-busy={resumeLoading}
-          >
-            <p className="eyebrow">履历</p>
-            {liveResume ? (
-              <ResumePaper
-                resume={liveResume}
-                dict={preview.dict}
-                sections={liveSections}
-              />
-            ) : (
-              <p className="agent-resume-live-pending">
-                {resumeLoading ? "正在读取履历…" : "还没有履历"}
-              </p>
-            )}
-          </aside>
-        ) : null}
+      <div className="agent-chat">
         <div className="agent-chat-intro">
           <span
             className={`agent-orb${livePhase ? ` is-${livePhase}` : ""}`}
@@ -1057,35 +1042,79 @@ export function AgentChat({
       </div>
 
       {!compact ? (
-        <aside className="agent-knowledge">
+        <aside className="agent-knowledge" aria-busy={resumePane && resumeLoading}>
           <div className="agent-panel-heading">
             <div>
-              <span className="eyebrow">PERSONAL RAG</span>
-              <h2 className="display-font">关于我</h2>
+              <span className="eyebrow">
+                {resumePane && preview ? "RESUME" : "PERSONAL RAG"}
+              </span>
+              <h2 className="display-font">
+                {resumePane && preview ? "履历" : "关于我"}
+              </h2>
             </div>
             <div className="agent-panel-actions">
-              <button
-                type="button"
-                className="agent-sync-button"
-                disabled={
-                  syncingAllKnowledge ||
-                  syncingKnowledgeIds.size > 0 ||
-                  knowledge.length === 0
-                }
-                onClick={() => void syncAllKnowledge()}
-              >
-                {syncingAllKnowledge ? "同步中…" : "同步全部"}
-              </button>
-              <button
-                type="button"
-                className="agent-new-button"
-                onClick={() => editKnowledge()}
-              >
-                ＋ 添加
-              </button>
+              {resumePane && preview ? (
+                <button
+                  type="button"
+                  className="agent-sync-button"
+                  onClick={() => setResumePane(false)}
+                >
+                  关于我
+                </button>
+              ) : (
+                <>
+                  {resumeWatch && preview ? (
+                    <button
+                      type="button"
+                      className="agent-sync-button"
+                      onClick={() => setResumePane(true)}
+                    >
+                      履历
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="agent-sync-button"
+                    disabled={
+                      syncingAllKnowledge ||
+                      syncingKnowledgeIds.size > 0 ||
+                      knowledge.length === 0
+                    }
+                    onClick={() => void syncAllKnowledge()}
+                  >
+                    {syncingAllKnowledge ? "同步中…" : "同步全部"}
+                  </button>
+                  <button
+                    type="button"
+                    className="agent-new-button"
+                    onClick={() => editKnowledge()}
+                  >
+                    ＋ 添加
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          {editingKnowledgeId !== null ? (
+          {resumePane && preview ? (
+            <div className="agent-knowledge-list">
+              {liveResume ? (
+                <article
+                  className={`agent-knowledge-card${resumePulse ? " is-live" : ""}`}
+                >
+                  <ResumePaper
+                    resume={liveResume}
+                    dict={preview.dict}
+                    sections={liveSections}
+                  />
+                </article>
+              ) : (
+                <p className="agent-knowledge-card">
+                  {resumeLoading ? "正在读取履历…" : "还没有履历"}
+                </p>
+              )}
+            </div>
+          ) : null}
+          {!resumePane && editingKnowledgeId !== null ? (
             <form className="agent-knowledge-form" onSubmit={saveKnowledge}>
               <input
                 required
@@ -1154,6 +1183,7 @@ export function AgentChat({
               </div>
             </form>
           ) : null}
+          {!resumePane ? (
           <div className="agent-knowledge-list" ref={knowledgeListRef}>
             {knowledge.length === 0 && editingKnowledgeId === null ? (
               <div className="agent-empty">
@@ -1221,6 +1251,7 @@ export function AgentChat({
               );
             })}
           </div>
+          ) : null}
         </aside>
       ) : null}
 
