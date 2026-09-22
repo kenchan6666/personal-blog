@@ -585,6 +585,23 @@ def build_status_content(
 
 _MANAGED_WORKSPACE_TEMPLATES = frozenset({"AGENTS.md", "TOOLS.md"})
 
+_SOUL_RESUME_OLD = (
+    "直接按 `skills/write-resume/SKILL.md` 写入并生成 PDF。"
+    "这是写入，不是先交一版文本建议。"
+)
+_SOUL_RESUME_NEW = "按系统提示里的 Write Resume 整页写入并生成 PDF。这是写入。"
+
+
+def _refresh_resume_soul_line(workspace: Path) -> None:
+    """Replace the resume line that told the agent to open a file it cannot read."""
+    soul = workspace / "SOUL.md"
+    if not soul.is_file():
+        return
+    text = soul.read_text(encoding="utf-8")
+    if _SOUL_RESUME_OLD not in text:
+        return
+    soul.write_text(text.replace(_SOUL_RESUME_OLD, _SOUL_RESUME_NEW), encoding="utf-8")
+
 
 def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
     """Sync bundled templates to workspace.
@@ -633,6 +650,8 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
                 workspace / "skills" / skill_dir.name / "SKILL.md",
                 overwrite=True,
             )
+
+    _refresh_resume_soul_line(workspace)
 
     if added and not silent:
         from rich.console import Console

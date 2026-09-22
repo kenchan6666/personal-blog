@@ -1,4 +1,8 @@
-from viola.utils.inline_tools import looks_like_tool_preamble, recover_inline_tool_calls
+from viola.utils.inline_tools import (
+    looks_like_resume_skill_stall,
+    looks_like_tool_preamble,
+    recover_inline_tool_calls,
+)
 
 
 def test_recovers_announced_github_readme() -> None:
@@ -67,3 +71,24 @@ def test_recovers_announced_about_page_read() -> None:
     assert calls[0].arguments["kind"] == "about"
     assert looks_like_tool_preamble(text)
     assert recover_inline_tool_calls("先查看关于我 RAG 里已有的事实。") == []
+
+
+def test_resume_skill_stall_opens_resume_tools() -> None:
+    text = (
+        "好的，我来帮你更新简历。我将按照 write-resume 技能的指引重写整份简历。\n"
+        "我无法直接读取 skills/write-resume/SKILL.md 文件。"
+    )
+    calls = recover_inline_tool_calls(
+        text,
+        available_names=[
+            "mcp_portfolio_portfolio_list_resumes",
+            "mcp_portfolio_portfolio_list_knowledge",
+        ],
+    )
+    names = {call.name for call in calls}
+    assert names == {
+        "mcp_portfolio_portfolio_list_resumes",
+        "mcp_portfolio_portfolio_list_knowledge",
+    }
+    assert looks_like_resume_skill_stall(text)
+    assert not looks_like_resume_skill_stall("已更新履历，改了项目经历和 summary。")

@@ -36,12 +36,26 @@ _ANNOUNCED_ABOUT_LIST = re.compile(
     r"|(?:关于我|關於我|About)\s*[\"'「」『』“”‘’]{0,2}\s*(?:页面|頁面)\s*(?:内容|內容|格式)"
 )
 
+# Owner chat has no read_file. A turn that stops on the resume skill path
+# should open the resume with MCP instead of waiting for a file read.
+_RESUME_SKILL_STALL = re.compile(
+    r"(?is)"
+    r"(?:无法|不能|未能|沒能|没法).{0,16}(?:直接)?(?:读取|讀取).{0,80}(?:SKILL\.md|write-resume)"
+    r"|(?:读取|讀取|查看|先看).{0,40}write-resume"
+    r"|write-resume\s*(?:技能|SKILL)"
+)
+
 _JSON_FENCE = re.compile(r"(?is)```(?:json|xml)?\s*([\s\S]*?)```")
 _XML_CALL = re.compile(r"(?is)<tool_call\b([^>]*)>([\s\S]*?)</tool_call>")
 
 
 def looks_like_tool_preamble(text: str | None) -> bool:
     return bool(_PREAMBLE.search(text or ""))
+
+
+def looks_like_resume_skill_stall(text: str | None) -> bool:
+    """True when the model stopped to read write-resume instead of calling MCP."""
+    return bool(_RESUME_SKILL_STALL.search(text or ""))
 
 
 def recover_inline_tool_calls(
@@ -78,6 +92,9 @@ def recover_inline_tool_calls(
         add("get_site", {})
     if _ANNOUNCED_ABOUT_LIST.search(text):
         add("list_content", {"kind": "about"})
+    if _RESUME_SKILL_STALL.search(text):
+        add("list_resumes", {})
+        add("list_knowledge", {})
 
     for match in _XML_CALL.finditer(text):
         attrs, body = match.group(1) or "", match.group(2) or ""
@@ -121,12 +138,24 @@ def _resolve_name(wanted: str, available: list[str] | None) -> str:
         for name in names:
             if "list_content" in name.casefold():
                 return name
+    if names and lowered in {"list_resumes", "portfolio_list_resumes"}:
+        for name in names:
+            if "list_resumes" in name.casefold():
+                return name
+    if names and lowered in {"list_knowledge", "portfolio_list_knowledge"}:
+        for name in names:
+            if "list_knowledge" in name.casefold():
+                return name
     if not names and lowered in {"get_github_file", "portfolio_get_github_file"}:
         return "mcp_portfolio_portfolio_get_github_file"
     if not names and lowered in {"get_site", "portfolio_get_site"}:
         return "mcp_portfolio_portfolio_get_site"
     if not names and lowered in {"list_content", "portfolio_list_content"}:
         return "mcp_portfolio_portfolio_list_content"
+    if not names and lowered in {"list_resumes", "portfolio_list_resumes"}:
+        return "mcp_portfolio_portfolio_list_resumes"
+    if not names and lowered in {"list_knowledge", "portfolio_list_knowledge"}:
+        return "mcp_portfolio_portfolio_list_knowledge"
     return wanted if not names else ""
 
 

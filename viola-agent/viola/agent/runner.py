@@ -26,7 +26,11 @@ from viola.utils.helpers import (
     strip_think,
     truncate_text,
 )
-from viola.utils.inline_tools import looks_like_tool_preamble, recover_inline_tool_calls
+from viola.utils.inline_tools import (
+    looks_like_resume_skill_stall,
+    looks_like_tool_preamble,
+    recover_inline_tool_calls,
+)
 from viola.utils.prompt_templates import render_template
 from viola.utils.runtime import (
     EMPTY_FINAL_RESPONSE_MESSAGE,
@@ -464,9 +468,10 @@ class AgentRunner:
                     await hook.after_iteration(context)
                     continue
 
+            resume_stall = looks_like_resume_skill_stall(clean)
             if (
                 not response.has_tool_calls
-                and looks_like_tool_preamble(clean)
+                and (looks_like_tool_preamble(clean) or resume_stall)
                 and preamble_retries < 1
             ):
                 preamble_retries += 1
@@ -482,11 +487,16 @@ class AgentRunner:
                     reasoning_content=response.reasoning_content,
                     thinking_blocks=response.thinking_blocks,
                 ))
+                nudge = (
+                    "履历步骤已在系统提示的 Write Resume 里。"
+                    "立刻调用 portfolio_list_resumes、portfolio_get_resume 和 portfolio_list_knowledge，"
+                    "按整页写回并调用 portfolio_generate_resume。"
+                    if resume_stall
+                    else "不要再预告。立刻调用 mcp_portfolio GitHub 工具读取你刚才点名的仓库和文件。"
+                )
                 messages.append({
                     "role": "user",
-                    "content": (
-                        "不要再预告。立刻调用 mcp_portfolio GitHub 工具读取你刚才点名的仓库和文件。"
-                    ),
+                    "content": nudge,
                 })
                 await hook.after_iteration(context)
                 continue

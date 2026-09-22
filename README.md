@@ -80,7 +80,7 @@ flowchart TD
 | `PORTFOLIO_WRITE_ENABLED` | MCP 寫入；Compose 生產為 `true` |
 | `UNI_API_KEY` | 缺則 Owner RAG 與公開 Guide 無法呼叫模型 |
 
-## 本版本：硬編碼 Prompt 與大模型（1.0.15）
+## 本版本：硬編碼 Prompt 與大模型（1.0.16）
 
 > 運行時以 `deployment/.env` 為準；下表為本版本基線。  
 > **憲法原則**：凡修改 prompt 模板或變更本節記載的大模型基線，必須在同一變更集更新本節、新增版本檔，並更新 [docs/prompt-model-versions/](docs/prompt-model-versions/)。
@@ -99,7 +99,7 @@ flowchart TD
 | Public Guide 系統提示 | [`backend/app/public_agent.py`](backend/app/public_agent.py) `_system_prompt()` |
 | Intent 分類 | [`docs/agents/agent-intents.md`](docs/agents/agent-intents.md) |
 
-Owner 預設 `max_tokens=4096`。会话只回放最近约 16 条消息，上下文窗口 32k；跨对话记忆是「关于我」RAG 里的短事实，不是聊天记录。首页走 SiteProfile（`get_site` / `update_site`），About 是 `/about` 模块，不是名叫 `main` 的页面。查看或整理 About 页时同一轮 `list_content` kind=`about`；若模型只预告「我先看看」而不调工具，运行时会恢复该调用。新建内容保持 Draft，仅在 Owner 明确要求发布时调用 `portfolio_publish_content`。凡改站点内容，同一轮必须把已确认事实写入「关于我」RAG。公開導覽必須給訪客完整回答：輸出至少 4096 token，關閉 thinking 以免佔用輸出額度；若模型仍在句中截斷會自動續寫到結束。
+Owner 說「更新一下我的 CV」時，整頁步驟已在系統提示的 Write Resume 裡，同一輪讀現有履歷並寫回、生成 PDF。Owner 預設 `max_tokens=4096`。会话只回放最近约 16 条消息，上下文窗口 32k；跨对话记忆是「关于我」RAG 里的短事实，不是聊天记录。首页走 SiteProfile（`get_site` / `update_site`），About 是 `/about` 模块，不是名叫 `main` 的页面。查看或整理 About 页时同一轮 `list_content` kind=`about`；若模型只预告「我先看看」而不调工具，运行时会恢复该调用。新建内容保持 Draft，仅在 Owner 明确要求发布时调用 `portfolio_publish_content`。凡改站点内容，同一轮必须把已确认事实写入「关于我」RAG。公開導覽必須給訪客完整回答：輸出至少 4096 token，關閉 thinking 以免佔用輸出額度；若模型仍在句中截斷會自動續寫到結束。
 
 歷史版本：[docs/prompt-model-versions/](docs/prompt-model-versions/)。
 

@@ -57,7 +57,7 @@
 | 取消发布履历 | `portfolio_unpublish_resume` | 公开页与 PDF 随即消失，再发布才可见 |
 | 推 cv 仓 | `portfolio_push_resume_to_github` | 写入私有 `cv`；没有仓则创建 |
 
-Public Guide **没有**这些工具。写履历栏目的句式与取舍见 workspace skill [`skills/write-resume/SKILL.md`](../../skills/write-resume/SKILL.md)。
+Public Guide **没有**这些工具。写履历栏目的句式与取舍见 workspace skill [`skills/write-resume/SKILL.md`](../../skills/write-resume/SKILL.md)。Owner 对话没有 `read_file`，该 skill 设 `always: true`，正文在每轮 Active Skills 里。
 
 ## 服务型：性格
 

@@ -1,6 +1,7 @@
 ---
 name: write-resume
 description: Write or fully rewrite a one-page Resume in XYZ bullets. Use when drafting a CV, polishing one section, or the Owner says 更新一下我的 CV / 更新 CV / 改简历 / 把 CV 改好.
+always: true
 ---
 
 # Write Resume
