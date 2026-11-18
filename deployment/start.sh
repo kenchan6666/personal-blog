@@ -2,20 +2,26 @@
 # One-command start for the portfolio stack (Git Bash / macOS / Linux).
 # Windows PowerShell: use .\deployment\start.ps1 — `bash` on Windows is WSL, not Git Bash.
 #   bash deployment/start.sh          local: Redis + FastAPI + Next.js (Mongo if MONGO_URI is set)
-#   bash deployment/start.sh --prod   single-VM compose (nginx :80)
+#   bash deployment/start.sh --prod          local/recovery: build images on this machine
+#   bash deployment/start.sh --prod --pull   production: pull images from Artifact Registry
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$DIR/.." && pwd)"
 PROD=0
+PULL=0
 DOWN=0
 
 usage() {
   cat <<'EOF'
-Usage: bash deployment/start.sh [--prod] [--down]
+Usage: bash deployment/start.sh [--prod] [--pull] [--down]
 
   (default)  Start Redis, FastAPI, and Next.js. Mongo starts only if MONGO_URI is set.
-  --prod     Build and start the nginx + containers stack on :80.
+  --prod     Start the nginx + containers stack (build images locally unless --pull).
+  --pull     With --prod: pull api/agent/web from Artifact Registry and up --no-build.
+             Honors IMAGE_TAG (git SHA) and IMAGE_REGISTRY. Requires AR_TOKEN,
+             a key at $HOME/.config/gcp/artifact-registry-reader.json, or an
+             existing docker login to asia-east2-docker.pkg.dev.
   --down     Stop the stack that matches the other flags (dev deps or prod).
 EOF
 }
@@ -32,6 +38,7 @@ need() {
 while [ $# -gt 0 ]; do
   case "$1" in
     --prod) PROD=1 ;;
+    --pull) PULL=1 ;;
     --down) DOWN=1 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1 (try --help)" ;;
@@ -39,8 +46,14 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ "$PULL" -eq 1 ] && [ "$PROD" -ne 1 ]; then
+  die "--pull requires --prod"
+fi
+
 if [ "$PROD" -eq 1 ] && [ "$DOWN" -eq 1 ]; then
   MODE="prod-down"
+elif [ "$PROD" -eq 1 ] && [ "$PULL" -eq 1 ]; then
+  MODE="prod-pull"
 elif [ "$PROD" -eq 1 ]; then
   MODE="prod"
 elif [ "$DOWN" -eq 1 ]; then
@@ -62,6 +75,40 @@ ensure_prod_env() {
 
 compose_prod() {
   docker compose -f "$ROOT/docker-compose.prod.yml" --env-file "$DIR/.env" "$@"
+}
+
+AR_DOCKER_HOST="${AR_DOCKER_HOST:-asia-east2-docker.pkg.dev}"
+AR_KEY_FILE="${AR_KEY_FILE:-$HOME/.config/gcp/artifact-registry-reader.json}"
+
+login_artifact_registry() {
+  if [ -n "${AR_TOKEN:-}" ]; then
+    printf '%s\n' "$AR_TOKEN" | docker login -u oauth2accesstoken --password-stdin "https://${AR_DOCKER_HOST}"
+    return
+  fi
+  if [ -f "$AR_KEY_FILE" ]; then
+    docker login -u _json_key --password-stdin "https://${AR_DOCKER_HOST}" < "$AR_KEY_FILE"
+    return
+  fi
+  if [ -f "$HOME/.docker/config.json" ] && grep -q "$AR_DOCKER_HOST" "$HOME/.docker/config.json" 2>/dev/null; then
+    echo "using existing Docker credentials for ${AR_DOCKER_HOST}"
+    return
+  fi
+  die "not logged in to ${AR_DOCKER_HOST}; set AR_TOKEN or place a read-only key at $AR_KEY_FILE"
+}
+
+finish_prod_up() {
+  if wait_http "http://127.0.0.1/api/health" 45; then
+    echo "health: http://127.0.0.1/api/health"
+  else
+    echo "containers are up; health check timed out. logs:"
+    compose_prod logs --tail 40 api web nginx
+  fi
+  if enable_tls; then
+    echo "ready: https (port 443)"
+  else
+    echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
+    echo "ready: http://127.0.0.1/zh-Hant"
+  fi
 }
 
 df_avail_kb() {
@@ -169,12 +216,15 @@ ensure_media_dir() {
   fi
 }
 
-start_prod() {
+prepare_prod_runtime() {
   ensure_prod_env
   ensure_media_dir
   mkdir -p "$DIR/nginx-runtime"
   cp "$DIR/nginx/http.conf" "$DIR/nginx-runtime/default.conf"
+}
 
+start_prod() {
+  prepare_prod_runtime
   echo "starting production stack (nginx :80/:443)…"
   reclaim_docker_disk
   echo "building images one at a time to keep peak disk use down…"
@@ -182,18 +232,16 @@ start_prod() {
   COMPOSE_PARALLEL_LIMIT=1 compose_prod build agent
   COMPOSE_PARALLEL_LIMIT=1 compose_prod build web
   compose_prod up -d
-  if wait_http "http://127.0.0.1/api/health" 45; then
-    echo "health: http://127.0.0.1/api/health"
-  else
-    echo "containers are up; health check timed out. logs:"
-    compose_prod logs --tail 40 api web nginx
-  fi
-  if enable_tls; then
-    echo "ready: https (port 443)"
-  else
-    echo "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443, turn off GoDaddy HTTPS forwarding)."
-    echo "ready: http://127.0.0.1/zh-Hant"
-  fi
+  finish_prod_up
+}
+
+start_prod_pull() {
+  prepare_prod_runtime
+  echo "pulling production images (IMAGE_TAG=${IMAGE_TAG:-latest})…"
+  login_artifact_registry
+  compose_prod pull
+  compose_prod up -d --no-build
+  finish_prod_up
 }
 
 host_from_origin() {
@@ -336,6 +384,7 @@ stop_dev() {
 
 case "$MODE" in
   prod) start_prod ;;
+  prod-pull) start_prod_pull ;;
   prod-down) stop_prod ;;
   dev-down) stop_dev ;;
   dev) start_dev ;;

@@ -9,26 +9,102 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false
 
+env:
+  REGISTRY: asia-east2-docker.pkg.dev/project-9d21d8d1-183d-4306-8c3/personal-blog
+  WIF_PROVIDER: projects/714995800340/locations/global/workloadIdentityPools/github-pool/providers/github
+  PUSH_SA: github-actions-ar-push@project-9d21d8d1-183d-4306-8c3.iam.gserviceaccount.com
+  PULL_SA: personalblog-ar-pull@project-9d21d8d1-183d-4306-8c3.iam.gserviceaccount.com
+
 jobs:
+  build:
+    name: Build and push ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      actions: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - service: api
+            context: ./backend
+            file: ./backend/Dockerfile
+          - service: agent
+            context: .
+            file: ./viola-agent/Dockerfile
+          - service: web
+            context: ./frontend
+            file: ./frontend/Dockerfile
+            build-args: |
+              NEXT_PUBLIC_API_BASE_URL=
+              NEXT_PUBLIC_SITE_URL=https://kenchan0522.blog
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.PUSH_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-east2-docker.pkg.dev --quiet
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ env.REGISTRY }}/${{ matrix.service }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ matrix.service }}:latest
+          build-args: ${{ matrix.build-args }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
   deploy:
     name: Deploy to GCP VM
+    needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: SSH and deploy
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.PUSH_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: SSH, pull images, and restart
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          IMAGE_TAG: ${{ github.sha }}
+          PULL_SA: ${{ env.PULL_SA }}
         run: |
           set -euo pipefail
           umask 077
           mkdir -p "$HOME/.ssh"
-          # Secrets may omit a trailing newline; OpenSSH requires one on the key file.
           printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/deploy_key"
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/deploy_key" "$HOME/.ssh/known_hosts"
+
+          # Short-lived reader token for the VM (org policy blocks long-lived SA keys;
+          # the VM's default scopes cannot reach Artifact Registry without a stop).
+          AR_TOKEN="$(gcloud auth print-access-token --impersonate-service-account="${PULL_SA}" --lifetime=900s)"
+          echo "::add-mask::${AR_TOKEN}"
 
           ssh -i "$HOME/.ssh/deploy_key" \
             -o IdentitiesOnly=yes \
@@ -37,20 +113,54 @@ jobs:
             -o BatchMode=yes \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=120 \
-            "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s <<'REMOTE'
+            "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "IMAGE_TAG='${IMAGE_TAG}' AR_TOKEN='${AR_TOKEN}' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /home/ynchanhk/personal-blog
+
+          echo "===== memory before deploy ====="
+          free -h
+          awk '/MemTotal:|MemAvailable:|MemFree:|Buffers:|^Cached:|SwapTotal:|SwapFree:/ {print}' /proc/meminfo
+          sampler="/tmp/deploy-mem-sample.$$"
+          : > "$sampler"
+          ( while true; do
+              awk -v ts="$(date +%s)" '/MemAvailable:/ {printf "%s available_kB=%s\n", ts, $2}' /proc/meminfo
+              sleep 2
+            done ) >> "$sampler" &
+          sample_pid=$!
+
           git pull --ff-only
-          # Official prod entrypoint: sequential image builds, existing .env,
-          # TLS restore from the Let's Encrypt cert already on the VM.
-          bash deployment/start.sh --prod
+          bash deployment/start.sh --prod --pull
           docker image prune -f
-          # After TLS is on, http://127.0.0.1/api/health is a 301. Wait for the
-          # public page itself so we don't race Next.js startup (first request
-          # after a rebuild can return 500).
+          docker logout https://asia-east2-docker.pkg.dev >/dev/null 2>&1 || true
+          unset AR_TOKEN
+
+          kill "$sample_pid" 2>/dev/null || true
+          wait "$sample_pid" 2>/dev/null || true
+          echo "===== memory after deploy ====="
+          free -h
+          if [ -s "$sampler" ]; then
+            awk '
+              BEGIN { min_av = -1; n = 0 }
+              {
+                split($2, a, /=/)
+                v = a[2] + 0
+                n++
+                if (min_av < 0 || v < min_av) min_av = v
+              }
+              END {
+                if (n > 0) printf "min MemAvailable during deploy: %.0f MiB (%d samples)\n", min_av/1024, n
+              }
+            ' "$sampler"
+          fi
+          rm -f "$sampler"
+
+          echo "===== running images ====="
+          docker ps --format "{{.Names}} {{.Image}} {{.Status}}"
+
           ok=0
           for i in $(seq 1 30); do
-            code="$(curl -k -sS -o /dev/null -w '%{http_code}' --max-time 10 https://127.0.0.1/zh-Hant || true)"
+            code="$(curl -k -sS -o /dev/null -w "%{http_code}" --max-time 10 https://127.0.0.1/zh-Hant || true)"
             echo "local https /zh-Hant try ${i}: ${code:-curl-fail}"
             if [ "${code:-}" = "200" ]; then
               ok=1
@@ -69,6 +179,9 @@ jobs:
             code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://kenchan0522.blog/zh-Hant || true)"
             echo "try ${i}: https://kenchan0522.blog/zh-Hant -> ${code:-curl-fail}"
             if [ "${code:-}" = "200" ]; then
+              health="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 https://kenchan0522.blog/api/health || true)"
+              echo "https://kenchan0522.blog/api/health -> ${health:-curl-fail}"
+              test "${health:-}" = "200"
               exit 0
             fi
             sleep 10

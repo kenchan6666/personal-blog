@@ -1,13 +1,15 @@
 # One-command start for the portfolio stack (Windows PowerShell).
 #   .\deployment\start.ps1          local: Redis + FastAPI + Next.js (Mongo if MONGO_URI is set)
-#   .\deployment\start.ps1 --prod   single-VM compose (nginx :80)
+#   .\deployment\start.ps1 --prod          local/recovery: build images on this machine
+#   .\deployment\start.ps1 --prod --pull   production: pull images from Artifact Registry
 
 function ShowUsage {
     Write-Host @"
-Usage: .\deployment\start.ps1 [--prod] [--down]
+Usage: .\deployment\start.ps1 [--prod] [--pull] [--down]
 
   (default)  Start Redis, FastAPI, and Next.js. Mongo starts only if MONGO_URI is set.
-  --prod     Build and start the nginx + containers stack on :80.
+  --prod     Start the nginx + containers stack (build images locally unless --pull).
+  --pull     With --prod: pull api/agent/web from Artifact Registry and up --no-build.
   --down     Stop the stack that matches the other flags (dev deps or prod).
 "@
 }
@@ -110,20 +112,14 @@ function ReclaimDockerDisk {
     & docker system df
 }
 
-function RunProdUp($Root, $Dir) {
+function PrepareProdRuntime($Dir) {
     EnsureProdEnv $Dir
     $runtime = Join-Path $Dir "nginx-runtime"
     New-Item -ItemType Directory -Force -Path $runtime | Out-Null
     Copy-Item (Join-Path $Dir "nginx\http.conf") (Join-Path $runtime "default.conf") -Force
+}
 
-    Write-Host "starting production stack (nginx :80/:443)..."
-    ReclaimDockerDisk
-    Write-Host "building images one at a time to keep peak disk use down..."
-    $env:COMPOSE_PARALLEL_LIMIT = "1"
-    ComposeProd $Root $Dir @("build", "api")
-    ComposeProd $Root $Dir @("build", "agent")
-    ComposeProd $Root $Dir @("build", "web")
-    ComposeProd $Root $Dir @("up", "-d")
+function FinishProdUp($Root, $Dir) {
     if (WaitHttp "http://127.0.0.1/api/health" 45) {
         Write-Host "health: http://127.0.0.1/api/health"
     } else {
@@ -136,6 +132,45 @@ function RunProdUp($Root, $Dir) {
         Write-Host "TLS skipped — site is on http until certbot succeeds (open GCP tcp:80 and tcp:443)."
         Write-Host "ready: http://127.0.0.1/zh-Hant"
     }
+}
+
+function LoginArtifactRegistry {
+    $hostName = if ($env:AR_DOCKER_HOST) { $env:AR_DOCKER_HOST } else { "asia-east2-docker.pkg.dev" }
+    $keyFile = if ($env:AR_KEY_FILE) { $env:AR_KEY_FILE } else { Join-Path $HOME ".config\gcp\artifact-registry-reader.json" }
+    if ($env:AR_TOKEN) {
+        $env:AR_TOKEN | docker login -u oauth2accesstoken --password-stdin "https://$hostName"
+        if ($LASTEXITCODE -ne 0) { throw "docker login to $hostName failed" }
+        return
+    }
+    if (Test-Path $keyFile) {
+        Get-Content -Raw $keyFile | docker login -u _json_key --password-stdin "https://$hostName"
+        if ($LASTEXITCODE -ne 0) { throw "docker login to $hostName failed" }
+        return
+    }
+    Write-Host "no AR_TOKEN or key file; assuming existing Docker credentials for $hostName"
+}
+
+function RunProdUp($Root, $Dir) {
+    PrepareProdRuntime $Dir
+    Write-Host "starting production stack (nginx :80/:443)..."
+    ReclaimDockerDisk
+    Write-Host "building images one at a time to keep peak disk use down..."
+    $env:COMPOSE_PARALLEL_LIMIT = "1"
+    ComposeProd $Root $Dir @("build", "api")
+    ComposeProd $Root $Dir @("build", "agent")
+    ComposeProd $Root $Dir @("build", "web")
+    ComposeProd $Root $Dir @("up", "-d")
+    FinishProdUp $Root $Dir
+}
+
+function RunProdPull($Root, $Dir) {
+    PrepareProdRuntime $Dir
+    $tag = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
+    Write-Host "pulling production images (IMAGE_TAG=$tag)..."
+    LoginArtifactRegistry
+    ComposeProd $Root $Dir @("pull")
+    ComposeProd $Root $Dir @("up", "-d", "--no-build")
+    FinishProdUp $Root $Dir
 }
 
 function HostFromOrigin([string]$Origin) {
@@ -290,18 +325,22 @@ $ErrorActionPreference = "Stop"
 $Dir = $PSScriptRoot
 $Root = Split-Path -Parent $Dir
 $Prod = $false
+$Pull = $false
 $Down = $false
 
 foreach ($arg in $args) {
     switch -Regex ($arg) {
         "^(--prod|-Prod|-prod)$" { $Prod = $true }
+        "^(--pull|-Pull|-pull)$" { $Pull = $true }
         "^(--down|-Down|-down)$" { $Down = $true }
         "^(-h|--help|-Help)$" { ShowUsage; exit 0 }
         default { throw "unknown argument: $arg (try --help)" }
     }
 }
 
+if ($Pull -and -not $Prod) { throw "--pull requires --prod" }
 if ($Prod -and $Down) { $Mode = "prod-down" }
+elseif ($Prod -and $Pull) { $Mode = "prod-pull" }
 elseif ($Prod) { $Mode = "prod" }
 elseif ($Down) { $Mode = "dev-down" }
 else { $Mode = "dev" }
@@ -312,6 +351,7 @@ if ($LASTEXITCODE -ne 0) { throw "docker compose plugin is required" }
 
 switch ($Mode) {
     "prod" { RunProdUp $Root $Dir }
+    "prod-pull" { RunProdPull $Root $Dir }
     "prod-down" { RunProdDown $Root $Dir }
     "dev-down" { RunDevDown $Root }
     "dev" { RunDevUp $Root }

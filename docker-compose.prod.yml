@@ -1,12 +1,19 @@
 # Single-VM stack: nginx :80/:443 → Next.js + FastAPI, plus Mongo, Redis, and certbot.
-# Preferred: bash deployment/start.sh --prod
+# Preferred on the GCP VM (images are built in GitHub Actions):
+#   IMAGE_TAG=<commit-sha> bash deployment/start.sh --prod --pull
+# Local / recovery build on the machine:
+#   bash deployment/start.sh --prod
 # Or: copy deployment/env.example to deployment/.env, then:
 #   docker compose -f docker-compose.prod.yml --env-file deployment/.env up -d --build
+
+# IMAGE_REGISTRY default is the private Artifact Registry repo in asia-east2.
+# CI and start.sh --pull set IMAGE_TAG to the git SHA.
 
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
     volumes:
       - mongo_data:/data/db
 
@@ -24,6 +31,7 @@ services:
       - qdrant_data:/qdrant/storage
 
   api:
+    image: ${IMAGE_REGISTRY:-asia-east2-docker.pkg.dev/project-9d21d8d1-183d-4306-8c3/personal-blog}/api:${IMAGE_TAG:-latest}
     build: ./backend
     restart: unless-stopped
     env_file:
@@ -43,6 +51,7 @@ services:
       - qdrant
 
   agent:
+    image: ${IMAGE_REGISTRY:-asia-east2-docker.pkg.dev/project-9d21d8d1-183d-4306-8c3/personal-blog}/agent:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: viola-agent/Dockerfile
@@ -73,6 +82,7 @@ services:
       - api
 
   web:
+    image: ${IMAGE_REGISTRY:-asia-east2-docker.pkg.dev/project-9d21d8d1-183d-4306-8c3/personal-blog}/web:${IMAGE_TAG:-latest}
     build:
       context: ./frontend
       args:
