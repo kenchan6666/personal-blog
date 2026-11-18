@@ -19,6 +19,8 @@ function mapError(message: string, dict: Dictionary): string {
       return dict.admin.errorInvalid;
     case "rate_limited":
       return dict.admin.errorRate;
+    case "otp_locked":
+      return dict.admin.errorLocked;
     case "smtp_failed":
       return dict.admin.errorSmtp;
     case "Failed to fetch":
@@ -59,8 +61,8 @@ export function AdminLoginForm({ locale, dict }: Props) {
     setError(null);
     setBusy("verify");
     try {
-      const { session_token } = await verifyOtp(email.trim(), code.trim());
-      setSessionToken(session_token);
+      await verifyOtp(email.trim(), code.trim());
+      setSessionToken();
       router.replace(`/${locale}/admin`);
     } catch (err) {
       setError(mapError(err instanceof Error ? err.message : "", dict));

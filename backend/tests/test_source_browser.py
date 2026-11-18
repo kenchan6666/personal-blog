@@ -20,7 +20,7 @@ async def _owner_token(client, mailer, settings) -> str:
         "/api/auth/otp/verify",
         json={"email": settings.owner_email, "code": code},
     )
-    return verified.json()["session_token"]
+    return verified.cookies["portfolio_session"]
 
 
 async def _connect_github(client, token: str) -> None:
@@ -143,6 +143,7 @@ async def test_private_source_repo_hides_tree_and_blob_from_visitors(
     assert secret.json()["content"] == "do-not-leak\n"
     assert secret.json()["private"] is True
 
+    client.cookies.clear()
     anonymous = await client.get("/api/owner/projects/secret-work/source")
     assert anonymous.status_code == 401
 

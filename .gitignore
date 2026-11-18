@@ -5,6 +5,8 @@ backend/.pytest_cache/
 backend/.env
 backend/data/
 data/media/
+# Runtime data (on the VM a symlink to the data disk)
+/data
 deploy/.env
 deployment/.env
 deployment/nginx-runtime/default.conf

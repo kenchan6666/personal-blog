@@ -21,7 +21,7 @@ async def _owner_token(client, mailer, settings) -> str:
         "/api/auth/otp/verify",
         json={"email": settings.owner_email, "code": code},
     )
-    return verified.json()["session_token"]
+    return verified.cookies["portfolio_session"]
 
 
 def _png_bytes(color: tuple[int, int, int] = (255, 0, 0)) -> bytes:

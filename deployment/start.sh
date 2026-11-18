@@ -216,9 +216,27 @@ ensure_media_dir() {
   fi
 }
 
+ensure_resume_dir() {
+  # Generated resume PDFs used to live inside the api container
+  # (/app/data/resumes) and vanished on every image update. They are now a
+  # bind mount; copy anything still in the old container across once.
+  mkdir -p "$ROOT/data/resumes"
+  local marker="$ROOT/data/resumes/.migrated-from-container"
+  if [ -f "$marker" ]; then
+    return 0
+  fi
+  local cid
+  cid="$(compose_prod ps -q api 2>/dev/null || true)"
+  if [ -n "$cid" ]; then
+    docker cp "$cid:/app/data/resumes/." "$ROOT/data/resumes/" >/dev/null 2>&1 || true
+  fi
+  touch "$marker"
+}
+
 prepare_prod_runtime() {
   ensure_prod_env
   ensure_media_dir
+  ensure_resume_dir
   mkdir -p "$DIR/nginx-runtime"
   cp "$DIR/nginx/http.conf" "$DIR/nginx-runtime/default.conf"
 }

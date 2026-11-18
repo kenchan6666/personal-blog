@@ -11,7 +11,18 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from beanie import PydanticObjectId, init_beanie
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Response, UploadFile, status
+from fastapi import (
+    Cookie,
+    Depends,
+    FastAPI,
+    File,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    UploadFile,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
@@ -21,7 +32,7 @@ from redis.asyncio import Redis
 from app.agent_proxy import register_agent_routes, sync_stale_knowledge
 from app.github_token import persist_github_owner_token, restore_github_owner_token
 from app.owner_actor import force_draft_if_service, owner_actor
-from app.auth import AuthService
+from app.auth import SESSION_COOKIE, AuthService
 from app.avatar import (
     ensure_avatar_dir,
     media_type_for_filename,
@@ -329,8 +340,8 @@ def create_app(
         )
         if backend == "smtp":
             print(
-                "[mail] Gmail SMTP from Compute Engine often fails; "
-                "OTP prints to logs on timeout. Use MAIL_BACKEND=resend to send.",
+                "[mail] Gmail SMTP from Compute Engine can be blocked; "
+                "prefer MAIL_BACKEND=resend with SMTP as the fallback.",
                 flush=True,
             )
         print(
@@ -367,18 +378,79 @@ def create_app(
     def get_auth() -> AuthService:
         return app.state.auth
 
+    trusted_origins = {
+        o.rstrip("/") for o in origins
+    }
+    success_origin = urlparse(settings.github_oauth_success_url)
+    if success_origin.scheme and success_origin.netloc:
+        trusted_origins.add(f"{success_origin.scheme}://{success_origin.netloc}")
+
+    def request_origin(request: Request) -> str:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("host") or request.url.netloc
+        return f"{proto}://{host}"
+
+    def ensure_same_origin(request: Request) -> None:
+        """CSRF guard for cookie-authenticated, state-changing requests."""
+        if request.method in {"GET", "HEAD", "OPTIONS"}:
+            return
+        origin = request.headers.get("origin")
+        if origin:
+            origin = origin.rstrip("/")
+            if origin in trusted_origins or origin == request_origin(request):
+                return
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="bad_origin")
+        fetch_site = request.headers.get("sec-fetch-site")
+        if fetch_site and fetch_site not in {"same-origin", "none"}:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="bad_origin")
+
+    def client_ip(request: Request) -> str | None:
+        # nginx overwrites X-Real-IP with $remote_addr; the API port itself is
+        # not published, so this header is trustworthy here.
+        real = (request.headers.get("x-real-ip") or "").strip()
+        if real:
+            return real
+        return request.client.host if request.client else None
+
+    def set_session_cookie(response: Response, token: str) -> None:
+        response.set_cookie(
+            SESSION_COOKIE,
+            token,
+            max_age=settings.session_ttl_seconds,
+            path="/api",
+            httponly=True,
+            secure=settings.session_cookie_secure,
+            samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+        )
+
+    def clear_session_cookie(response: Response) -> None:
+        response.delete_cookie(
+            SESSION_COOKIE,
+            path="/api",
+            httponly=True,
+            secure=settings.session_cookie_secure,
+            samesite=settings.session_cookie_samesite,  # type: ignore[arg-type]
+        )
+
     async def require_owner(
+        request: Request,
         authorization: str | None = Header(default=None),
+        session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE),
         auth: AuthService = Depends(get_auth),
     ) -> str:
         scheme, _, token = (authorization or "").partition(" ")
         if scheme.lower() != "bearer":
             token = ""
         service_token = settings.agent_service_token.strip()
-        if service_token and secrets.compare_digest(token, service_token):
+        if token and service_token and secrets.compare_digest(token, service_token):
             owner_actor.set("service")
             return settings.owner_email
-        email = await auth.resolve_session(token or None)
+        if token:
+            # Explicit bearer header: not sent automatically by browsers.
+            email = await auth.resolve_session(token)
+        else:
+            ensure_same_origin(request)
+            email = await auth.resolve_session(session_cookie or None)
         owner_actor.set("session")
         return email
 
@@ -409,11 +481,12 @@ def create_app(
     @app.post("/api/auth/otp/request")
     async def otp_request(
         body: OtpRequestBody,
+        request: Request,
         auth: AuthService = Depends(get_auth),
     ) -> dict[str, str]:
         print(f"[otp] request received for {body.email}", flush=True)
         try:
-            await auth.request_otp(body.email)
+            await auth.request_otp(body.email, ip=client_ip(request))
         except HTTPException:
             raise
         except Exception as exc:
@@ -427,10 +500,27 @@ def create_app(
     @app.post("/api/auth/otp/verify")
     async def otp_verify(
         body: OtpVerifyBody,
+        request: Request,
+        response: Response,
         auth: AuthService = Depends(get_auth),
     ) -> dict[str, str]:
-        token = await auth.verify_otp(body.email, body.code)
-        return {"session_token": token}
+        ensure_same_origin(request)
+        token = await auth.verify_otp(body.email, body.code, ip=client_ip(request))
+        set_session_cookie(response, token)
+        # The token travels only in the HttpOnly cookie, never to page scripts.
+        return {"status": "ok"}
+
+    @app.post("/api/auth/logout")
+    async def logout(
+        request: Request,
+        response: Response,
+        session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE),
+        auth: AuthService = Depends(get_auth),
+    ) -> dict[str, str]:
+        ensure_same_origin(request)
+        await auth.revoke_session(session_cookie)
+        clear_session_cookie(response)
+        return {"status": "signed_out"}
 
     @app.get("/api/auth/me")
     async def me(email: str = Depends(require_owner)) -> dict[str, str]:

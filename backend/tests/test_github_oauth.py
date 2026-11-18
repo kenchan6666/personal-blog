@@ -22,7 +22,7 @@ async def _owner_token(client, mailer, settings) -> str:
         "/api/auth/otp/verify",
         json={"email": settings.owner_email, "code": code},
     )
-    return verified.json()["session_token"]
+    return verified.cookies["portfolio_session"]
 
 
 def _project_payload(**overrides):
@@ -197,6 +197,7 @@ async def test_owner_can_read_unbound_private_github_repo(
     assert via_agent.status_code == 200
     assert via_agent.json()["private"] is True
 
+    client.cookies.clear()
     anonymous = await client.get("/api/owner/github/repos/kenchan6666/secret-lab")
     assert anonymous.status_code == 401
 

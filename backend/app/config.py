@@ -21,7 +21,13 @@ class Settings(BaseSettings):
     otp_ttl_seconds: int = 300
     otp_rate_limit: int = 5
     otp_rate_window_seconds: int = 900
+    otp_verify_max_failures: int = 5
+    otp_verify_lock_seconds: int = 900
     session_ttl_seconds: int = 60 * 60 * 24 * 7
+    # Owner session cookie. Secure must stay on in production (HTTPS only);
+    # tests and plain-http local dev may turn it off.
+    session_cookie_secure: bool = True
+    session_cookie_samesite: str = "lax"
 
     smtp_host: str = "smtp.gmail.com"
     smtp_port: int = 587
@@ -29,8 +35,8 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "ynchanhk@gmail.com"
     # console | smtp | resend
-    # resend = HTTPS to api.resend.com (works on GCP). smtp = Gmail, often
-    # fails from Compute Engine IPs; OTP still prints to logs on failure.
+    # resend = HTTPS to api.resend.com (works on GCP). smtp = Gmail SMTP.
+    # OTP codes are never logged; see otp_fallback_file below.
     mail_backend: str = "console"
     resend_api_key: str = ""
     # Sender for Resend (a verified domain address). Falls back to SMTP_FROM.

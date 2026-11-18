@@ -1,0 +1,13 @@
+[Unit]
+Description=personal-blog daily Mongo + files backup
+Wants=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+User=ynchanhk
+Group=docker
+WorkingDirectory=/home/ynchanhk/personal-blog
+ExecStart=/bin/bash /home/ynchanhk/personal-blog/deployment/backup.sh
+Nice=10
+IOSchedulingClass=idle

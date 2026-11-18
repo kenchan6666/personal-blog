@@ -74,9 +74,13 @@ async def test_otp_verify_issues_session_for_valid_code(client, mailer, settings
         json={"email": settings.owner_email, "code": code},
     )
     assert response.status_code == 200
-    body = response.json()
-    assert "session_token" in body
-    assert len(body["session_token"]) >= 32
+    assert response.json() == {"status": "ok"}
+    token = response.cookies["portfolio_session"]
+    assert len(token) >= 32
+    set_cookie = response.headers["set-cookie"].lower()
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+    assert "path=/api" in set_cookie
 
 
 @pytest.mark.asyncio
@@ -93,7 +97,7 @@ async def test_owner_route_requires_session(client, mailer, settings):
         "/api/auth/otp/verify",
         json={"email": settings.owner_email, "code": code},
     )
-    token = verified.json()["session_token"]
+    token = verified.cookies["portfolio_session"]
 
     allowed = await client.get(
         "/api/auth/me",

@@ -41,10 +41,14 @@ services:
       MONGO_DB: portfolio
       REDIS_URL: redis://redis:6379/0
       AVATAR_DIR: /data/avatars
+      RESUME_DIR: /data/resumes
       AGENT_API_URL: http://agent:8900
       QDRANT_URL: http://qdrant:6333
     volumes:
+      # Host bind mounts (on the data disk) so uploads and generated resume
+      # PDFs survive image updates. Backed up by deployment/backup.sh.
       - ./data/media:/data/avatars
+      - ./data/resumes:/data/resumes
     depends_on:
       - mongo
       - redis

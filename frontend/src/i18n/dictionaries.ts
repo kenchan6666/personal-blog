@@ -294,6 +294,7 @@ const zhHant = {
     errorNotAllowed: "此信箱無權限。",
     errorInvalid: "驗證碼無效或已過期。",
     errorRate: "請求過於頻繁，請稍後再試。",
+    errorLocked: "驗證碼錯誤次數過多，已暫時鎖定，請 15 分鐘後再試。",
     errorSmtp: "郵件發送失敗，請稍後再試。",
     errorNetwork:
       "連不上 API。請確認後端已在 http://127.0.0.1:8000 運行，且沒有舊進程佔用端口。",
@@ -727,6 +728,7 @@ const en = {
     errorNotAllowed: "This email is not allowed.",
     errorInvalid: "Invalid or expired code.",
     errorRate: "Too many requests. Please wait.",
+    errorLocked: "Too many wrong codes. Sign-in is locked for 15 minutes.",
     errorSmtp: "Mail send failed. Please try again later.",
     errorNetwork:
       "Cannot reach API. Ensure the backend is running at http://127.0.0.1:8000 and no stale process owns the port.",
@@ -1130,6 +1132,7 @@ const zhHans = {
     errorNotAllowed: "此邮箱无权限。",
     errorInvalid: "验证码无效或已过期。",
     errorRate: "请求过于频繁，请稍后再试。",
+    errorLocked: "验证码错误次数过多，已暂时锁定，请 15 分钟后再试。",
     errorSmtp: "邮件发送失败，请稍后再试。",
     errorNetwork:
       "连不上 API。请确认后端已在 http://127.0.0.1:8000 运行，且没有旧进程占用端口。",

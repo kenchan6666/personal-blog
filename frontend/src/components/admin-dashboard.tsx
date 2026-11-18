@@ -6,6 +6,7 @@ import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 import {
   clearSessionToken,
+  logoutOwner,
   fetchMe,
   getSessionToken,
 } from "@/lib/api";
@@ -162,8 +163,7 @@ export function AdminDashboard({ locale, dict }: Props) {
   }, [locale, router]);
 
   function logout() {
-    clearSessionToken();
-    router.replace(`/${locale}/admin/login`);
+    void logoutOwner().finally(() => router.replace(`/${locale}/admin/login`));
   }
 
   if (loading) {

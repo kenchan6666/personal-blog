@@ -7,7 +7,28 @@ const API_BASE =
     ? (process.env.API_INTERNAL_URL ?? PUBLIC_API)
     : (process.env.NEXT_PUBLIC_API_BASE_URL ?? "");
 
-export const SESSION_KEY = "portfolio_session_token";
+/** Legacy key that used to hold the raw session token (now cleared on read). */
+const LEGACY_SESSION_KEY = "portfolio_session_token";
+/**
+ * Non-secret "signed in" hint for UI routing only. The real session lives in
+ * an HttpOnly cookie set by the API, which page scripts cannot read.
+ */
+export const SESSION_KEY = "portfolio_session_hint";
+const SESSION_HINT = "cookie";
+
+/** Every API call carries the session cookie (needed when the API is cross-origin in dev). */
+function apiFetch(input: RequestInfo | URL, init?: RequestInit) {
+  return fetch(input, { credentials: "include", ...init });
+}
+
+/**
+ * Owner calls still take the session hint as `token` so call sites keep their
+ * "must be signed in" checks; authentication itself rides on the cookie.
+ */
+function ownerHeaders(token: string): Record<string, string> {
+  void token;
+  return {};
+}
 
 export type Localized = {
   "zh-Hant": string;
@@ -141,15 +162,29 @@ export function mediaUrl(path: string): string {
 
 export function getSessionToken(): string | null {
   if (typeof window === "undefined") return null;
+  // Drop any raw token left over from the old localStorage session scheme.
+  if (window.localStorage.getItem(LEGACY_SESSION_KEY) !== null) {
+    window.localStorage.removeItem(LEGACY_SESSION_KEY);
+  }
   return window.localStorage.getItem(SESSION_KEY);
 }
 
-export function setSessionToken(token: string) {
-  window.localStorage.setItem(SESSION_KEY, token);
+export function setSessionToken() {
+  window.localStorage.removeItem(LEGACY_SESSION_KEY);
+  window.localStorage.setItem(SESSION_KEY, SESSION_HINT);
 }
 
 export function clearSessionToken() {
+  window.localStorage.removeItem(LEGACY_SESSION_KEY);
   window.localStorage.removeItem(SESSION_KEY);
+}
+
+export async function logoutOwner() {
+  try {
+    await apiFetch(`${API_BASE}/api/auth/logout`, { method: "POST" });
+  } finally {
+    clearSessionToken();
+  }
 }
 
 export class PublicApiError extends Error {
@@ -163,7 +198,7 @@ export class PublicApiError extends Error {
 const PUBLIC_FETCH_MS = 8_000;
 
 function publicFetch(url: string, init?: RequestInit) {
-  return fetch(url, {
+  return apiFetch(url, {
     ...init,
     signal: AbortSignal.timeout(PUBLIC_FETCH_MS),
   });
@@ -201,7 +236,7 @@ async function parseError(res: Response): Promise<string> {
 export async function requestOtp(email: string) {
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/api/auth/otp/request`, {
+    res = await apiFetch(`${API_BASE}/api/auth/otp/request`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
@@ -214,18 +249,18 @@ export async function requestOtp(email: string) {
 }
 
 export async function verifyOtp(email: string, code: string) {
-  const res = await fetch(`${API_BASE}/api/auth/otp/verify`, {
+  const res = await apiFetch(`${API_BASE}/api/auth/otp/verify`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, code }),
   });
   if (!res.ok) throw new Error(await parseError(res));
-  return res.json() as Promise<{ session_token: string }>;
+  return res.json() as Promise<{ status: string }>;
 }
 
 export async function fetchMe(token: string) {
-  const res = await fetch(`${API_BASE}/api/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/auth/me`, {
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return res.json() as Promise<{ email: string; role: string }>;
@@ -262,7 +297,7 @@ export async function streamPublicGuide(
   history: PublicGuideMessage[],
   onDelta: (text: string) => void,
 ): Promise<string> {
-  const response = await fetch(`${API_BASE}/api/public/guide/chat`, {
+  const response = await apiFetch(`${API_BASE}/api/public/guide/chat`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -322,8 +357,8 @@ export async function streamPublicGuide(
 }
 
 export async function fetchOwnerSite(token: string): Promise<OwnerSite> {
-  const res = await fetch(`${API_BASE}/api/owner/site`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/site`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -334,10 +369,10 @@ export async function saveOwnerSite(
   token: string,
   body: OwnerSite,
 ): Promise<OwnerSite> {
-  const res = await fetch(`${API_BASE}/api/owner/site`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/site`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -352,9 +387,9 @@ export async function uploadOwnerAvatar(
 ): Promise<{ avatarUrl: string }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/api/owner/avatar`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/avatar`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
     body: form,
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -367,9 +402,9 @@ export async function uploadOwnerHeroVisual(
 ): Promise<OwnerSite> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/api/owner/hero-visual`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/hero-visual`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
     body: form,
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -377,9 +412,9 @@ export async function uploadOwnerHeroVisual(
 }
 
 export async function clearOwnerHeroVisual(token: string): Promise<OwnerSite> {
-  const res = await fetch(`${API_BASE}/api/owner/hero-visual`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/hero-visual`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerSite;
@@ -391,9 +426,9 @@ export async function uploadOwnerMedia(
 ): Promise<{ url: string }> {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch(`${API_BASE}/api/owner/media`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/media`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
     body: form,
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -409,10 +444,10 @@ export async function translateOwnerLocalized(
   token: string,
   value: Localized,
 ): Promise<TranslateResult> {
-  const res = await fetch(`${API_BASE}/api/owner/translate`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/translate`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ ...value, overwrite: true }),
@@ -501,7 +536,7 @@ export async function fetchPublicSource(
 ): Promise<PublicSourceOverview | null> {
   const params = ref ? `?ref=${encodeURIComponent(ref)}` : "";
   try {
-    const res = await fetch(
+    const res = await apiFetch(
       `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source${params}`,
       { cache: "no-store" },
     );
@@ -518,7 +553,7 @@ export async function fetchPublicSourceTree(
   path: string,
 ): Promise<SourceTreeEntry[]> {
   const params = new URLSearchParams({ ref, path });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source/tree?${params}`,
     { cache: "no-store" },
   );
@@ -533,7 +568,7 @@ export async function fetchPublicSourceBlob(
   path: string,
 ): Promise<{ path: string; content: string } | null> {
   const params = new URLSearchParams({ ref, path });
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/public/projects/${encodeURIComponent(slug)}/source/blob?${params}`,
     { cache: "no-store" },
   );
@@ -544,8 +579,8 @@ export async function fetchPublicSourceBlob(
 export async function fetchOwnerProjects(
   token: string,
 ): Promise<OwnerProject[]> {
-  const res = await fetch(`${API_BASE}/api/owner/projects`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/projects`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -556,10 +591,10 @@ export async function createOwnerProject(
   token: string,
   body: Omit<OwnerProject, "id" | "sourceRepo">,
 ): Promise<OwnerProject> {
-  const res = await fetch(`${API_BASE}/api/owner/projects`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/projects`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -573,10 +608,10 @@ export async function saveOwnerProject(
   id: string,
   body: Omit<OwnerProject, "id" | "sourceRepo">,
 ): Promise<OwnerProject> {
-  const res = await fetch(`${API_BASE}/api/owner/projects/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/projects/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -588,8 +623,8 @@ export async function saveOwnerProject(
 export async function startGitHubOAuth(
   token: string,
 ): Promise<{ authorizationUrl: string }> {
-  const res = await fetch(`${API_BASE}/api/owner/github/oauth/start`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/github/oauth/start`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -621,8 +656,8 @@ export type ResumeGithubPush = {
 export async function fetchOwnerGitHubRepos(
   token: string,
 ): Promise<SourceRepo[] | null> {
-  const res = await fetch(`${API_BASE}/api/owner/github/repos`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/github/repos`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (res.status === 409) return null;
@@ -633,8 +668,8 @@ export async function fetchOwnerGitHubRepos(
 export async function fetchOwnerGitHubAccount(
   token: string,
 ): Promise<GitHubAccount> {
-  const res = await fetch(`${API_BASE}/api/owner/github/account`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/github/account`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -642,9 +677,9 @@ export async function fetchOwnerGitHubAccount(
 }
 
 export async function ensureOwnerCvRepo(token: string): Promise<CvRepo> {
-  const res = await fetch(`${API_BASE}/api/owner/github/cv-repo`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/github/cv-repo`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as CvRepo;
@@ -655,12 +690,12 @@ export async function attachOwnerSourceRepo(
   projectId: string,
   fullName: string,
 ): Promise<OwnerProject> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/owner/projects/${projectId}/source-repo`,
     {
       method: "PUT",
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...ownerHeaders(token),
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ fullName }),
@@ -771,8 +806,8 @@ export async function fetchPublicArticleCategories(
 export async function fetchOwnerArticleCategories(
   token: string,
 ): Promise<OwnerArticleCategory[]> {
-  const res = await fetch(`${API_BASE}/api/owner/article-categories`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/article-categories`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -783,10 +818,10 @@ export async function createOwnerArticleCategory(
   token: string,
   body: { slug: string; title: Localized; order: number },
 ): Promise<OwnerArticleCategory> {
-  const res = await fetch(`${API_BASE}/api/owner/article-categories`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/article-categories`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -800,10 +835,10 @@ export async function saveOwnerArticleCategory(
   id: string,
   body: { slug: string; title: Localized; order: number },
 ): Promise<OwnerArticleCategory> {
-  const res = await fetch(`${API_BASE}/api/owner/article-categories/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/article-categories/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -816,9 +851,9 @@ export async function deleteOwnerArticleCategory(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/article-categories/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/article-categories/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
@@ -826,8 +861,8 @@ export async function deleteOwnerArticleCategory(
 export async function fetchOwnerArticles(
   token: string,
 ): Promise<OwnerArticle[]> {
-  const res = await fetch(`${API_BASE}/api/owner/articles`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/articles`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -838,10 +873,10 @@ export async function createOwnerArticle(
   token: string,
   body: Omit<OwnerArticle, "id">,
 ): Promise<OwnerArticle> {
-  const res = await fetch(`${API_BASE}/api/owner/articles`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/articles`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -855,10 +890,10 @@ export async function saveOwnerArticle(
   id: string,
   body: Omit<OwnerArticle, "id">,
 ): Promise<OwnerArticle> {
-  const res = await fetch(`${API_BASE}/api/owner/articles/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/articles/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -871,9 +906,9 @@ export async function deleteOwnerArticle(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/articles/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/articles/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
@@ -931,8 +966,8 @@ export async function fetchPublicJournal(
 export async function fetchOwnerJournals(
   token: string,
 ): Promise<OwnerJournal[]> {
-  const res = await fetch(`${API_BASE}/api/owner/journals`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/journals`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -943,10 +978,10 @@ export async function createOwnerJournal(
   token: string,
   body: Omit<OwnerJournal, "id">,
 ): Promise<OwnerJournal> {
-  const res = await fetch(`${API_BASE}/api/owner/journals`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/journals`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -960,10 +995,10 @@ export async function saveOwnerJournal(
   id: string,
   body: Omit<OwnerJournal, "id">,
 ): Promise<OwnerJournal> {
-  const res = await fetch(`${API_BASE}/api/owner/journals/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/journals/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -976,9 +1011,9 @@ export async function deleteOwnerJournal(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/journals/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/journals/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
@@ -1011,7 +1046,7 @@ export async function submitPublicComment(
   slug: string,
   body: { displayName: string; email: string; body: string },
 ): Promise<void> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/public/${kind}/${encodeURIComponent(slug)}/comments`,
     {
       method: "POST",
@@ -1025,8 +1060,8 @@ export async function submitPublicComment(
 export async function fetchOwnerComments(
   token: string,
 ): Promise<OwnerComment[]> {
-  const res = await fetch(`${API_BASE}/api/owner/comments`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/comments`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -1038,9 +1073,9 @@ export async function moderateOwnerComment(
   id: string,
   action: "approve" | "reject",
 ): Promise<OwnerComment> {
-  const res = await fetch(`${API_BASE}/api/owner/comments/${id}/${action}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/comments/${id}/${action}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerComment;
@@ -1051,10 +1086,10 @@ export async function replyOwnerComment(
   id: string,
   body: string,
 ): Promise<OwnerComment> {
-  const res = await fetch(`${API_BASE}/api/owner/comments/${id}/reply`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/comments/${id}/reply`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ body }),
@@ -1111,8 +1146,8 @@ export async function fetchPublicAbout(
 export async function fetchOwnerAboutModules(
   token: string,
 ): Promise<OwnerAboutModule[]> {
-  const res = await fetch(`${API_BASE}/api/owner/about-modules`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/about-modules`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -1123,10 +1158,10 @@ export async function createOwnerAboutModule(
   token: string,
   body: Omit<OwnerAboutModule, "id">,
 ): Promise<OwnerAboutModule> {
-  const res = await fetch(`${API_BASE}/api/owner/about-modules`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/about-modules`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -1140,10 +1175,10 @@ export async function saveOwnerAboutModule(
   id: string,
   body: Omit<OwnerAboutModule, "id">,
 ): Promise<OwnerAboutModule> {
-  const res = await fetch(`${API_BASE}/api/owner/about-modules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/about-modules/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -1156,9 +1191,9 @@ export async function deleteOwnerAboutModule(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/about-modules/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/about-modules/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
@@ -1327,8 +1362,8 @@ export async function fetchPublicResume(slug: string): Promise<PublicResume> {
 export async function fetchOwnerResumeTemplates(
   token: string,
 ): Promise<OwnerResumeTemplate[]> {
-  const res = await fetch(`${API_BASE}/api/owner/resume-templates`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/resume-templates`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -1339,10 +1374,10 @@ export async function createOwnerResumeTemplate(
   token: string,
   body: Omit<OwnerResumeTemplate, "id" | "builtin">,
 ): Promise<OwnerResumeTemplate> {
-  const res = await fetch(`${API_BASE}/api/owner/resume-templates`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resume-templates`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -1356,10 +1391,10 @@ export async function saveOwnerResumeTemplate(
   id: string,
   body: Omit<OwnerResumeTemplate, "id" | "builtin">,
 ): Promise<OwnerResumeTemplate> {
-  const res = await fetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -1372,16 +1407,16 @@ export async function deleteOwnerResumeTemplate(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resume-templates/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
 
 export async function fetchOwnerResumes(token: string): Promise<OwnerResume[]> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes`, {
+    headers: ownerHeaders(token),
     cache: "no-store",
   });
   if (!res.ok) throw new Error(await parseError(res));
@@ -1415,10 +1450,10 @@ export async function createOwnerResume(
   token: string,
   body: OwnerResume,
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(resumePayload(body)),
@@ -1432,10 +1467,10 @@ export async function saveOwnerResume(
   id: string,
   body: OwnerResume,
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}`, {
     method: "PUT",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(resumePayload(body)),
@@ -1448,9 +1483,9 @@ export async function deleteOwnerResume(
   token: string,
   id: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}`, {
     method: "DELETE",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
 }
@@ -1459,9 +1494,9 @@ export async function generateOwnerResume(
   token: string,
   id: string,
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/generate`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}/generate`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerResume;
@@ -1476,8 +1511,8 @@ export async function downloadOwnerResumePdf(
   id: string,
   filename: string,
 ) {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/pdf`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}/pdf`, {
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   const blob = await res.blob();
@@ -1493,9 +1528,9 @@ export async function publishOwnerResume(
   token: string,
   id: string,
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/publish`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}/publish`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerResume;
@@ -1505,9 +1540,9 @@ export async function unpublishOwnerResume(
   token: string,
   id: string,
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/unpublish`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}/unpublish`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as OwnerResume;
@@ -1517,9 +1552,9 @@ export async function pushOwnerResumeToGithub(
   token: string,
   id: string,
 ): Promise<ResumeGithubPush> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/${id}/push-github`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/${id}/push-github`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
+    headers: ownerHeaders(token),
   });
   if (!res.ok) throw new Error(await parseError(res));
   return (await res.json()) as ResumeGithubPush;
@@ -1529,12 +1564,12 @@ export async function analyzeOwnerResumeGithubProject(
   token: string,
   body: { fullName: string; locale: string },
 ): Promise<{ name: string; tech_stack: string[]; description: string[] }> {
-  const res = await fetch(
+  const res = await apiFetch(
     `${API_BASE}/api/owner/resumes/analyze-github-project`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
+        ...ownerHeaders(token),
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -1552,10 +1587,10 @@ export async function importOwnerResumeFromGithub(
   token: string,
   body: { fullName: string; path: string; ref?: string; slug?: string },
 ): Promise<OwnerResume> {
-  const res = await fetch(`${API_BASE}/api/owner/resumes/import-github`, {
+  const res = await apiFetch(`${API_BASE}/api/owner/resumes/import-github`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -1622,10 +1657,10 @@ async function ownerAgentJson<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await apiFetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...ownerHeaders(token),
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
@@ -1762,7 +1797,7 @@ export async function streamOwnerAgent(
   signal?: AbortSignal,
 ): Promise<string> {
   let body: BodyInit;
-  let headers: HeadersInit = { Authorization: `Bearer ${token}` };
+  let headers: HeadersInit = ownerHeaders(token);
   if (files.length) {
     const form = new FormData();
     form.append("message", message);
@@ -1779,7 +1814,7 @@ export async function streamOwnerAgent(
     });
   }
 
-  const response = await fetch(`${API_BASE}/api/owner/agent/chat`, {
+  const response = await apiFetch(`${API_BASE}/api/owner/agent/chat`, {
     method: "POST",
     headers,
     body,

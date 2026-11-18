@@ -70,6 +70,7 @@ def settings(tmp_path) -> Settings:
             "http://localhost:3000,http://127.0.0.1:3000"
         ),
         agent_service_token="",
+        session_cookie_secure=False,
     )
 
 
