@@ -27,7 +27,7 @@ function LazyCodeBlock({ lang, text }: { lang: string; text: string }) {
   }, [inView, lang, text]);
 
   return (
-    <pre ref={ref} className="code-block">
+    <pre ref={ref} className="code-block" tabIndex={0}>
       {html ? (
         <code
           className={`hljs${lang ? ` language-${lang}` : ""}`}
@@ -44,6 +44,6 @@ export function HighlightedPre({ children }: { children?: ReactNode }) {
   const mermaid = mermaidSourceFromPre(children);
   if (mermaid !== null) return <MermaidDiagram source={mermaid} />;
   const fence = fenceFromPre(children);
-  if (!fence) return <pre>{children}</pre>;
+  if (!fence) return <pre tabIndex={0}>{children}</pre>;
   return <LazyCodeBlock lang={fence.lang} text={fence.text} />;
 }

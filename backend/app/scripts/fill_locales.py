@@ -97,15 +97,19 @@ def fix_field(
 
     hant, hans = out["zh-Hant"], out["zh-Hans"]
     if hant.strip() and needs_script_conversion(hant, "zh-Hant"):
-        out["zh-Hant"] = to_script(hant, "zh-Hant")
-        notes.append("script-fix:zh-Hant")
+        fixed = to_script(hant, "zh-Hant")
+        if fixed != hant:
+            out["zh-Hant"] = fixed
+            notes.append("script-fix:zh-Hant")
     elif not hant.strip() and hans.strip():
         out["zh-Hant"] = to_script(hans, "zh-Hant")
         notes.append("fill:zh-Hant")
 
     if hans.strip() and needs_script_conversion(hans, "zh-Hans"):
-        out["zh-Hans"] = to_script(hans, "zh-Hans")
-        notes.append("script-fix:zh-Hans")
+        fixed = to_script(hans, "zh-Hans")
+        if fixed != hans:
+            out["zh-Hans"] = fixed
+            notes.append("script-fix:zh-Hans")
     elif not hans.strip() and out["zh-Hant"].strip():
         out["zh-Hans"] = to_script(out["zh-Hant"], "zh-Hans")
         notes.append("fill:zh-Hans")

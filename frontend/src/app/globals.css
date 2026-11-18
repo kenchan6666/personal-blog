@@ -7059,3 +7059,14 @@ html[data-theme="dark"] .nav-sheet-scrim {
 .empty-state:not(.is-compact) {
   margin-top: 1.5rem;
 }
+
+/* Small pills on tinted fills need the stronger ink to clear 4.5:1. */
+.status-pill,
+.gh-files-count {
+  color: var(--text-primary);
+}
+
+pre[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-link);
+  outline-offset: 2px;
+}
