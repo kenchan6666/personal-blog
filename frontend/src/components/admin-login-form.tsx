@@ -100,6 +100,10 @@ export function AdminLoginForm({ locale, dict }: Props) {
           </label>
         )}
 
+        {sent && !error && (
+          <p className="text-sm text-[var(--text-muted)]">{dict.admin.sentHint}</p>
+        )}
+
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
         <button type="submit" className="btn-cta w-full" disabled={busy !== "idle"}>
