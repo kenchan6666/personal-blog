@@ -7,7 +7,7 @@ pydantic-settings>=2.6.0
 python-multipart>=0.0.12
 pillow>=10.0.0
 httpx>=0.28.0
-zhconv>=1.4.3
+opencc-python-reimplemented==0.1.7
 reportlab>=4.2.0
 pypdf>=5.0.0
 asgi-lifespan>=2.1.0

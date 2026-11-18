@@ -86,6 +86,8 @@ from app.models import (
 )
 from app.public_agent import register_public_agent_routes
 from app.resume_routes import register_resume_routes
+from app.image_variants import intrinsic_size, variant_path
+from app.search import SearchDoc, localized_values, run_search
 from app.store import bind_store, build_store, current_store, new_document
 from app.translate import (
     GoogleGtxTranslator,
@@ -636,8 +638,7 @@ def create_app(
         )
         return {"url": content_public_url(filename)}
 
-    @app.get("/api/public/media/content/{filename}")
-    async def public_content_image(filename: str) -> FileResponse:
+    def media_file(filename: str) -> Path:
         directory: Path = app.state.avatar_dir
         path = resolve_avatar_path(directory, filename)
         if path is None:
@@ -645,12 +646,42 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
+        return path
+
+    def media_meta(filename: str) -> dict[str, int]:
+        path = media_file(filename)
+        try:
+            width, height = intrinsic_size(path)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="not_found"
+            ) from None
+        return {"width": width, "height": height}
+
+    def serve_media(filename: str, width: int | None) -> FileResponse:
+        path = media_file(filename)
         media_type = media_type_for_filename(path.name)
+        if width:
+            try:
+                variant = variant_path(path, width)
+            except Exception as exc:
+                print(f"[media] variant failed {path.name}: {type(exc).__name__}", flush=True)
+                variant = path
+            if variant != path:
+                path, media_type = variant, "image/webp"
         return FileResponse(
             path,
             media_type=media_type,
-            headers={"Cache-Control": "public, max-age=86400"},
+            headers={"Cache-Control": "public, max-age=2592000, immutable" if width else "public, max-age=86400"},
         )
+
+    @app.get("/api/public/media/content/{filename}/meta")
+    async def public_content_image_meta(filename: str) -> dict[str, int]:
+        return media_meta(filename)
+
+    @app.get("/api/public/media/content/{filename}")
+    async def public_content_image(filename: str, w: int | None = None) -> FileResponse:
+        return serve_media(filename, w)
 
     @app.post("/api/owner/hero-visual")
     async def owner_upload_hero_visual(
@@ -683,21 +714,13 @@ def create_app(
         await current_store().save(site)
         return site.to_owner_dict()
 
+    @app.get("/api/public/media/hero/{filename}/meta")
+    async def public_hero_visual_meta(filename: str) -> dict[str, int]:
+        return media_meta(filename)
+
     @app.get("/api/public/media/hero/{filename}")
-    async def public_hero_visual(filename: str) -> FileResponse:
-        directory: Path = app.state.avatar_dir
-        path = resolve_avatar_path(directory, filename)
-        if path is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="not_found",
-            )
-        media_type = media_type_for_filename(path.name)
-        return FileResponse(
-            path,
-            media_type=media_type,
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
+    async def public_hero_visual(filename: str, w: int | None = None) -> FileResponse:
+        return serve_media(filename, w)
 
     def normalize_locale(locale: str) -> str:
         return locale if locale in LOCALES else "zh-Hant"
@@ -1845,6 +1868,88 @@ def create_app(
         modules = await current_store().find(AboutModule, status="published")
         modules.sort(key=lambda item: (item.order, item.slug))
         return [item.resolve(locale) for item in modules]
+
+    @app.get("/api/public/search")
+    async def public_search(q: str = "", locale: str = "zh-Hant") -> list[dict[str, Any]]:
+        locale = normalize_locale(locale)
+        if not q.strip():
+            return []
+        store = current_store()
+        categories = {
+            item.slug: item for item in await store.find(ArticleCategory)
+        }
+        docs: list[SearchDoc] = []
+        articles = await store.find(Article, status="published")
+        articles.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
+        for article in articles:
+            payload = await public_article_payload(article, locale)
+            category = categories.get(payload["categorySlug"])
+            docs.append(
+                SearchDoc(
+                    kind="article",
+                    slug=payload["slug"],
+                    title=payload["title"],
+                    summary=payload["summary"],
+                    body=payload["body"],
+                    category_slug=payload["categorySlug"],
+                    category_title=payload["categoryTitle"],
+                    tags=list(localized_values(category.title)) if category else [],
+                    haystack_parts=[
+                        *localized_values(article.title, article.summary, article.body),
+                        *(localized_values(category.title) if category else []),
+                        payload["categorySlug"],
+                    ],
+                )
+            )
+        journals = await store.find(Journal, status="published")
+        journals.sort(key=lambda item: dated(item.published_at, item.id), reverse=True)
+        for journal in journals:
+            payload = journal.resolve(locale)
+            docs.append(
+                SearchDoc(
+                    kind="journal",
+                    slug=journal.slug,
+                    title=payload["title"],
+                    summary=payload["summary"],
+                    body=payload["body"],
+                    haystack_parts=list(
+                        localized_values(journal.title, journal.summary, journal.body)
+                    ),
+                )
+            )
+        projects = await store.find(Project, status="published")
+        projects.sort(key=lambda item: (item.order, item.slug))
+        for project in projects:
+            payload = project.resolve(locale)
+            repo = project.source_repo
+            docs.append(
+                SearchDoc(
+                    kind="project",
+                    slug=project.slug,
+                    title=payload["title"],
+                    summary=payload["summary"],
+                    body=payload["body"],
+                    haystack_parts=[
+                        *localized_values(project.title, project.summary, project.body),
+                        repo.full_name if repo else "",
+                    ],
+                )
+            )
+        modules = await store.find(AboutModule, status="published")
+        modules.sort(key=lambda item: (item.order, item.slug))
+        for module in modules:
+            payload = module.resolve(locale)
+            docs.append(
+                SearchDoc(
+                    kind="about",
+                    slug=module.slug,
+                    title=payload["title"],
+                    summary="",
+                    body=payload["body"],
+                    haystack_parts=list(localized_values(module.title, module.body)),
+                )
+            )
+        return run_search(docs, q)
 
     @app.get("/api/owner/about-modules")
     async def owner_list_about_modules(

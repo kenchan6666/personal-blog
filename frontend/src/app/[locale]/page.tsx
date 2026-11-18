@@ -18,6 +18,8 @@ import { pageMetadata } from "@/lib/seo";
 import { firstMarkdownImage } from "@/lib/markdown-preview";
 import { toProjectTiles } from "@/lib/project-tiles";
 import { ProjectTile } from "@/components/project-tile";
+import { EmptyState } from "@/components/empty-state";
+import { mediaSrcSet, mediaVariant } from "@/lib/content-image";
 import {
   mergeHeroContent,
   mergeProfileContent,
@@ -83,18 +85,30 @@ function ArticleRow({
             {formatCount(dict.archive.words, article.wordCount)}
           </p>
         </div>
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image}
-            alt=""
-            width={168}
-            height={96}
-            loading="lazy"
-            decoding="async"
-            className="post-row-image"
-          />
-        ) : null}
+        {/* Typographic cover (category + date) that the photo, if any, sits on;
+            never an empty grey box while the image loads or when there is none. */}
+        <span className={`post-row-cover${image ? " has-image" : ""}`} aria-hidden>
+          <span className="post-row-cover-label">
+            {article.categoryTitle || dict.articles.title}
+          </span>
+          <span className="post-row-cover-date">
+            {formatPostDate(article.publishedAt, locale)}
+          </span>
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={mediaVariant(image, 384)}
+              srcSet={mediaSrcSet(image)?.split(", ").slice(0, 3).join(", ")}
+              sizes="(min-width: 900px) 168px, 104px"
+              alt=""
+              width={168}
+              height={96}
+              loading="lazy"
+              decoding="async"
+              className="post-row-image"
+            />
+          ) : null}
+        </span>
       </Link>
     </li>
   );
@@ -155,6 +169,10 @@ export default async function HomePage({
         email={site?.profile.publicEmail ?? ""}
         links={site?.profile.links ?? []}
         visual={site?.hero.visual ?? null}
+        visualAlt={dict.heroVisualAlt.replace(
+          "{brand}",
+          mergeHeroContent(dict, site).brand,
+        )}
       />
       <ProfileSection content={mergeProfileContent(dict, site)} />
       {featured ? (
@@ -226,7 +244,11 @@ export default async function HomePage({
                 ))}
               </ul>
             ) : (
-              <p className="card home-empty">{dict.journals.empty}</p>
+              <EmptyState
+                compact
+                title={dict.journals.emptyTitle}
+                body={dict.journals.emptyBody}
+              />
             )}
           </div>
         </div>

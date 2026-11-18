@@ -95,10 +95,11 @@ export function ArchiveIndex({
         </p>
       </div>
       {visibleFilters.length > 0 ? (
-        <div className="archive-filters" role="tablist">
+        <div className="archive-filters" role="group" aria-label={labels.all}>
           <button
             type="button"
             className={`archive-chip${active === "all" ? " is-active" : ""}`}
+            aria-pressed={active === "all"}
             onClick={() => setActive("all")}
           >
             {labels.all}
@@ -108,6 +109,7 @@ export function ArchiveIndex({
               key={filter.id}
               type="button"
               className={`archive-chip${active === filter.id ? " is-active" : ""}`}
+              aria-pressed={active === filter.id}
               onClick={() => setActive(filter.id)}
             >
               {filter.label}

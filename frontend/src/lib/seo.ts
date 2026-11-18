@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { locales, type Locale } from "@/i18n/config";
 import { fetchPublicSite, type PublicSite } from "@/lib/api";
+import { brandForShell } from "@/lib/site-content";
 import { markdownImages } from "@/lib/markdown-images";
+import { getDictionary } from "@/i18n/dictionaries";
 
 const SITE_NAME = "ken";
 
@@ -61,8 +63,11 @@ export async function pageMetadata({
   const languages = Object.fromEntries(
     locales.map((item) => [item, `${origin}/${item}${suffix}`]),
   );
-  const fullTitle = title === SITE_NAME ? SITE_NAME : `${title} · ${SITE_NAME}`;
-  const desc = description?.trim() || undefined;
+  const siteName = await siteNameFor(locale);
+  const fullTitle = title === siteName ? siteName : `${title} · ${siteName}`;
+  const desc = clampDescription(
+    description?.trim() || (await siteDescriptionFallback(locale)),
+  );
   const ogImage = absoluteUrl(
     firstMarkdownImage(markdown) || image || (await siteImageFallback(locale)),
   );
@@ -78,7 +83,7 @@ export async function pageMetadata({
       title: fullTitle,
       description: desc,
       url,
-      siteName: SITE_NAME,
+      siteName,
       locale: OG_LOCALE[locale],
       type: "website",
       images: [{ url: ogImage, alt: fullTitle }],
@@ -97,5 +102,33 @@ async function siteImageFallback(locale: Locale): Promise<string> {
     return siteShareImage(await fetchPublicSite(locale));
   } catch {
     return "/mascot.png";
+  }
+}
+
+function clampDescription(text: string): string {
+  const flat = text.replace(/[#>*_`]/g, "").replace(/\s+/g, " ").trim();
+  return flat.length > 160 ? `${flat.slice(0, 157).trimEnd()}…` : flat;
+}
+
+/** Every page gets a description: the owner's own bio, else a generic line. */
+async function siteDescriptionFallback(locale: Locale): Promise<string> {
+  try {
+    const site = await fetchPublicSite(locale);
+    const support = site?.hero.support?.trim();
+    const bio = site?.profile.bio?.trim();
+    if (support) return support;
+    if (bio) return bio;
+  } catch {
+    /* fall through */
+  }
+  return getDictionary(locale).seoFallback;
+}
+
+/** Title suffix: the owner's brand ("Chan Yat Nam"), not a hard-coded nickname. */
+async function siteNameFor(locale: Locale): Promise<string> {
+  try {
+    return brandForShell(getDictionary(locale), await fetchPublicSite(locale)) || SITE_NAME;
+  } catch {
+    return SITE_NAME;
   }
 }

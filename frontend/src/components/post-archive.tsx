@@ -136,10 +136,13 @@ export function PostArchive({
 
   const categories = useMemo(() => {
     if (categoryOptions && categoryOptions.length > 0) {
-      return categoryOptions.map((item) => ({
-        ...item,
-        count: posts.filter((post) => post.categorySlug === item.slug).length,
-      }));
+      // Categories with no published posts are noise in the filter row.
+      return categoryOptions
+        .map((item) => ({
+          ...item,
+          count: posts.filter((post) => post.categorySlug === item.slug).length,
+        }))
+        .filter((item) => item.count > 0);
     }
     const seen = new Map<string, { slug: string; title: string; count: number }>();
     for (const post of posts) {
@@ -240,6 +243,7 @@ export function PostArchive({
                   key={key}
                   type="button"
                   className={sort === key ? "segment-active" : undefined}
+                  aria-pressed={sort === key}
                   onClick={() => setSort(key)}
                 >
                   {label}
@@ -252,12 +256,13 @@ export function PostArchive({
               {categories.length > 0 ? (
                 <div
                   className="post-archive-chips"
-                  role="tablist"
+                  role="group"
                   aria-label={chrome.category ?? chrome.all}
                 >
                   <button
                     type="button"
                     className={`post-archive-chip${category === "all" ? " is-active" : ""}`}
+                    aria-pressed={category === "all"}
                     onClick={() => setCategory("all")}
                   >
                     {chrome.category ?? chrome.all}
@@ -268,6 +273,7 @@ export function PostArchive({
                       key={item.slug}
                       type="button"
                       className={`post-archive-chip${category === item.slug ? " is-active" : ""}`}
+                      aria-pressed={category === item.slug}
                       onClick={() => setCategory(item.slug)}
                     >
                       {item.title}
@@ -277,10 +283,11 @@ export function PostArchive({
                 </div>
               ) : null}
               {years.length > 0 ? (
-                <div className="post-archive-chips" role="tablist" aria-label={chrome.all}>
+                <div className="post-archive-chips" role="group" aria-label={chrome.all}>
                   <button
                     type="button"
                     className={`post-archive-chip${year === "all" ? " is-active" : ""}`}
+                    aria-pressed={year === "all"}
                     onClick={() => setYear("all")}
                   >
                     {chrome.all}
@@ -291,6 +298,7 @@ export function PostArchive({
                       key={value}
                       type="button"
                       className={`post-archive-chip${year === String(value) ? " is-active" : ""}`}
+                      aria-pressed={year === String(value)}
                       onClick={() => setYear(String(value))}
                     >
                       {value}
@@ -300,10 +308,11 @@ export function PostArchive({
                 </div>
               ) : null}
               {projects.length > 0 ? (
-                <div className="post-archive-chips" role="tablist" aria-label={chrome.related}>
+                <div className="post-archive-chips" role="group" aria-label={chrome.related}>
                   <button
                     type="button"
                     className={`post-archive-chip${project === "all" ? " is-active" : ""}`}
+                    aria-pressed={project === "all"}
                     onClick={() => setProject("all")}
                   >
                     {chrome.related}
@@ -313,6 +322,7 @@ export function PostArchive({
                       key={item.slug}
                       type="button"
                       className={`post-archive-chip${project === item.slug ? " is-active" : ""}`}
+                      aria-pressed={project === item.slug}
                       onClick={() => setProject(item.slug)}
                     >
                       {item.title}

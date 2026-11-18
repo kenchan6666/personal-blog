@@ -6,6 +6,7 @@ import { mediaUrl, type HeroVisual as HeroVisualConfig } from "@/lib/api";
 
 type Props = {
   visual?: HeroVisualConfig | null;
+  alt?: string;
 };
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
@@ -23,7 +24,7 @@ function heroSource(path: string): { src: string; optimize: boolean } {
 }
 
 /** Mascot / photo sitting on a liquid-glass disc with a soft warm glow behind it. */
-export function HeroVisual({ visual }: Props) {
+export function HeroVisual({ visual, alt = "" }: Props) {
   const { src, optimize } = visual?.url
     ? heroSource(visual.url)
     : { src: "", optimize: false };
@@ -48,7 +49,7 @@ export function HeroVisual({ visual }: Props) {
         >
           <Image
             src={failed ? mediaUrl(visual?.url ?? "") : src}
-            alt=""
+            alt={alt}
             fill
             priority
             unoptimized={!optimize || failed}

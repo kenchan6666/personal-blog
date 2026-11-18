@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PageFrame } from "@/components/page-frame";
 import { PostArchive } from "@/components/post-archive";
+import { EmptyState } from "@/components/empty-state";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicJournals } from "@/lib/api";
@@ -34,6 +35,21 @@ export default async function JournalsPage({
   const locale = raw as Locale;
   const dict = getDictionary(locale);
   const journals = await fetchPublicJournals(locale);
+
+  if (journals.length === 0) {
+    return (
+      <PageFrame title={dict.nav.journals} narrow>
+        <EmptyState
+          title={dict.journals.emptyTitle}
+          body={dict.journals.emptyBody}
+          actions={[
+            { href: `/${locale}/articles`, label: dict.nav.articles },
+            { href: `/${locale}/projects`, label: dict.nav.projects },
+          ]}
+        />
+      </PageFrame>
+    );
+  }
 
   return (
     <PageFrame title={dict.nav.journals} narrow>

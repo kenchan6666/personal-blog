@@ -6,7 +6,13 @@ import { MarkdownBody } from "@/components/markdown-body";
 import { ReadingProgress } from "@/components/reading-progress";
 import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
-import { articleHref, fetchPublicArticle, type PublicArticle } from "@/lib/api";
+import {
+  articleHref,
+  fetchMediaMeta,
+  fetchPublicArticle,
+  type PublicArticle,
+} from "@/lib/api";
+import { markdownImages } from "@/lib/markdown-images";
 import { extractMarkdownHeadings } from "@/lib/headings";
 import { formatCount, formatPostDate } from "@/lib/post-meta";
 import { pageMetadata, pathWithoutLocale } from "@/lib/seo";
@@ -53,7 +59,7 @@ export default async function ArticlePathPage({
     if (article.categorySlug) {
       redirect(articleHref(locale, article));
     }
-    return renderArticle(locale, article);
+    return await renderArticle(locale, article);
   }
 
   if (path.length !== 2) notFound();
@@ -67,11 +73,16 @@ export default async function ArticlePathPage({
     redirect(articleHref(locale, article));
   }
 
-  return renderArticle(locale, article);
+  return await renderArticle(locale, article);
 }
 
-function renderArticle(locale: Locale, article: PublicArticle) {
+async function renderArticle(locale: Locale, article: PublicArticle) {
   const dict = getDictionary(locale);
+  const imageMeta = await fetchMediaMeta(
+    markdownImages(article.body).map((image) => image.src),
+  );
+  const figureAlt = (n: number) =>
+    dict.figureAlt.replace("{title}", article.title).replace("{n}", String(n));
   const headings = extractMarkdownHeadings(article.body);
   const showToc = headings.length >= 2;
   const showCategory = Boolean(article.categoryTitle);
@@ -118,7 +129,12 @@ function renderArticle(locale: Locale, article: PublicArticle) {
         </header>
         <div className="article-layout">
           <div className="article-body">
-            <MarkdownBody source={article.body} />
+            <MarkdownBody
+              source={article.body}
+              imageMeta={imageMeta}
+              fallbackAlt={figureAlt}
+              eagerFirstImage
+            />
           </div>
           {showToc ? (
             <ArticleToc headings={headings} label={dict.articles.contents} />

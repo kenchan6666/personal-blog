@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageFrame } from "@/components/page-frame";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
-import { articleHref } from "@/lib/api";
+import { articleHref, searchPublic, type PublicSearchHit } from "@/lib/api";
 import type { PublicAboutModule, PublicArticle, PublicJournal, PublicProject } from "@/lib/api";
 
 type Props = {
@@ -41,13 +41,62 @@ export function SiteSearch({
 }: Props) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
+  // Server search matches every locale and both Chinese scripts; the local
+  // filter below is only a fallback if the API is unreachable.
+  const [remote, setRemote] = useState<{ q: string; hits: PublicSearchHit[] } | null>(null);
+  const [remoteFailed, setRemoteFailed] = useState(false);
 
-  const results = useMemo(() => {
+  useEffect(() => {
+    const term = query.trim();
+    if (!term) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      searchPublic(locale, term, controller.signal)
+        .then((hits) => {
+          setRemote({ q: term, hits });
+          setRemoteFailed(false);
+        })
+        .catch((error: unknown) => {
+          if ((error as Error)?.name !== "AbortError") setRemoteFailed(true);
+        });
+    }, 160);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query, locale]);
+
+  const kindLabel: Record<PublicSearchHit["kind"], string> = {
+    article: dict.nav.articles,
+    journal: dict.nav.journals,
+    project: dict.nav.projects,
+    about: dict.nav.about,
+  };
+  const remoteHits =
+    remote && remote.q.toLowerCase() === q
+      ? remote.hits.map((hit) => ({
+          href:
+            hit.kind === "article"
+              ? articleHref(locale, hit)
+              : hit.kind === "journal"
+                ? `/${locale}/journals/${hit.slug}`
+                : hit.kind === "project"
+                  ? `/${locale}/projects/${hit.slug}`
+                  : `/${locale}/about#${hit.slug}`,
+          title: hit.title,
+          kind: hit.categoryTitle
+            ? `${kindLabel[hit.kind]} · ${hit.categoryTitle}`
+            : kindLabel[hit.kind],
+          summary: hit.summary,
+        }))
+      : null;
+
+  const localResults = useMemo(() => {
     if (!q) return [];
     const hits: { href: string; title: string; kind: string; summary: string }[] =
       [];
     for (const article of articles) {
-      if (haystack(article.title, article.summary, article.body).includes(q)) {
+      if (haystack(article.title, article.summary, article.body, article.categoryTitle, article.categorySlug).includes(q)) {
         hits.push({
           href: articleHref(locale, article),
           title: article.title,
@@ -91,18 +140,19 @@ export function SiteSearch({
         });
       }
     }
-    for (const module of about) {
-      if (haystack(module.title, module.body).includes(q)) {
+    for (const entry of about) {
+      if (haystack(entry.title, entry.body).includes(q)) {
         hits.push({
-          href: `/${locale}/about#${module.slug}`,
-          title: module.title,
+          href: `/${locale}/about#${entry.slug}`,
+          title: entry.title,
           kind: dict.nav.about,
-          summary: excerptAround(module.body, q),
+          summary: excerptAround(entry.body, q),
         });
       }
     }
     return hits;
   }, [q, query, articles, journals, projects, about, dict, locale]);
+  const results = remoteHits ?? (remoteFailed || !remote ? localResults : []);
 
   return (
     <PageFrame title={dict.search.title} narrow>
@@ -115,6 +165,9 @@ export function SiteSearch({
         aria-label={dict.nav.search}
         autoFocus
       />
+      <p className="sr-only" aria-live="polite">
+        {q ? `${results.length}` : ""}
+      </p>
       {!q ? (
         <p className="mt-6 text-sm text-[var(--text-muted)]">
           {dict.search.emptyQuery}
@@ -124,18 +177,14 @@ export function SiteSearch({
           {dict.archive.noMatch}
         </p>
       ) : (
-        <ul className="mt-6 flex flex-col gap-3">
+        <ul className="search-results">
           {results.map((item, index) => (
             <li key={`${item.href}-${item.title}-${index}`}>
-              <Link href={item.href} className="block rounded-xl py-2">
-                <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-                  {item.kind}
-                </p>
-                <p className="display-font text-lg font-bold">{item.title}</p>
+              <Link href={item.href} className="search-hit">
+                <p className="search-hit-kind">{item.kind}</p>
+                <p className="search-hit-title display-font">{item.title}</p>
                 {item.summary ? (
-                  <p className="text-sm text-[var(--text-muted)]">
-                    {item.summary}
-                  </p>
+                  <p className="search-hit-summary">{item.summary}</p>
                 ) : null}
               </Link>
             </li>

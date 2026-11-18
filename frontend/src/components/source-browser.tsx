@@ -54,6 +54,9 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   );
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState(false);
+  // README leads; the file tree stays folded until the visitor asks for it.
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [readmeOpen, setReadmeOpen] = useState(false);
   const skipInitialFetch = useRef(Boolean(initial));
 
   useEffect(() => {
@@ -141,6 +144,9 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   }
 
   const crumbs = dir.split("/").filter(Boolean);
+  // Dotfiles (.DS_Store, .gitignore, .env.example…) are noise for visitors.
+  const visibleTree = tree.filter((entry) => !entry.name.startsWith("."));
+  const atRoot = !blob && !dir;
   const language = blob ? sourceLanguage(blob.path) : { hljs: "", label: "" };
   const githubFile = blob
     ? githubBlobUrl(sourceRepo.fullName, overview.ref, blob.path)
@@ -214,47 +220,155 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
         </nav>
       </div>
 
-      {!blob ? (
-        <div className="gh-files">
-          <table>
-            <thead>
-              <tr>
-                <th>{labels.fileName}</th>
-                <th className="gh-kind-col">{labels.fileKind}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dir ? (
-                <tr>
-                  <td colSpan={2}>
-                    <button
-                      type="button"
-                      className="gh-file"
-                      onClick={() => void openDir(parentPath(dir))}
-                    >
-                      <span className="gh-muted">..</span>
-                    </button>
-                  </td>
-                </tr>
-              ) : null}
-              {tree.map((entry) => (
-                <tr key={entry.path}>
-                  <td>
-                    <button
-                      type="button"
-                      className="gh-file"
-                      onClick={() => void openEntry(entry)}
-                    >
-                      <FileIcon dir={entry.type === "dir"} />
-                      <span>{entry.name}</span>
-                    </button>
-                  </td>
-                  <td className="gh-kind-col">{kindLabel(entry)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {atRoot ? (
+        <div className="gh-box gh-readme">
+          <div className="gh-box-bar">
+            <button
+              type="button"
+              className="font-mono text-sm text-[var(--accent-link)]"
+              onClick={() =>
+                overview.readme.path
+                  ? void openFile(overview.readme.path)
+                  : undefined
+              }
+            >
+              {overview.readme.path || labels.readme}
+            </button>
+          </div>
+          <div
+            id={`readme-${slug}`}
+            className={`gh-box-body gh-readme-body${readmeOpen ? " is-open" : ""}`}
+          >
+            {overview.readme.content ? (
+              <GithubMarkdown
+                source={overview.readme.content}
+                repoFullName={sourceRepo.fullName}
+                refName={overview.ref}
+                onRepoPath={(path) => void openRepoPath(path)}
+              />
+            ) : (
+              <p className="text-[var(--text-muted)]">{labels.noReadme}</p>
+            )}
+          </div>
+          {overview.readme.content && overview.readme.content.length > 1800 ? (
+            <button
+              type="button"
+              className="gh-readme-toggle"
+              aria-expanded={readmeOpen}
+              aria-controls={`readme-${slug}`}
+              onClick={() => setReadmeOpen((open) => !open)}
+            >
+              {readmeOpen ? labels.readmeLess : labels.readmeMore}
+            </button>
+          ) : null}
         </div>
+      ) : null}
+
+      {!blob ? (
+        atRoot ? (
+          <details
+            className="gh-files-disclosure"
+            open={filesOpen}
+            onToggle={(event) => setFilesOpen(event.currentTarget.open)}
+          >
+            <summary className="gh-files-summary">
+              <FileIcon dir />
+              <span>{labels.files}</span>
+              <span className="gh-files-count">{visibleTree.length}</span>
+            </summary>
+            <div
+              className="gh-files"
+              tabIndex={0}
+              role="region"
+              aria-label={labels.files}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>{labels.fileName}</th>
+                    <th className="gh-kind-col">{labels.fileKind}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dir ? (
+                    <tr>
+                      <td colSpan={2}>
+                        <button
+                          type="button"
+                          className="gh-file"
+                          onClick={() => void openDir(parentPath(dir))}
+                        >
+                          <span className="gh-muted">..</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ) : null}
+                  {visibleTree.map((entry) => (
+                    <tr key={entry.path}>
+                      <td>
+                        <button
+                          type="button"
+                          className="gh-file"
+                          onClick={() => void openEntry(entry)}
+                        >
+                          <FileIcon dir={entry.type === "dir"} />
+                          <span>{entry.name}</span>
+                        </button>
+                      </td>
+                      <td className="gh-kind-col">{kindLabel(entry)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        ) : (
+          <div
+            className="gh-files"
+            tabIndex={0}
+            role="region"
+            aria-label={labels.files}
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>{labels.fileName}</th>
+                  <th className="gh-kind-col">{labels.fileKind}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dir ? (
+                  <tr>
+                    <td colSpan={2}>
+                      <button
+                        type="button"
+                        className="gh-file"
+                        onClick={() => void openDir(parentPath(dir))}
+                      >
+                        <span className="gh-muted">..</span>
+                      </button>
+                    </td>
+                  </tr>
+                ) : null}
+                {visibleTree.map((entry) => (
+                  <tr key={entry.path}>
+                    <td>
+                      <button
+                        type="button"
+                        className="gh-file"
+                        onClick={() => void openEntry(entry)}
+                      >
+                        <FileIcon dir={entry.type === "dir"} />
+                        <span>{entry.name}</span>
+                      </button>
+                    </td>
+                    <td className="gh-kind-col">{kindLabel(entry)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : (
         <div className="gh-box">
           <div className="gh-box-bar">
@@ -296,35 +410,6 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
         </div>
       )}
 
-      {!blob && !dir ? (
-        <div className="gh-box">
-          <div className="gh-box-bar">
-            <button
-              type="button"
-              className="font-mono text-sm text-[var(--accent-link)]"
-              onClick={() =>
-                overview.readme.path
-                  ? void openFile(overview.readme.path)
-                  : undefined
-              }
-            >
-              {overview.readme.path || labels.readme}
-            </button>
-          </div>
-          <div className="gh-box-body">
-            {overview.readme.content ? (
-              <GithubMarkdown
-                source={overview.readme.content}
-                repoFullName={sourceRepo.fullName}
-                refName={overview.ref}
-                onRepoPath={(path) => void openRepoPath(path)}
-              />
-            ) : (
-              <p className="text-[var(--text-muted)]">{labels.noReadme}</p>
-            )}
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }

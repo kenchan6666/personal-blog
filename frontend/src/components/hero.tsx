@@ -17,6 +17,7 @@ type Props = {
   email?: string;
   links?: PublicLink[];
   visual?: HeroVisualConfig | null;
+  visualAlt?: string;
 };
 
 export function Hero({
@@ -25,6 +26,7 @@ export function Hero({
   email = "",
   links = [],
   visual = null,
+  visualAlt = "",
 }: Props) {
   return (
     <section className="home-hero">
@@ -49,7 +51,7 @@ export function Hero({
         </div>
 
         <div className="hero-visual">
-          <HeroVisual visual={visual} />
+          <HeroVisual visual={visual} alt={visualAlt} />
         </div>
       </div>
     </section>

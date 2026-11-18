@@ -44,7 +44,7 @@ for sub in media resumes; do
 done
 if [ "${#targets[@]}" -gt 0 ]; then
   # -h follows the data/ symlink target so the real files are archived.
-  tar -czhf "$files_out.part" -C "$ROOT/data" "${targets[@]}"
+  tar -czhf "$files_out.part" --exclude=".variants" -C "$ROOT/data" "${targets[@]}"
   mv "$files_out.part" "$files_out"
 fi
 

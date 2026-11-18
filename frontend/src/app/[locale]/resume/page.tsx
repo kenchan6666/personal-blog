@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { PageFrame } from "@/components/page-frame";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -36,6 +36,8 @@ export default async function ResumeIndexPage({
   const dict = getDictionary(locale);
   const resumes = await fetchPublicResumes();
   if (resumes.length === 0) notFound();
+  // A single résumé: the list would be one lonely card, so go straight to it.
+  if (resumes.length === 1) redirect(`/${locale}/resume/${resumes[0].slug}`);
 
   return (
     <PageFrame title={dict.resume.title} lead={dict.resume.lead} narrow>

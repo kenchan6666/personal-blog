@@ -50,6 +50,8 @@ export default async function ResumeDetailPage({
     .filter(Boolean)
     .join(" · ");
   const pdfHref = publicResumePdfPath(slug);
+  // Older APIs lack the flag; fall back to "has a URL".
+  const hasPdf = resume.pdfAvailable ?? Boolean(resume.pdfUrl);
 
   return (
     <PageFrame
@@ -62,11 +64,13 @@ export default async function ResumeDetailPage({
       }
       narrow
     >
-      <div className="mb-5 flex flex-wrap gap-3">
-        <a className="btn-ghost" href={pdfHref} download={`${resume.slug}.pdf`}>
-          {dict.resume.download}
-        </a>
-      </div>
+      {hasPdf ? (
+        <div className="mb-5 flex flex-wrap gap-3">
+          <a className="btn-ghost" href={pdfHref} download={`${resume.slug}.pdf`}>
+            {dict.resume.download}
+          </a>
+        </div>
+      ) : null}
       <ResumePaper
         resume={resume}
         dict={dict}

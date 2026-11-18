@@ -146,19 +146,29 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
                 detail="github_write_failed",
             ) from None
 
+    def resume_pdf_path(row: Resume) -> Path | None:
+        if not row.pdf_filename:
+            return None
+        path = ensure_resume_dir(app.state.settings.resume_dir) / Path(row.pdf_filename).name
+        return path if path.is_file() else None
+
     @app.get("/api/public/resumes")
     async def public_list_resumes() -> list[dict[str, Any]]:
         rows = await current_store().find(Resume, status="published")
         rows.sort(key=lambda item: item.slug)
-        return [
-            {
-                "slug": item.slug,
-                "title": item.header.name or item.title or item.slug,
-                "locale": item.locale,
-                "pdfUrl": item.pdf_url() if item.pdf_filename else "",
-            }
-            for item in rows
-        ]
+        out: list[dict[str, Any]] = []
+        for item in rows:
+            available = resume_pdf_path(item) is not None
+            out.append(
+                {
+                    "slug": item.slug,
+                    "title": item.header.name or item.title or item.slug,
+                    "locale": item.locale,
+                    "pdfUrl": item.pdf_url() if available else "",
+                    "pdfAvailable": available,
+                }
+            )
+        return out
 
     @app.get("/api/public/resumes/{slug}")
     async def public_get_resume(slug: str) -> dict[str, Any]:
@@ -168,6 +178,9 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
         payload = row.to_public_dict()
+        available = resume_pdf_path(row) is not None
+        payload["pdfUrl"] = row.pdf_url() if available else ""
+        payload["pdfAvailable"] = available
         template = await current_store().find_one(
             ResumeTemplate, slug=row.template_slug
         )
@@ -180,10 +193,8 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         row = await current_store().find_one(
             Resume, slug=validate_slug(slug), status="published"
         )
-        if row is None or not row.pdf_filename:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
-        path = ensure_resume_dir(app.state.settings.resume_dir) / Path(row.pdf_filename).name
-        if not path.is_file():
+        path = resume_pdf_path(row) if row is not None else None
+        if path is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not_found")
         return Response(
             content=path.read_bytes(),

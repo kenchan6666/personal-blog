@@ -46,3 +46,33 @@ export function canOptimizeImage(url: string): boolean {
     return false;
   }
 }
+
+/** Width ladder the API's `?w=` resizer snaps to (keep in sync with backend). */
+export const MEDIA_WIDTHS = [256, 384, 640, 828, 1080, 1280, 1600, 1920] as const;
+
+/** `?w=` WebP variant URL for site-hosted media; other URLs are returned as-is. */
+export function mediaVariant(src: string, width: number): string {
+  const url = toImageSrc(src);
+  if (!isSiteMediaPath(url)) return url;
+  const base = url.split("?")[0];
+  return `${base}?w=${width}`;
+}
+
+/** `srcset` for site media, capped at the image's natural width when known. */
+export function mediaSrcSet(src: string, naturalWidth?: number): string | undefined {
+  const url = toImageSrc(src);
+  if (!isSiteMediaPath(url)) return undefined;
+  const widths = MEDIA_WIDTHS.filter(
+    (w, i) => !naturalWidth || w <= naturalWidth || i === 0,
+  );
+  return widths.map((w) => `${mediaVariant(url, w)} ${w}w`).join(", ");
+}
+
+const FILENAME_ALT =
+  /^(?:whatsapp image|img[_-]?\d|dsc[_-]?\d|screenshot|screen shot|photo|image|wechat|微信圖片|微信图片|截圖|截图)|\.(?:jpe?g|png|webp|gif|heic)$/i;
+
+/** Alt text that is just a camera/app filename says nothing to a reader. */
+export function isFilenameAlt(alt: string): boolean {
+  const value = alt.trim();
+  return !value || FILENAME_ALT.test(value) || /\d{4}-\d{2}-\d{2} at \d/.test(value);
+}

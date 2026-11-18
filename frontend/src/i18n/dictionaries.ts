@@ -35,7 +35,7 @@ const zhHant = {
   },
   guide: {
     entry: "問問看",
-    eyebrow: "PORTFOLIO GUIDE",
+    eyebrow: "作品導覽",
     title: "問問 Ken",
     intro: "想了解作品、經歷或技能？直接問我就好。",
     prompts: ["有哪些代表項目？", "介紹一下你的技能", "你在哪裡畢業？", "哪個項目最值得先看？"],
@@ -55,10 +55,18 @@ const zhHant = {
   retry: "重試",
   notFoundPage: "找不到這頁。",
   backHome: "回到首頁",
+  notFound: {
+    title: "找不到這一頁",
+    body: "這個連結可能已經移動，或者網址打錯了。可以回到首頁，或用搜尋找找看。",
+    search: "搜尋網站",
+  },
+  heroVisualAlt: "{brand} 的主視覺形象",
+  figureAlt: "{title}｜配圖 {n}",
+  seoFallback: "個人作品集：項目、文章、日誌與履歷。",
   archive: {
     search: "搜尋",
     all: "全部",
-    results: "{n} 則",
+    results: "{n} 個項目",
     noMatch: "沒有符合的結果。",
     withSource: "有源碼",
     publicRepo: "公開",
@@ -85,6 +93,9 @@ const zhHant = {
     sourceLoading: "載入源碼…",
     sourceUnavailable: "源碼暫時無法載入。",
     privateHint: "此倉庫為 Private，訪客只能看到說明與 GitHub 連結，無法瀏覽檔案。",
+    files: "檔案",
+    readmeMore: "展開完整 README",
+    readmeLess: "收合 README",
   },
   articles: {
     title: "文章",
@@ -102,6 +113,8 @@ const zhHant = {
   journals: {
     title: "日誌",
     empty: "目前沒有已發布的日誌。",
+    emptyTitle: "日誌還在醞釀中",
+    emptyBody: "這裡會放比文章更短、更隨手的紀錄。第一篇寫好之前，先看看文章或項目吧。",
   },
   about: {
     title: "關於",
@@ -463,7 +476,7 @@ const en = {
   },
   guide: {
     entry: "Ask me",
-    eyebrow: "PORTFOLIO GUIDE",
+    eyebrow: "Portfolio guide",
     title: "Ask about Ken",
     intro: "Curious about the work, background, or skills? Ask away.",
     prompts: [
@@ -489,10 +502,18 @@ const en = {
   retry: "Retry",
   notFoundPage: "This page could not be found.",
   backHome: "Back home",
+  notFound: {
+    title: "Page not found",
+    body: "The link may have moved, or the address has a typo. Head back home or try a search.",
+    search: "Search the site",
+  },
+  heroVisualAlt: "{brand}'s hero illustration",
+  figureAlt: "{title} — image {n}",
+  seoFallback: "Personal portfolio: projects, articles, journals and résumé.",
   archive: {
     search: "Search",
     all: "All",
-    results: "{n}",
+    results: "{n} projects",
     noMatch: "No matching results.",
     withSource: "Has source",
     publicRepo: "Public repo",
@@ -519,6 +540,9 @@ const en = {
     sourceLoading: "Loading source…",
     sourceUnavailable: "Source is unavailable right now.",
     privateHint: "This repo is private. Visitors see the write-up and GitHub link, not the file tree.",
+    files: "Files",
+    readmeMore: "Show full README",
+    readmeLess: "Collapse README",
   },
   articles: {
     title: "Articles",
@@ -536,6 +560,8 @@ const en = {
   journals: {
     title: "Journals",
     empty: "No published journals yet.",
+    emptyTitle: "Journals are on the way",
+    emptyBody: "This is where shorter, more casual notes will live. Until the first one is up, have a look at the articles or projects.",
   },
   about: {
     title: "About",
@@ -873,7 +899,7 @@ const zhHans = {
   },
   guide: {
     entry: "问问看",
-    eyebrow: "PORTFOLIO GUIDE",
+    eyebrow: "作品导览",
     title: "问问 Ken",
     intro: "想了解作品、经历或技能？直接问我就好。",
     prompts: ["有哪些代表项目？", "介绍一下你的技能", "你在哪里毕业？", "哪个项目最值得先看？"],
@@ -893,6 +919,14 @@ const zhHans = {
   retry: "重试",
   notFoundPage: "找不到这页。",
   backHome: "回到首页",
+  notFound: {
+    title: "找不到这一页",
+    body: "这个链接可能已经移动，或者网址打错了。可以回到首页，或用搜索找找看。",
+    search: "搜索网站",
+  },
+  heroVisualAlt: "{brand} 的主视觉形象",
+  figureAlt: "{title}｜配图 {n}",
+  seoFallback: "个人作品集：项目、文章、日志与简历。",
   nav: {
     home: "首页",
     projects: "项目",
@@ -921,7 +955,7 @@ const zhHans = {
     ...zhHant.archive,
     search: "搜索",
     all: "全部",
-    results: "{n} 则",
+    results: "{n} 个项目",
     noMatch: "没有符合的结果。",
     withSource: "有源码",
     publicRepo: "公开",
@@ -946,6 +980,9 @@ const zhHans = {
     sourceLoading: "加载源码…",
     sourceUnavailable: "源码暂时无法加载。",
     privateHint: "此仓库为私有，访客只能看到说明与 GitHub 链接，无法浏览文件。",
+    files: "文件",
+    readmeMore: "展开完整 README",
+    readmeLess: "收起 README",
   },
   articles: {
     ...zhHant.articles,
@@ -960,6 +997,8 @@ const zhHans = {
   journals: {
     title: "日志",
     empty: "目前没有已发布的日志。",
+    emptyTitle: "日志还在酝酿中",
+    emptyBody: "这里会放比文章更短、更随手的记录。第一篇写好之前，先看看文章或项目吧。",
   },
   about: {
     title: "关于",

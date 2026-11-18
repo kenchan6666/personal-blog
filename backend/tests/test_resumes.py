@@ -5,6 +5,8 @@ Resume templates, filled documents, PDF generation, GitHub import.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from pypdf import PdfReader
 
 import pytest
@@ -263,6 +265,17 @@ async def test_draft_resume_is_hidden_until_published_and_pdf_matches_a4(
     assert detail.json()["header"]["name"] == "Chan YatNam"
     public_pdf = await client.get("/api/public/resumes/intern-en/pdf")
     assert public_pdf.status_code == 200
+    assert listed.json()[0]["pdfAvailable"] is True
+    assert detail.json()["pdfAvailable"] is True
+
+    # A PDF that vanished from disk is reported as unavailable, not linked.
+    for stale in Path(settings.resume_dir).glob("*.pdf"):
+        stale.unlink()
+    gone = (await client.get("/api/public/resumes")).json()[0]
+    assert gone["pdfAvailable"] is False and gone["pdfUrl"] == ""
+    gone_detail = (await client.get("/api/public/resumes/intern-en")).json()
+    assert gone_detail["pdfAvailable"] is False and gone_detail["pdfUrl"] == ""
+    assert (await client.get("/api/public/resumes/intern-en/pdf")).status_code == 404
 
     unpublished = await client.post(
         f"/api/owner/resumes/{resume_id}/unpublish",

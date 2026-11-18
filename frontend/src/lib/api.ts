@@ -778,6 +778,54 @@ export function articleHref(
   return `/${locale}/articles/${category}/${slug}`;
 }
 
+export type PublicSearchHit = {
+  kind: "article" | "journal" | "project" | "about";
+  slug: string;
+  title: string;
+  summary: string;
+  categorySlug: string;
+  categoryTitle: string;
+};
+
+export async function searchPublic(
+  locale: string,
+  query: string,
+  signal?: AbortSignal,
+): Promise<PublicSearchHit[]> {
+  const res = await fetch(
+    `${API_BASE}/api/public/search?locale=${encodeURIComponent(locale)}&q=${encodeURIComponent(query)}`,
+    { signal, cache: "no-store" },
+  );
+  if (!res.ok) throw new Error(`search ${res.status}`);
+  return (await res.json()) as PublicSearchHit[];
+}
+
+export type MediaMeta = { width: number; height: number };
+
+/** Intrinsic sizes for site-hosted images, keyed by their original src. */
+export async function fetchMediaMeta(
+  srcs: string[],
+): Promise<Record<string, MediaMeta>> {
+  const out: Record<string, MediaMeta> = {};
+  await Promise.all(
+    [...new Set(srcs)].map(async (src) => {
+      const path = src.replace(/^https?:\/\/[^/]+/, "").split("?")[0];
+      if (!path.startsWith("/api/public/media/")) return;
+      try {
+        const res = await fetch(`${API_BASE}${path}/meta`, {
+          next: { revalidate: 3600 },
+        });
+        if (!res.ok) return;
+        const meta = (await res.json()) as MediaMeta;
+        if (meta.width > 0 && meta.height > 0) out[src] = meta;
+      } catch {
+        /* sizes are an optimisation only */
+      }
+    }),
+  );
+  return out;
+}
+
 export async function fetchPublicArticles(
   locale: string,
 ): Promise<PublicArticle[]> {
@@ -1303,9 +1351,13 @@ export type PublicResumeCard = {
   title: string;
   locale: string;
   pdfUrl: string;
+  /** False when the PDF file is missing on the server (link would 404). */
+  pdfAvailable?: boolean;
 };
 
-export type PublicResume = Omit<OwnerResume, "id" | "status">;
+export type PublicResume = Omit<OwnerResume, "id" | "status"> & {
+  pdfAvailable?: boolean;
+};
 
 export function emptyOwnerResume(): OwnerResume {
   return {
