@@ -45,10 +45,11 @@ from app.github import (
 )
 from app.mailer import (
     ConsoleMailer,
+    FallbackMailer,
+    FileDropMailer,
     Mailer,
     ResendMailer,
     SmtpMailer,
-    SmtpThenConsoleMailer,
 )
 from app.models import (
     ABOUT_KINDS,
@@ -215,6 +216,39 @@ GITHUB_STATE_TTL = 600
 GITHUB_TOKEN_KEY = "github:owner_token"
 
 
+def _gmail_smtp(settings: Settings) -> SmtpMailer:
+    return SmtpMailer(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        username=settings.smtp_user,
+        password=settings.smtp_password,
+        from_addr=settings.smtp_from or settings.smtp_user,
+    )
+
+
+def _build_mail_chain(settings: Settings, backend: str) -> Mailer:
+    """resend: Resend -> Gmail SMTP -> owner-only file. smtp: SMTP -> file."""
+    routes: list[tuple[str, Mailer]] = []
+    if backend == "resend":
+        if settings.resend_api_key.strip():
+            routes.append(
+                (
+                    "resend",
+                    ResendMailer(
+                        api_key=settings.resend_api_key,
+                        from_addr=settings.resend_from or settings.smtp_from,
+                    ),
+                )
+            )
+        else:
+            print("[mail] MAIL_BACKEND=resend but RESEND_API_KEY is empty", flush=True)
+    # Gmail SMTP: the main route for MAIL_BACKEND=smtp, the fallback for
+    # resend once an app password is configured.
+    if backend != "resend" or settings.smtp_password.strip():
+        routes.append(("smtp", _gmail_smtp(settings)))
+    return FallbackMailer(routes, FileDropMailer(settings.otp_fallback_file))
+
+
 def create_app(
     settings: Settings | None = None,
     mailer: Mailer | None = None,
@@ -228,32 +262,8 @@ def create_app(
         resolved_mailer: Mailer = mailer
     elif backend == "console":
         resolved_mailer = ConsoleMailer()
-    elif backend == "resend":
-        if not settings.resend_api_key.strip():
-            print(
-                "[mail] MAIL_BACKEND=resend but RESEND_API_KEY is empty; using console",
-                flush=True,
-            )
-            resolved_mailer = ConsoleMailer()
-        else:
-            resolved_mailer = SmtpThenConsoleMailer(
-                ResendMailer(
-                    api_key=settings.resend_api_key,
-                    from_addr=settings.smtp_from,
-                ),
-                ConsoleMailer(),
-            )
     else:
-        resolved_mailer = SmtpThenConsoleMailer(
-            SmtpMailer(
-                host=settings.smtp_host,
-                port=settings.smtp_port,
-                username=settings.smtp_user,
-                password=settings.smtp_password,
-                from_addr=settings.smtp_from,
-            ),
-            ConsoleMailer(),
-        )
+        resolved_mailer = _build_mail_chain(settings, backend)
     resolved_github: GitHubClient = github or HttpGitHub(
         client_id=settings.github_client_id,
         client_secret=settings.github_client_secret,
@@ -307,7 +317,14 @@ def create_app(
             mailer=resolved_mailer,
         )
         print(
-            f"[mail] backend={settings.mail_backend} mailer={type(resolved_mailer).__name__}",
+            f"[mail] backend={settings.mail_backend} mailer={type(resolved_mailer).__name__}"
+            + (
+                " routes="
+                + "->".join(name for name, _ in resolved_mailer.routes)
+                + "->file"
+                if isinstance(resolved_mailer, FallbackMailer)
+                else ""
+            ),
             flush=True,
         )
         if backend == "smtp":

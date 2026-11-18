@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # fails from Compute Engine IPs; OTP still prints to logs on failure.
     mail_backend: str = "console"
     resend_api_key: str = ""
+    # Sender for Resend (a verified domain address). Falls back to SMTP_FROM.
+    resend_from: str = ""
+    # With MAIL_BACKEND=resend, Gmail SMTP is tried next when SMTP_PASSWORD
+    # is set. If every route fails, the code goes to this owner-only file
+    # (never to the logs).
+    otp_fallback_file: str = "/tmp/portfolio-otp/latest.txt"
 
     cors_origins: str = (
         "http://localhost:3000,http://localhost:3001,http://localhost:3002,"

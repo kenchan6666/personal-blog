@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Protocol
 
 import httpx
@@ -122,3 +125,60 @@ class SmtpThenConsoleMailer:
                 flush=True,
             )
             await self.console.send_otp(to=to, code=code)
+
+
+class FileDropMailer:
+    """Last resort that keeps the code out of logs.
+
+    Writes the latest OTP to an owner-only (0600) file inside the container,
+    so the Owner can still sign in with
+    ``docker compose exec api cat <path>`` when every mail route is down.
+    """
+
+    def __init__(self, path: str) -> None:
+        self.path = Path(path)
+
+    async def send_otp(self, *, to: str, code: str) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            os.fchmod(fd, 0o600)
+            os.write(fd, f"{stamp} to={to} code={code}\n".encode())
+        finally:
+            os.close(fd)
+        print(
+            "[otp] all mail routes failed; latest code saved to "
+            f"{self.path} (owner-only file, not logged)",
+            flush=True,
+        )
+
+
+class FallbackMailer:
+    """Try each mailer in order (e.g. Resend -> Gmail SMTP), then a last resort.
+
+    Failures are logged by route name and exception type only; the OTP code
+    never reaches the logs.
+    """
+
+    def __init__(
+        self,
+        routes: list[tuple[str, Mailer]],
+        last_resort: Mailer,
+    ) -> None:
+        self.routes = routes
+        self.last_resort = last_resort
+
+    async def send_otp(self, *, to: str, code: str) -> None:
+        for name, mailer in self.routes:
+            try:
+                await mailer.send_otp(to=to, code=code)
+            except Exception as exc:
+                print(
+                    f"[mail] {name} failed ({type(exc).__name__}); trying next route",
+                    flush=True,
+                )
+                continue
+            print(f"[mail] otp sent via {name}", flush=True)
+            return
+        await self.last_resort.send_otp(to=to, code=code)
