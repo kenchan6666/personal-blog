@@ -5346,6 +5346,12 @@ html[data-theme="dark"] .theme-toggle-moon {
   background: var(--panel-fill-strong);
 }
 
+.top-nav-guide:focus-visible,
+.top-nav-menu:focus-visible {
+  outline: 2px solid var(--accent-link);
+  outline-offset: 2px;
+}
+
 @media (min-width: 1024px) {
   .top-nav-links,
   .top-nav-locale {
@@ -5460,6 +5466,36 @@ html[data-theme="dark"] .theme-toggle-moon {
   height: 32px;
 }
 
+/* Phones: the launcher moves into the top nav so nothing floats over the
+   content or under Safari's bottom toolbar. */
+.top-nav-guide {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .guide-fab {
+    display: none;
+  }
+
+  .top-nav-guide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    cursor: pointer;
+  }
+
+  .top-nav-guide .guide-orb {
+    width: 30px;
+    height: 30px;
+  }
+}
+
 .public-guide-scrim {
   background: var(--lg-scrim);
   -webkit-backdrop-filter: none;
@@ -5530,7 +5566,7 @@ html[data-theme="dark"] .theme-toggle-moon {
 .home-wrap {
   max-width: 68rem;
   margin: 0 auto;
-  padding: 0 max(1.25rem, env(safe-area-inset-left));
+  padding: 0 max(1.25rem, env(safe-area-inset-right)) 0 max(1.25rem, env(safe-area-inset-left));
 }
 
 @media (min-width: 640px) {
@@ -5648,18 +5684,26 @@ html[data-theme="dark"] .hero-stage-disc {
 
 .hero-stage-figure {
   position: absolute;
-  left: 14%;
-  right: 12%;
-  top: 14%;
-  bottom: 6%;
-  transform-origin: center bottom;
+  inset: 11%;
+  overflow: hidden;
+  border-radius: 50%;
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.35);
+  /* Safari: keep the rounded clip while the image is composited. */
+  isolation: isolate;
+  -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+
+html[data-theme="dark"] .hero-stage-figure {
+  box-shadow:
+    0 18px 40px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .hero-stage-img {
-  object-fit: contain;
-  object-position: center bottom;
-  clip-path: inset(0 round 0 0 46% 46%);
-  filter: drop-shadow(0 20px 24px rgba(0, 0, 0, 0.1));
+  object-fit: cover;
+  object-position: 50% 40%;
 }
 
 .home-section {
@@ -5764,26 +5808,6 @@ html[data-theme="dark"] .hero-stage-disc {
   }
 }
 
-.project-cover {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 0.5rem;
-  aspect-ratio: 16 / 10;
-  background: var(--cover-fill);
-  color: var(--text-faint);
-  font-size: 0.82rem;
-}
-
-.project-cover-icon {
-  width: 40px;
-  height: 30px;
-  border: 1.5px solid currentColor;
-  border-radius: 6px;
-  opacity: 0.6;
-  background: linear-gradient(currentColor, currentColor) 50% 8px / 100% 1.5px no-repeat;
-}
-
 .project-repo {
   margin: 0;
   font-size: 0.8rem;
@@ -5792,30 +5816,15 @@ html[data-theme="dark"] .hero-stage-disc {
 }
 
 .project-summary {
-  margin: 0.35rem 0 0;
+  margin: 0.5rem 0 0;
   font-size: 0.95rem;
   line-height: 1.6;
   color: var(--text-muted);
 }
 
-.project-feature {
-  display: grid;
-  overflow: hidden;
-}
-
-.project-feature-body {
-  padding: 1.5rem;
-}
-
-.project-feature-title {
-  margin: 0.3rem 0 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
 .project-excerpt {
-  margin: 1rem 0 0;
+  margin: 0.9rem 0 0;
+  max-width: 40rem;
   font-size: 0.95rem;
   line-height: 1.75;
   display: -webkit-box;
@@ -5824,11 +5833,120 @@ html[data-theme="dark"] .hero-stage-disc {
   overflow: hidden;
 }
 
-.project-links {
+.project-tile {
+  position: relative;
+  display: grid;
+  height: 100%;
+  overflow: hidden;
+  color: var(--text-primary);
+  transition: box-shadow 200ms ease;
+}
+
+.project-tile:hover {
+  box-shadow: var(--card-shadow-hover);
+}
+
+.project-tile-cover {
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--cover-fill);
+}
+
+.project-tile-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-tile-body {
   display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: 1.25rem 1.25rem 1.3rem;
+}
+
+.project-tile-title {
+  margin: 0.3rem 0 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.project-tile-link,
+.project-tile-link:visited {
+  color: inherit;
+}
+
+/* The whole card is clickable; inner links sit above the stretched link. */
+.project-tile-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.project-tile-link:focus-visible {
+  outline: none;
+}
+
+.project-tile:has(.project-tile-link:focus-visible) {
+  outline: 2px solid var(--accent-link);
+  outline-offset: 2px;
+}
+
+.project-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.project-chip-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.project-langbar {
+  display: flex;
+  height: 4px;
+  gap: 2px;
+  margin-top: 0.9rem;
+  overflow: hidden;
+  border-radius: 999px;
+}
+
+.project-langbar span {
+  min-width: 2px;
+  flex-basis: 0;
+}
+
+.project-links {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
   gap: 1.25rem;
-  margin: 1.4rem 0 0;
-  font-size: 0.95rem;
+  margin: auto 0 0;
+  padding-top: 1.1rem;
+  font-size: 0.92rem;
 }
 
 .project-links a,
@@ -5840,19 +5958,38 @@ html[data-theme="dark"] .hero-stage-disc {
   text-decoration: underline;
 }
 
+/* typographic feature card: big title, generous whitespace */
+.project-tile-feature .project-tile-body {
+  padding: 1.75rem 1.5rem 1.6rem;
+}
+
+.project-tile-feature .project-tile-title {
+  font-size: clamp(1.75rem, 1.2rem + 2.2vw, 2.75rem);
+  letter-spacing: -0.025em;
+}
+
+.project-tile-feature .project-summary {
+  font-size: 1.05rem;
+}
+
+.project-tile-feature .project-langbar {
+  max-width: 28rem;
+  height: 6px;
+}
+
 @media (min-width: 900px) {
-  .project-feature {
+  .project-tile-feature.has-cover {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   }
 
-  .project-feature .project-cover {
+  .project-tile-feature.has-cover .project-tile-cover {
     height: 100%;
     aspect-ratio: auto;
     min-height: 20rem;
   }
 
-  .project-feature-body {
-    padding: 2.25rem 2.25rem 2rem;
+  .project-tile-feature .project-tile-body {
+    padding: 2.5rem 2.5rem 2.25rem;
   }
 }
 
@@ -5864,33 +6001,14 @@ html[data-theme="dark"] .hero-stage-disc {
   list-style: none;
 }
 
-.project-card {
-  display: grid;
-  grid-template-columns: 104px minmax(0, 1fr);
-  height: 100%;
-  overflow: hidden;
-  color: var(--text-primary);
-  transition: box-shadow 200ms ease;
+.project-grid > li {
+  min-width: 0;
 }
 
-.project-card:hover {
-  box-shadow: var(--card-shadow-hover);
-}
-
-.project-card .project-cover {
-  aspect-ratio: auto;
-  font-size: 0;
-  gap: 0;
-}
-
-.project-card-body {
-  padding: 1rem;
-}
-
-.project-card-title {
-  margin: 0.2rem 0 0;
-  font-size: 1.1rem;
-  font-weight: 600;
+@media (min-width: 640px) {
+  .project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (min-width: 900px) {
@@ -5900,20 +6018,13 @@ html[data-theme="dark"] .hero-stage-disc {
     margin-top: 1.5rem;
   }
 
-  .project-card {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+  .project-grid-archive {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
 
-  .project-card .project-cover {
-    aspect-ratio: 16 / 10;
-    font-size: 0.82rem;
-    gap: 0.5rem;
-  }
-
-  .project-card-body {
-    padding: 1.25rem 1.25rem 1.4rem;
-  }
+.project-grid-archive {
+  margin-top: 1.75rem;
 }
 
 .home-writing {
@@ -6120,4 +6231,13 @@ html[data-theme="dark"] .hero-stage-disc {
 .page-frame,
 .article-page {
   padding-top: 3rem;
+}
+
+/* Phones: the guide panel spans the screen inside the safe area. */
+@media (max-width: 760px) {
+  .public-guide-panel {
+    left: max(0.5rem, env(safe-area-inset-left));
+    right: max(0.5rem, env(safe-area-inset-right));
+    width: auto;
+  }
 }

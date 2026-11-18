@@ -29,10 +29,11 @@ export function HeroVisual({ visual }: Props) {
     : { src: "", optimize: false };
   // If the optimizer cannot fetch the original, serve the file as-is.
   const [failed, setFailed] = useState(false);
-  const scale = Math.max(0.8, (visual?.scale || 100) / 100);
+  // The stage is a fixed circle, so the image is always centred in it; only a
+  // gentle zoom from the hero editor is honoured (offsets were tuned for the
+  // old full-bleed layout and would push the mascot out of the disc).
+  const scale = Math.min(1.25, Math.max(1, (visual?.scale || 100) / 100));
   const blur = Math.max(0, visual?.blur || 0);
-  const posX = visual?.posX ?? 50;
-  const posY = visual?.posY ?? 50;
 
   return (
     <div className="hero-stage">
@@ -42,7 +43,6 @@ export function HeroVisual({ visual }: Props) {
         <div
           className="hero-stage-figure"
           style={{
-            transform: `translate(${(posX - 50) * 0.4}%, ${(posY - 50) * 0.4}%) scale(${scale})`,
             filter: blur ? `blur(${blur}px)` : undefined,
           }}
         >
@@ -53,8 +53,9 @@ export function HeroVisual({ visual }: Props) {
             priority
             unoptimized={!optimize || failed}
             onError={() => setFailed(true)}
-            sizes="(min-width: 1024px) 400px, (min-width: 640px) 320px, 260px"
+            sizes="(min-width: 900px) 340px, 230px"
             className="hero-stage-img"
+            style={scale > 1 ? { transform: `scale(${scale})` } : undefined}
           />
         </div>
       ) : null}

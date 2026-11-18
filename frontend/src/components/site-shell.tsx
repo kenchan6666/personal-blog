@@ -97,6 +97,14 @@ export function SiteShell({ children }: Props) {
         showResume={hasResume !== false}
         onToggle={() => setOpen((v) => !v)}
         onNavigate={() => setOpen(false)}
+        onOpenGuide={
+          admin
+            ? undefined
+            : () => {
+                setOpen(false);
+                setGuideOpen(true);
+              }
+        }
       />
       <PublicGuide
         locale={locale}
@@ -108,6 +116,7 @@ export function SiteShell({ children }: Props) {
         <button
           type="button"
           className="guide-fab liquid-glass"
+          aria-label={shellDict.guide.entry}
           onClick={() => {
             setOpen(false);
             setGuideOpen(true);
@@ -118,7 +127,7 @@ export function SiteShell({ children }: Props) {
             <i />
             <i />
           </span>
-          {shellDict.guide.entry}
+          <span className="guide-fab-label">{shellDict.guide.entry}</span>
         </button>
       )}
 

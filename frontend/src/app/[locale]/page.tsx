@@ -10,13 +10,14 @@ import {
   fetchPublicJournals,
   fetchPublicProjects,
   fetchPublicSite,
-  mediaUrl,
   type PublicArticle,
   type PublicJournal,
-  type PublicProject,
 } from "@/lib/api";
 import { formatCount, formatPostDate } from "@/lib/post-meta";
 import { pageMetadata } from "@/lib/seo";
+import { firstMarkdownImage } from "@/lib/markdown-preview";
+import { toProjectTiles } from "@/lib/project-tiles";
+import { ProjectTile } from "@/components/project-tile";
 import {
   mergeHeroContent,
   mergeProfileContent,
@@ -51,90 +52,8 @@ async function settle<T>(promise: Promise<T[]>): Promise<T[]> {
   }
 }
 
-/** First image in a markdown body, e.g. `![](</api/public/media/content/x.jpg>)`. */
 function firstImage(markdown: string): string {
-  const match = markdown.match(/!\[[^\]]*\]\(\s*<?([^)\s>]+)>?/);
-  return match ? mediaUrl(match[1]) : "";
-}
-
-function CoverPlaceholder({ label }: { label: string }) {
-  return (
-    <div className="project-cover" aria-hidden>
-      <span className="project-cover-icon" />
-      <span>{label}</span>
-    </div>
-  );
-}
-
-function FeaturedProject({
-  project,
-  locale,
-  dict,
-}: {
-  project: PublicProject;
-  locale: Locale;
-  dict: Dictionary;
-}) {
-  const href = `/${locale}/projects/${project.slug}`;
-  const excerpt = project.body
-    .replace(/[#>*_`]/g, "")
-    .split(/\n\s*\n/)
-    .map((part) => part.trim())
-    .find(Boolean);
-  return (
-    <article className="card project-feature">
-      <Link href={href} tabIndex={-1} aria-hidden>
-        <CoverPlaceholder label={dict.projects.coverPending} />
-      </Link>
-      <div className="project-feature-body">
-        {project.sourceRepo ? (
-          <p className="project-repo">{project.sourceRepo.fullName}</p>
-        ) : null}
-        <h3 className="project-feature-title">
-          <Link href={href}>{project.title}</Link>
-        </h3>
-        {project.summary ? (
-          <p className="project-summary">{project.summary}</p>
-        ) : null}
-        {excerpt ? <p className="project-excerpt">{excerpt}</p> : null}
-        <p className="project-links">
-          <Link href={href}>{dict.projects.about}</Link>
-          {project.sourceRepo ? (
-            <a href={project.sourceRepo.htmlUrl} target="_blank" rel="noreferrer">
-              {dict.projects.source}
-            </a>
-          ) : null}
-        </p>
-      </div>
-    </article>
-  );
-}
-
-function ProjectCard({
-  project,
-  locale,
-  dict,
-}: {
-  project: PublicProject;
-  locale: Locale;
-  dict: Dictionary;
-}) {
-  return (
-    <li>
-      <Link href={`/${locale}/projects/${project.slug}`} className="card project-card">
-        <CoverPlaceholder label={dict.projects.coverPending} />
-        <div className="project-card-body">
-          {project.sourceRepo ? (
-            <p className="project-repo">{project.sourceRepo.fullName}</p>
-          ) : null}
-          <h3 className="project-card-title">{project.title}</h3>
-          {project.summary ? (
-            <p className="project-summary">{project.summary}</p>
-          ) : null}
-        </div>
-      </Link>
-    </li>
-  );
+  return firstMarkdownImage(markdown);
 }
 
 function ArticleRow({
@@ -190,7 +109,10 @@ function JournalRow({
 }) {
   return (
     <li>
-      <Link href={`/${locale}/journals/${journal.slug}`} className="journal-row">
+      <Link
+        href={`/${locale}/journals/${journal.slug}`}
+        className="journal-row"
+      >
         <span className="post-row-title">{journal.title}</span>
         <span className="post-row-meta">
           {formatPostDate(journal.publishedAt, locale)}
@@ -215,7 +137,9 @@ export default async function HomePage({
     settle(fetchPublicArticles(locale)),
     settle(fetchPublicJournals(locale)),
   ]);
-  const [featured, ...rest] = projects;
+  const [featured, ...rest] = await toProjectTiles(projects, locale, {
+    excerptFor: projects[0]?.slug,
+  });
   const latestArticles = [...articles]
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, 4);
@@ -242,16 +166,21 @@ export default async function HomePage({
                 {dict.hero.ctaProjects}
               </Link>
             </div>
-            <FeaturedProject project={featured} locale={locale} dict={dict} />
+            <ProjectTile
+              project={featured}
+              variant="feature"
+              sourceLabel={dict.projects.source}
+              aboutLabel={dict.projects.about}
+            />
             {rest.length > 0 ? (
               <ul className="project-grid">
                 {rest.map((project) => (
-                  <ProjectCard
-                    key={project.slug}
-                    project={project}
-                    locale={locale}
-                    dict={dict}
-                  />
+                  <li key={project.href}>
+                    <ProjectTile
+                      project={project}
+                      sourceLabel={dict.projects.source}
+                    />
+                  </li>
                 ))}
               </ul>
             ) : null}
@@ -289,7 +218,11 @@ export default async function HomePage({
             {latestJournals.length > 0 ? (
               <ul className="card journal-list">
                 {latestJournals.map((journal) => (
-                  <JournalRow key={journal.slug} journal={journal} locale={locale} />
+                  <JournalRow
+                    key={journal.slug}
+                    journal={journal}
+                    locale={locale}
+                  />
                 ))}
               </ul>
             ) : (

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ProjectTile, type ProjectTileData } from "@/components/project-tile";
 
 export type ArchiveItem = {
   href: string;
@@ -9,6 +10,8 @@ export type ArchiveItem = {
   summary: string;
   meta?: string;
   tags: string[];
+  /** When set, the item renders as a project card instead of a plain entry. */
+  project?: ProjectTileData;
 };
 
 export type ArchiveFilter = {
@@ -26,6 +29,8 @@ type Labels = {
 
 type Props = {
   items: ArchiveItem[];
+  /** Label for the external source link on project cards. */
+  sourceLabel?: string;
   filters: ArchiveFilter[];
   searchPlaceholder: string;
   labels: Labels;
@@ -40,6 +45,7 @@ export function ArchiveIndex({
   filters,
   searchPlaceholder,
   labels,
+  sourceLabel = "",
 }: Props) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState("all");
@@ -114,23 +120,38 @@ export function ArchiveIndex({
           <p>{labels.noMatch}</p>
         </div>
       ) : (
-        <ul className="entry-grid">
-          {filtered.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className="glass glass-hover entry-card"
-              >
-                {item.meta ? (
-                  <p className="entry-card-meta">{item.meta}</p>
-                ) : null}
-                <h2 className="display-font entry-card-title">{item.title}</h2>
-                {item.summary ? (
-                  <p className="entry-card-summary">{item.summary}</p>
-                ) : null}
-              </Link>
-            </li>
-          ))}
+        <ul
+          className={
+            filtered.some((item) => item.project)
+              ? "project-grid project-grid-archive"
+              : "entry-grid"
+          }
+        >
+          {filtered.map((item) =>
+            item.project ? (
+              <li key={item.href}>
+                <ProjectTile
+                  project={item.project}
+                  sourceLabel={sourceLabel}
+                  headingLevel="h2"
+                />
+              </li>
+            ) : (
+              <li key={item.href}>
+                <Link href={item.href} className="glass glass-hover entry-card">
+                  {item.meta ? (
+                    <p className="entry-card-meta">{item.meta}</p>
+                  ) : null}
+                  <h2 className="display-font entry-card-title">
+                    {item.title}
+                  </h2>
+                  {item.summary ? (
+                    <p className="entry-card-summary">{item.summary}</p>
+                  ) : null}
+                </Link>
+              </li>
+            ),
+          )}
         </ul>
       )}
     </div>

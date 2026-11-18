@@ -68,7 +68,6 @@ const zhHant = {
   },
   projects: {
     title: "項目",
-    coverPending: "截圖待補",
     about: "說明",
     source: "源碼",
     readme: "README",
@@ -502,7 +501,6 @@ const en = {
   },
   projects: {
     title: "Projects",
-    coverPending: "Screenshot coming soon",
     about: "About",
     source: "Source",
     readme: "README",
@@ -931,7 +929,6 @@ const zhHans = {
   projects: {
     ...zhHant.projects,
     title: "项目",
-    coverPending: "截图待补",
     about: "说明",
     source: "源码",
     noReadme: "这个仓库还没有 README。",

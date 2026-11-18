@@ -15,6 +15,8 @@ type Props = {
   open: boolean;
   onToggle: () => void;
   onNavigate: () => void;
+  /** Opens the AI guide; shown as a nav button on phones instead of a floating launcher. */
+  onOpenGuide?: () => void;
   showResume?: boolean;
 };
 
@@ -63,6 +65,7 @@ export function TopNav({
   open,
   onToggle,
   onNavigate,
+  onOpenGuide,
   showResume = true,
 }: Props) {
   const pathname = usePathname();
@@ -113,6 +116,20 @@ export function TopNav({
             <div className="top-nav-locale">
               <LocaleSwitcher locale={locale} />
             </div>
+            {onOpenGuide ? (
+              <button
+                type="button"
+                className="top-nav-guide"
+                aria-label={dict.guide.entry}
+                onClick={onOpenGuide}
+              >
+                <span className="guide-orb" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              </button>
+            ) : null}
             <ThemeToggle dict={dict} />
             <button
               type="button"

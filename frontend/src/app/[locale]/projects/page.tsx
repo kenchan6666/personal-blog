@@ -5,6 +5,7 @@ import { getDictionary } from "@/i18n/dictionaries";
 import { isLocale, type Locale } from "@/i18n/config";
 import { fetchPublicProjects } from "@/lib/api";
 import { pageMetadata } from "@/lib/seo";
+import { toProjectTiles } from "@/lib/project-tiles";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function ProjectsPage({
   const locale = raw as Locale;
   const dict = getDictionary(locale);
   const projects = await fetchPublicProjects(locale);
+  const tiles = await toProjectTiles(projects, locale);
 
   return (
     <PageFrame title={dict.nav.projects}>
@@ -51,7 +53,8 @@ export default async function ProjectsPage({
           { id: "public", label: dict.archive.publicRepo },
           { id: "private", label: dict.archive.privateRepo },
         ]}
-        items={projects.map((project) => {
+        sourceLabel={dict.projects.source}
+        items={projects.map((project, index) => {
           const tags: string[] = [];
           if (project.sourceRepo) {
             tags.push("source");
@@ -63,6 +66,7 @@ export default async function ProjectsPage({
             summary: project.summary,
             meta: project.sourceRepo?.fullName,
             tags,
+            project: tiles[index],
           };
         })}
       />
