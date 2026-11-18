@@ -96,7 +96,9 @@ function CollapsibleBlock({
         </button>
         {action}
       </div>
-      <div className="resume-block-body">{children}</div>
+      <div className="resume-block-body disclosure is-open" inert={collapsed}>
+        <div className="disclosure-inner">{children}</div>
+      </div>
     </section>
   );
 }

@@ -67,6 +67,38 @@ export function SiteShell({ children }: Props) {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Focus: move into the menu sheet when it opens, hand it back on close.
+  useEffect(() => {
+    if (!open) return;
+    const opener = document.activeElement as HTMLElement | null;
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>("#site-menu-sheet .nav-sheet-link")
+        ?.focus({ preventScroll: true });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      const sheet = document.getElementById("site-menu-sheet");
+      const active = document.activeElement;
+      if (!active || active === document.body || sheet?.contains(active)) {
+        opener?.focus?.({ preventScroll: true });
+      }
+    };
+  }, [open]);
+
+  // The guide focuses its own input; restore focus to whatever opened it.
+  useEffect(() => {
+    if (!guideOpen) return;
+    const opener = document.activeElement as HTMLElement | null;
+    return () => {
+      const panel = document.querySelector(".public-guide");
+      const active = document.activeElement;
+      if (!active || active === document.body || panel?.contains(active)) {
+        opener?.focus?.({ preventScroll: true });
+      }
+    };
+  }, [guideOpen]);
+
   useEffect(() => {
     if (!open) return;
     const mq = window.matchMedia(DESKTOP_NAV);

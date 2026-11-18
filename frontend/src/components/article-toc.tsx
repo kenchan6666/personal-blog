@@ -61,12 +61,21 @@ export function ArticleToc({ headings, label }: Props) {
           type="button"
           className="article-toc-mobile-toggle"
           aria-expanded={open}
+          aria-controls="article-toc-mobile-list"
           onClick={() => setOpen((value) => !value)}
         >
           <span>{label}</span>
-          <span aria-hidden>{open ? "–" : "+"}</span>
+          <span className="chevron" aria-hidden />
         </button>
-        {open ? <HeadingList onPick={() => setOpen(false)} /> : null}
+        <div
+          id="article-toc-mobile-list"
+          className={`disclosure${open ? " is-open" : ""}`}
+          inert={!open}
+        >
+          <div className="disclosure-inner">
+            <HeadingList onPick={() => setOpen(false)} />
+          </div>
+        </div>
       </nav>
       <nav className="article-toc" aria-label={label}>
         <p className="article-toc-label">{label}</p>

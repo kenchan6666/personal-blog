@@ -1008,13 +1008,10 @@ html.is-route-pending {
 }
 
 html.is-route-pending .site-main {
-  opacity: 0.38;
-  filter: blur(7px) saturate(130%);
   pointer-events: none;
 }
 
 html.is-locale-swap .site-main {
-  opacity: 0.88;
   filter: none;
 }
 
@@ -1134,10 +1131,6 @@ html.is-locale-hold .article-page {
     animation: none;
   }
 
-  html.is-route-pending .site-main {
-    filter: none;
-    opacity: 0.7;
-  }
 
   html.is-locale-swap .site-main {
     opacity: 1;
@@ -4980,7 +4973,7 @@ html[data-theme="dark"] .theme-toggle-moon {
 }
 
 .resume-block.is-collapsed .resume-block-body {
-  display: none;
+  grid-template-rows: 0fr;
 }
 
 .resume-block-toggle {
@@ -5119,10 +5112,6 @@ html[data-theme="dark"] .theme-toggle-moon {
   .btn-cta,
   .cms-modal-scrim,
   .cms-modal-panel,
-  .nav-sheet,
-  .nav-sheet-scrim,
-  .public-guide-panel,
-  .public-guide-scrim,
   .admin-dashboard-shell,
   .admin-tab-panel,
   .agent-messages {
@@ -6239,5 +6228,308 @@ html[data-theme="dark"] .hero-stage-figure {
     left: max(0.5rem, env(safe-area-inset-left));
     right: max(0.5rem, env(safe-area-inset-right));
     width: auto;
+  }
+}
+
+/* ==========================================================================
+   Motion: one easing, short durations, opacity/transform only.
+   ========================================================================== */
+:root {
+  --ease-apple: cubic-bezier(0.32, 0.72, 0, 1);
+  --dur-open: 280ms;
+  --dur-close: 200ms;
+  --dur-page-out: 160ms;
+  --dur-page-in: 240ms;
+}
+
+/* --- route transitions (React <ViewTransition> in [locale]/template) ---- */
+/* The chrome stays put; only the page content swaps. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* While a transition runs, the nav is its own layer above the page so the
+   outgoing page never paints over it. Named only then: a permanent
+   view-transition-name would make it a backdrop root. */
+html:active-view-transition .top-nav {
+  view-transition-name: site-nav;
+}
+
+html:active-view-transition .guide-fab {
+  view-transition-name: guide-fab;
+}
+
+::view-transition-group(site-nav),
+::view-transition-group(guide-fab) {
+  animation: none;
+}
+
+::view-transition-old(site-nav),
+::view-transition-old(guide-fab) {
+  display: none;
+}
+
+::view-transition-new(site-nav),
+::view-transition-new(guide-fab) {
+  animation: none;
+}
+
+::view-transition-old(.page-exit) {
+  animation: page-out var(--dur-page-out) var(--ease-apple) both;
+}
+
+::view-transition-new(.page-enter) {
+  animation: page-in var(--dur-page-in) var(--ease-apple) 90ms both;
+}
+
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Active nav underline slides between items. */
+.top-nav-link {
+  position: relative;
+}
+
+.top-nav-link[aria-current="page"] {
+  box-shadow: none;
+}
+
+.top-nav-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent-taiko);
+  view-transition-name: nav-indicator;
+  pointer-events: none;
+}
+
+::view-transition-group(nav-indicator) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-apple);
+}
+
+::view-transition-old(nav-indicator),
+::view-transition-new(nav-indicator) {
+  animation: none;
+  height: 100%;
+}
+
+::view-transition-old(nav-indicator) {
+  display: none;
+}
+
+/* --- mobile menu sheet ------------------------------------------------- */
+.nav-sheet-scrim {
+  transition: opacity var(--dur-close) var(--ease-apple);
+}
+
+.nav-sheet-scrim.is-open {
+  transition-duration: var(--dur-open);
+}
+
+.nav-sheet {
+  transform: translateY(-10px);
+  transform-origin: top center;
+  transition:
+    opacity var(--dur-close) var(--ease-apple),
+    transform var(--dur-close) var(--ease-apple),
+    visibility 0s var(--dur-close);
+}
+
+.nav-sheet.is-open {
+  transform: none;
+  transition:
+    opacity var(--dur-open) var(--ease-apple),
+    transform var(--dur-open) var(--ease-apple),
+    visibility 0s;
+}
+
+.top-nav-menu svg {
+  transition: transform var(--dur-open) var(--ease-apple);
+}
+
+/* --- AI guide panel ---------------------------------------------------- */
+.public-guide {
+  transition: visibility 0s var(--dur-close);
+}
+
+.public-guide.is-open {
+  transition: visibility 0s;
+}
+
+.public-guide-scrim {
+  transition: opacity var(--dur-close) var(--ease-apple);
+}
+
+.public-guide.is-open .public-guide-scrim {
+  transition-duration: var(--dur-open);
+}
+
+.public-guide-panel {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity var(--dur-close) var(--ease-apple),
+    transform var(--dur-close) var(--ease-apple);
+}
+
+.public-guide.is-open .public-guide-panel {
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--dur-open);
+}
+
+/* --- expand / collapse ------------------------------------------------- */
+.disclosure {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-close) var(--ease-apple);
+}
+
+.disclosure.is-open {
+  grid-template-rows: 1fr;
+  transition-duration: var(--dur-open);
+}
+
+.disclosure-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Once fully open, stop clipping focus rings and popovers. */
+.disclosure.is-open > .disclosure-inner {
+  animation: disclosure-unclip 0s var(--dur-open) forwards;
+}
+
+.resume-block.is-collapsed .disclosure > .disclosure-inner {
+  animation: none;
+}
+
+@keyframes disclosure-unclip {
+  to {
+    overflow: visible;
+  }
+}
+
+.resume-block-body.disclosure {
+  grid-template-rows: 1fr;
+}
+
+.resume-block.is-collapsed .resume-block-body.disclosure {
+  grid-template-rows: 0fr;
+}
+
+.chevron {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin: 0 0.2rem 0.2rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(45deg);
+  transition: transform var(--dur-open) var(--ease-apple);
+}
+
+[aria-expanded="true"] > .chevron {
+  transform: translateY(0.15rem) rotate(-135deg);
+}
+
+.resume-block-toggle i {
+  transition: transform var(--dur-open) var(--ease-apple);
+}
+
+/* --- reduced motion: opacity only, very short -------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.page-exit),
+  ::view-transition-new(.page-enter) {
+    animation-duration: 90ms;
+    animation-delay: 0s;
+  }
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  ::view-transition-group(nav-indicator) {
+    animation-duration: 0s;
+  }
+
+  .nav-sheet,
+  .nav-sheet.is-open,
+  .public-guide-panel,
+  .public-guide.is-open .public-guide-panel {
+    transform: none !important;
+  }
+
+  .nav-sheet,
+  .nav-sheet-scrim,
+  .public-guide-panel,
+  .public-guide-scrim {
+    transition-duration: 100ms !important;
+  }
+
+  .nav-sheet {
+    transition:
+      opacity 100ms linear,
+      visibility 0s 100ms !important;
+  }
+
+  .nav-sheet.is-open {
+    transition:
+      opacity 100ms linear,
+      visibility 0s !important;
+  }
+
+  .public-guide {
+    transition: visibility 0s 100ms !important;
+  }
+
+  .public-guide.is-open {
+    transition: visibility 0s !important;
+  }
+
+  .disclosure,
+  .chevron,
+  .resume-block-toggle i,
+  .top-nav-menu svg {
+    transition: none !important;
+  }
+
+  .disclosure.is-open > .disclosure-inner {
+    animation-delay: 0s;
+  }
+}
+
+/* Desktop nav: links centred on the bar, independent of brand/tool widths,
+   so late brand or link changes never shift them. */
+@media (min-width: 1024px) {
+  .top-nav-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .top-nav-brand {
+    justify-self: start;
+  }
+
+  .top-nav-tools {
+    justify-self: end;
   }
 }

@@ -103,6 +103,9 @@ export function TopNav({
                 aria-current={item.active ? "page" : undefined}
               >
                 {item.label}
+                {item.active ? (
+                  <span className="top-nav-indicator" aria-hidden />
+                ) : null}
               </Link>
             ))}
             {showAdmin ? (
@@ -154,6 +157,7 @@ export function TopNav({
         id="site-menu-sheet"
         className={`nav-sheet liquid-glass liquid-glass-strong${open ? " is-open" : ""}`}
         aria-hidden={!open}
+        inert={!open}
       >
         <nav className="nav-sheet-links">
           {items.map((item) => (
