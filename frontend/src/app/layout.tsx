@@ -1,21 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import {
-  Geist_Mono,
-  Noto_Sans_SC,
-  Noto_Sans_TC,
-  Space_Grotesk,
-} from "next/font/google";
+import { Geist_Mono, Noto_Sans_SC, Noto_Sans_TC } from "next/font/google";
 import { SiteShell } from "@/components/site-shell";
 import { ThemeScript } from "@/components/theme-script";
 import { defaultLocale, isLocale } from "@/i18n/config";
 import "./globals.css";
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-});
 
 const notoSansTC = Noto_Sans_TC({
   variable: "--font-noto-sans-tc",
@@ -65,15 +54,10 @@ export default async function RootLayout({
     <html
       lang={locale}
       suppressHydrationWarning
-      className={`${spaceGrotesk.variable} ${notoSansTC.variable} ${notoSansSC.variable} ${geistMono.variable} locale-${locale} h-full antialiased`}
+      className={`${notoSansTC.variable} ${notoSansSC.variable} ${geistMono.variable} locale-${locale} h-full antialiased`}
     >
       <body className="min-h-full">
         <ThemeScript />
-        <div className="ambient" aria-hidden>
-          <span className="ambient-orb ambient-orb-a" />
-          <span className="ambient-orb ambient-orb-b" />
-          <span className="ambient-orb ambient-orb-c" />
-        </div>
         <SiteShell>{children}</SiteShell>
       </body>
     </html>

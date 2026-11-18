@@ -9,8 +9,8 @@ import { brandForShell, publicBrand } from "@/lib/site-content";
 import { LocaleHtml } from "./locale-html";
 import { PublicGuide } from "./public-guide";
 import { RouteProgress } from "./route-progress";
-import { Sidebar } from "./sidebar";
-import { SiteChrome } from "./site-chrome";
+import { SiteFooter } from "./site-footer";
+import { TopNav } from "./top-nav";
 
 const DESKTOP_NAV = "(min-width: 1024px)";
 
@@ -84,22 +84,19 @@ export function SiteShell({ children }: Props) {
   }, [open]);
 
   const shellDict = { ...dict, brand };
+  const admin = pathname.includes("/admin");
 
   return (
     <div className="site-root">
       <LocaleHtml locale={locale} />
       <RouteProgress />
-      <Sidebar
+      <TopNav
         locale={locale}
         dict={shellDict}
         open={open}
         showResume={hasResume !== false}
         onToggle={() => setOpen((v) => !v)}
         onNavigate={() => setOpen(false)}
-        onGuide={() => {
-          setOpen(false);
-          setGuideOpen(true);
-        }}
       />
       <PublicGuide
         locale={locale}
@@ -107,9 +104,32 @@ export function SiteShell({ children }: Props) {
         open={guideOpen}
         onClose={closeGuide}
       />
+      {admin ? null : (
+        <button
+          type="button"
+          className="guide-fab liquid-glass"
+          onClick={() => {
+            setOpen(false);
+            setGuideOpen(true);
+          }}
+        >
+          <span className="guide-orb" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+          {shellDict.guide.entry}
+        </button>
+      )}
 
-      <SiteChrome locale={locale} dict={shellDict} showResume={hasResume !== false} />
       <main className="site-main">{children}</main>
+      {admin ? null : (
+        <SiteFooter
+          locale={locale}
+          dict={shellDict}
+          showResume={hasResume !== false}
+        />
+      )}
     </div>
   );
 }

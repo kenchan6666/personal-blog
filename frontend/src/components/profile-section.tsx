@@ -25,7 +25,7 @@ type Props = {
   content: ProfileContent;
 };
 
-function Block({
+function Row({
   label,
   children,
 }: {
@@ -34,14 +34,10 @@ function Block({
 }) {
   if (!children) return null;
   return (
-    <div className="mb-8">
-      <h3 className="mb-2 text-xs font-semibold tracking-[0.18em] text-[var(--accent-link)] uppercase">
-        {label}
-      </h3>
-      <div className="whitespace-pre-wrap text-base leading-relaxed text-[var(--text-primary)]">
-        {children}
-      </div>
-    </div>
+    <>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </>
   );
 }
 
@@ -53,28 +49,29 @@ export function ProfileSection({ content }: Props) {
   if (!hasBody) return null;
 
   return (
-    <section
-      id="profile"
-      className="hairline-t px-5 py-14 sm:px-10 sm:py-16 lg:px-14"
-    >
-      <div className="mx-auto max-w-3xl">
-        <h2 className="display-font mb-10 text-3xl font-bold tracking-tight">
-          {content.title}
-        </h2>
-        {avatarSrc ? (
-          <div className="mb-10">
+    <section id="profile" className="home-section">
+      <div className="home-wrap">
+        <div className="home-section-head">
+          <h2>{content.title}</h2>
+        </div>
+        <div className="home-profile">
+          {avatarSrc ? (
             <img
               src={avatarSrc}
               alt=""
-              width={128}
-              height={128}
-              className="avatar-frame h-32 w-32 object-cover"
+              width={96}
+              height={96}
+              loading="lazy"
+              decoding="async"
+              className="home-profile-avatar"
             />
-          </div>
-        ) : null}
-        <Block label={content.bioLabel}>{content.bio}</Block>
-        <Block label={content.skillsLabel}>{content.skills}</Block>
-        <Block label={content.experienceLabel}>{content.experience}</Block>
+          ) : null}
+          <dl className="home-profile-facts">
+            <Row label={content.bioLabel}>{content.bio}</Row>
+            <Row label={content.skillsLabel}>{content.skills}</Row>
+            <Row label={content.experienceLabel}>{content.experience}</Row>
+          </dl>
+        </div>
       </div>
     </section>
   );
