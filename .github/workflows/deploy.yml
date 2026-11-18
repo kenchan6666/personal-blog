@@ -45,13 +45,33 @@ jobs:
           # TLS restore from the Let's Encrypt cert already on the VM.
           bash deployment/start.sh --prod
           docker image prune -f
-          curl -fsS --max-time 30 http://127.0.0.1/api/health >/dev/null
+          # After TLS is on, http://127.0.0.1/api/health is a 301. Wait for the
+          # public page itself so we don't race Next.js startup (first request
+          # after a rebuild can return 500).
+          ok=0
+          for i in $(seq 1 30); do
+            code="$(curl -k -sS -o /dev/null -w '%{http_code}' --max-time 10 https://127.0.0.1/zh-Hant || true)"
+            echo "local https /zh-Hant try ${i}: ${code:-curl-fail}"
+            if [ "${code:-}" = "200" ]; then
+              ok=1
+              break
+            fi
+            sleep 5
+          done
+          [ "$ok" -eq 1 ]
           echo "deploy ok"
           REMOTE
 
       - name: Verify public site
         run: |
           set -euo pipefail
-          code="$(curl -fsS -o /dev/null -w '%{http_code}' --max-time 30 https://kenchan0522.blog/zh-Hant)"
-          echo "https://kenchan0522.blog/zh-Hant -> ${code}"
-          test "$code" = "200"
+          for i in $(seq 1 18); do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 https://kenchan0522.blog/zh-Hant || true)"
+            echo "try ${i}: https://kenchan0522.blog/zh-Hant -> ${code:-curl-fail}"
+            if [ "${code:-}" = "200" ]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "public site did not return 200 in time"
+          exit 1
