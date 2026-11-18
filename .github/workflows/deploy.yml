@@ -120,14 +120,7 @@ jobs:
 
           echo "===== memory before deploy ====="
           free -h
-          awk '/MemTotal:|MemAvailable:|MemFree:|Buffers:|^Cached:|SwapTotal:|SwapFree:/ {print}' /proc/meminfo
-          sampler="/tmp/deploy-mem-sample.$$"
-          : > "$sampler"
-          ( while true; do
-              awk -v ts="$(date +%s)" '/MemAvailable:/ {printf "%s available_kB=%s\n", ts, $2}' /proc/meminfo
-              sleep 2
-            done ) >> "$sampler" &
-          sample_pid=$!
+          awk "/MemTotal:|MemAvailable:|MemFree:|Buffers:|^Cached:|SwapTotal:|SwapFree:/ {print}" /proc/meminfo
 
           git pull --ff-only
           bash deployment/start.sh --prod --pull
@@ -135,25 +128,9 @@ jobs:
           docker logout https://asia-east2-docker.pkg.dev >/dev/null 2>&1 || true
           unset AR_TOKEN
 
-          kill "$sample_pid" 2>/dev/null || true
-          wait "$sample_pid" 2>/dev/null || true
           echo "===== memory after deploy ====="
           free -h
-          if [ -s "$sampler" ]; then
-            awk '
-              BEGIN { min_av = -1; n = 0 }
-              {
-                split($2, a, /=/)
-                v = a[2] + 0
-                n++
-                if (min_av < 0 || v < min_av) min_av = v
-              }
-              END {
-                if (n > 0) printf "min MemAvailable during deploy: %.0f MiB (%d samples)\n", min_av/1024, n
-              }
-            ' "$sampler"
-          fi
-          rm -f "$sampler"
+          awk "/MemTotal:|MemAvailable:|MemFree:|Buffers:|^Cached:|SwapTotal:|SwapFree:/ {print}" /proc/meminfo
 
           echo "===== running images ====="
           docker ps --format "{{.Names}} {{.Image}} {{.Status}}"

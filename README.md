@@ -127,7 +127,11 @@ bash deployment/start.sh
 | [`docker-compose.prod.yml`](docker-compose.prod.yml) | 生產：mongo、redis、qdrant、api、agent、web、nginx、certbot |
 | [`deployment/env.example`](deployment/env.example) | 複製為 `deployment/.env`，勿提交 |
 
-單機生產：
+單機生產：GitHub Actions 會建構 `api` / `agent` / `web` 並推到私有 Artifact Registry；VM 只拉鏡像重啟。手動救援才在機器上建構：
+
+```bash
+IMAGE_TAG=<git-sha> bash deployment/start.sh --prod --pull
+```
 
 ```powershell
 .\deployment\start.ps1 --prod

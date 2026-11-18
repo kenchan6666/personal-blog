@@ -13,19 +13,32 @@ Local Mongo/Redis on host ports (`docker compose up -d`) is unchanged. This file
 
 ## Bring up
 
-Windows PowerShell:
+Production images (`api`, `agent`, `web`) are built in GitHub Actions and pushed
+to a private Artifact Registry repo in `asia-east2`. A push to `master` (or a
+manual workflow run) pulls those images onto the VM and restarts the stack —
+the 4 GB VM does not build images.
+
+On the VM, after CI has pushed the images:
+
+```bash
+IMAGE_TAG=<git-sha> bash deployment/start.sh --prod --pull
+```
+
+Windows PowerShell (local/recovery build, or `--pull` if you are already
+logged in to Artifact Registry):
 
 ```powershell
 .\deployment\start.ps1 --prod
+.\deployment\start.ps1 --prod --pull
 ```
 
-macOS / Linux / Git Bash:
+The script copies `deployment/env.example` to `deployment/.env` on first run. Edit that file (see checklist below) and run the same command again if you change secrets.
+
+To build on the machine itself (recovery if the registry is unreachable):
 
 ```bash
 bash deployment/start.sh --prod
 ```
-
-The script copies `deployment/env.example` to `deployment/.env` on first run. Edit that file (see checklist below) and run the same command again if you change secrets.
 
 Equivalent compose (build one image at a time; a parallel `--build` can fill a small VM disk):
 
@@ -125,7 +138,8 @@ Open GCP firewall **tcp:80** and **tcp:443**. Turn off GoDaddy HTTPS forwarding/
 
 ## Layout
 
-- `bash deployment/start.sh --prod` — one-command bring-up
+- `bash deployment/start.sh --prod --pull` — production bring-up (pull images; no local build)
+- `bash deployment/start.sh --prod` — local/recovery build on the machine
 - `docker-compose.prod.yml` — mongo, redis, qdrant, api, agent, web, nginx
 - `deployment/nginx.conf` — reverse proxy
 - `deployment/env.example` — template for `deployment/.env`
