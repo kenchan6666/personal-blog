@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { getDictionary } from "@/i18n/dictionaries";
 import { defaultLocale, isLocale, type Locale } from "@/i18n/config";
@@ -13,6 +13,8 @@ import { SiteFooter } from "./site-footer";
 import { TopNav } from "./top-nav";
 
 const DESKTOP_NAV = "(min-width: 1024px)";
+/** Matches the .nav-sheet close transition in globals.css. */
+const MENU_CLOSE_MS = 220;
 
 function localeFromPath(pathname: string): Locale {
   const segment = pathname.split("/").filter(Boolean)[0] ?? defaultLocale;
@@ -32,6 +34,7 @@ export function SiteShell({ children }: Props) {
   const [guideOpen, setGuideOpen] = useState(false);
   const [hasResume, setHasResume] = useState<boolean | null>(null);
   const closeGuide = useCallback(() => setGuideOpen(false), []);
+  const unlockTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     const next = getDictionary(locale);
@@ -106,6 +109,7 @@ export function SiteShell({ children }: Props) {
     // Lock via a class on <html>: overflow hidden + scrollbar-gutter stable,
     // so desktop-width scrollbars don't vanish and shift the page sideways.
     const root = document.documentElement;
+    window.clearTimeout(unlockTimer.current);
     root.classList.add("is-scroll-locked");
     function onChange() {
       root.classList.toggle("is-scroll-locked", !mq.matches);
@@ -113,7 +117,11 @@ export function SiteShell({ children }: Props) {
     mq.addEventListener("change", onChange);
     return () => {
       mq.removeEventListener("change", onChange);
-      root.classList.remove("is-scroll-locked");
+      // Unlock once the sheet has faded out: releasing overflow re-lays out
+      // the whole page, which used to land on the close's first frame.
+      unlockTimer.current = window.setTimeout(() => {
+        root.classList.remove("is-scroll-locked");
+      }, MENU_CLOSE_MS);
     };
   }, [open]);
 

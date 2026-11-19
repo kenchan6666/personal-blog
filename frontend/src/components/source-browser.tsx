@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCollapseMotion } from "@/lib/use-collapse-motion";
 import type { Dictionary } from "@/i18n/dictionaries";
 import type { SourceRepo } from "@/lib/api";
 import {
@@ -60,6 +61,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   const skipInitialFetch = useRef(Boolean(initial));
   const readmeRef = useRef<HTMLDivElement>(null);
   const readmeCollapsedHeight = useRef(0);
+  const { ref: filesRef } = useCollapseMotion<HTMLDivElement>(filesOpen);
 
   // README expands/collapses by animating its real height (measured, then
   // released), instead of jumping between a clipped and a full box.
@@ -168,6 +170,15 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
     if (name.includes(".") && (await openFile(path))) return;
     await openDir(path);
   }
+
+  // Stable handler so the memoised README doesn't re-render on every toggle.
+  const openRepoPathRef = useRef(openRepoPath);
+  useLayoutEffect(() => {
+    openRepoPathRef.current = openRepoPath;
+  });
+  const onRepoPath = useCallback((path: string) => {
+    void openRepoPathRef.current(path);
+  }, []);
 
   if (!overview) {
     return (
@@ -305,7 +316,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
                 source={overview.readme.content}
                 repoFullName={sourceRepo.fullName}
                 refName={overview.ref}
-                onRepoPath={(path) => void openRepoPath(path)}
+                onRepoPath={onRepoPath}
               />
             ) : (
               <p className="text-[var(--text-muted)]">{labels.noReadme}</p>
@@ -341,6 +352,8 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
             </button>
             <div
               id={`files-${slug}`}
+              ref={filesRef}
+              data-motion=""
               className={`disclosure${filesOpen ? " is-open" : ""}`}
               inert={!filesOpen}
             >
@@ -472,7 +485,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
                 repoFullName={sourceRepo.fullName}
                 refName={overview.ref}
                 baseDir={parentPath(blob.path)}
-                onRepoPath={(path) => void openRepoPath(path)}
+                onRepoPath={onRepoPath}
               />
             </div>
           ) : (

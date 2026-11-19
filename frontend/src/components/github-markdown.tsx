@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent } from "react";
+import { memo, type MouseEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { githubBlobUrl, githubRawUrl, resolveRepoPath } from "@/lib/repo-path";
@@ -16,7 +16,10 @@ type Props = {
   onRepoPath?: (path: string) => void;
 };
 
-export function GithubMarkdown({
+// Memoised: a long README is the most expensive thing to re-render, and its
+// parent re-renders on every expand/collapse (that render used to delay the
+// start of the close animation by a frame or more on phones).
+export const GithubMarkdown = memo(function GithubMarkdown({
   source,
   repoFullName,
   refName,
@@ -102,4 +105,4 @@ export function GithubMarkdown({
       </ReactMarkdown>
     </div>
   );
-}
+});

@@ -2,15 +2,44 @@
 
 import { useEffect, useState } from "react";
 import type { ArticleHeading } from "@/lib/headings";
+import { useCollapseMotion } from "@/lib/use-collapse-motion";
 
 type Props = {
   headings: ArticleHeading[];
   label: string;
 };
 
+type ListProps = {
+  headings: ArticleHeading[];
+  active: string;
+  onPick?: () => void;
+};
+
+// Top level (not declared inside ArticleToc): a component defined during
+// render is a new type every render, so React remounted both lists on each
+// open/close and the items lost their fade-out mid-transition.
+function HeadingList({ headings, active, onPick }: ListProps) {
+  return (
+    <ol>
+      {headings.map((heading) => (
+        <li key={heading.id} className={heading.level === 3 ? "is-sub" : undefined}>
+          <a
+            href={`#${heading.id}`}
+            className={active === heading.id ? "is-active" : undefined}
+            onClick={onPick}
+          >
+            {heading.text}
+          </a>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export function ArticleToc({ headings, label }: Props) {
   const [active, setActive] = useState(headings[0]?.id ?? "");
   const [open, setOpen] = useState(false);
+  const { ref, skipNextAnimation } = useCollapseMotion<HTMLDivElement>(open);
 
   useEffect(() => {
     const nodes = headings
@@ -33,25 +62,11 @@ export function ArticleToc({ headings, label }: Props) {
     return () => observer.disconnect();
   }, [headings]);
 
-  function HeadingList({ onPick }: { onPick?: () => void }) {
-    return (
-      <ol>
-        {headings.map((heading) => (
-          <li
-            key={heading.id}
-            className={heading.level === 3 ? "is-sub" : undefined}
-          >
-            <a
-              href={`#${heading.id}`}
-              className={active === heading.id ? "is-active" : undefined}
-              onClick={onPick}
-            >
-              {heading.text}
-            </a>
-          </li>
-        ))}
-      </ol>
-    );
+  // Picking a heading jumps below the list: fold it at once so the page
+  // above the target doesn't shrink during the jump and land it off-target.
+  function pick() {
+    skipNextAnimation();
+    setOpen(false);
   }
 
   return (
@@ -69,17 +84,19 @@ export function ArticleToc({ headings, label }: Props) {
         </button>
         <div
           id="article-toc-mobile-list"
+          ref={ref}
+          data-motion=""
           className={`disclosure${open ? " is-open" : ""}`}
           inert={!open}
         >
           <div className="disclosure-inner">
-            <HeadingList onPick={() => setOpen(false)} />
+            <HeadingList headings={headings} active={active} onPick={pick} />
           </div>
         </div>
       </nav>
       <nav className="article-toc" aria-label={label}>
         <p className="article-toc-label">{label}</p>
-        <HeadingList />
+        <HeadingList headings={headings} active={active} />
       </nav>
     </div>
   );

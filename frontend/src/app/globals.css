@@ -7169,9 +7169,11 @@ html.is-guide-locked body {
 .disclosure > .disclosure-inner > * {
   opacity: 0;
   transform: translateY(-4px);
+  /* Close: content stays readable while the box folds, fading out with it
+     (it used to vanish at 140ms and leave an empty box shrinking). */
   transition:
-    opacity 140ms var(--ease-out-soft),
-    transform 200ms var(--ease-apple);
+    opacity 200ms var(--ease-out-soft),
+    transform 240ms var(--ease-apple);
 }
 
 .disclosure.is-open > .disclosure-inner > * {
@@ -7184,7 +7186,27 @@ html.is-guide-locked body {
 
 .article-toc-mobile-toggle .chevron,
 .gh-files-summary::after {
-  transition: transform 280ms var(--ease-apple);
+  transition: transform 240ms var(--ease-apple);
+}
+
+.article-toc-mobile-toggle[aria-expanded="true"] .chevron,
+.gh-files-disclosure.is-open > .gh-files-summary::after {
+  transition-duration: 280ms;
+}
+
+/* JS-driven height (useCollapseMotion): one Web Animation on the box height,
+   content stays at full size underneath and is clipped, not re-laid out. */
+.disclosure[data-motion] {
+  transition: none;
+}
+
+.disclosure.is-animating {
+  grid-template-rows: 1fr;
+  overflow: hidden;
+}
+
+.disclosure.is-animating > .disclosure-inner > * {
+  will-change: opacity, transform;
 }
 
 /* Project files: a real button + animated disclosure instead of <details>. */
