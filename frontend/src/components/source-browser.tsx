@@ -191,6 +191,18 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
     ? githubBlobUrl(sourceRepo.fullName, overview.ref, blob.path)
     : sourceRepo.htmlUrl;
 
+  const languageTotal = Object.values(overview.languages ?? {}).reduce(
+    (sum, bytes) => sum + bytes,
+    0,
+  );
+  const languageStats = Object.entries(overview.languages ?? {})
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 4)
+    .map(([name, bytes]) => ({
+      name,
+      percent: languageTotal ? Math.max(1, Math.round((bytes / languageTotal) * 100)) : 0,
+    }));
+
   function kindLabel(entry: SourceTreeEntry) {
     if (entry.type === "dir") return labels.dir;
     return sourceLanguage(entry.name).label || labels.file;
@@ -214,6 +226,15 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
           ) : (
             <span className="status-pill">{labels.publicRepo}</span>
           )}
+          {languageStats.length > 0 ? (
+            <p className="gh-languages">
+              {languageStats.map((item) => (
+                <span key={item.name}>
+                  {item.name} {item.percent}%
+                </span>
+              ))}
+            </p>
+          ) : null}
         </div>
         {busy ? <SoftLoader label={labels.sourceLoading} /> : null}
         <a

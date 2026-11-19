@@ -7526,3 +7526,12 @@ html.is-guide-locked body {
     transform: none;
   }
 }
+
+.gh-languages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  margin: 0.45rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}

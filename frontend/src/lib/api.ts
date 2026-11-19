@@ -523,6 +523,8 @@ export type SourceTreeEntry = {
 };
 
 export type PublicSourceOverview = {
+  /** GitHub language bytes, e.g. { TypeScript: 51234 }. */
+  languages?: Record<string, number>;
   defaultBranch: string;
   ref: string;
   branches: string[];
