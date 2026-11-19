@@ -1,4 +1,4 @@
-const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
+import { isOptimizedImageHost } from "./image-hosts";
 
 export function toImageSrc(url: string): string {
   if (!url.startsWith("http://") && !url.startsWith("https://")) return url;
@@ -35,13 +35,7 @@ export function canOptimizeImage(url: string): boolean {
   if (src.startsWith("/")) return true;
   try {
     const { protocol, hostname } = new URL(src);
-    if (protocol !== "http:" && protocol !== "https:") return false;
-    if (LOCAL_HOSTS.has(hostname)) return true;
-    if (hostname.endsWith("githubusercontent.com")) return true;
-    if (hostname === "github.com" || hostname.endsWith(".github.com")) {
-      return true;
-    }
-    return protocol === "https:";
+    return isOptimizedImageHost(protocol, hostname);
   } catch {
     return false;
   }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { canOptimizeImage } from "@/lib/content-image";
 import { mediaUrl, type HeroVisual as HeroVisualConfig } from "@/lib/api";
 
 type Props = {
@@ -18,7 +19,7 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/$/, "");
  */
 function heroSource(path: string): { src: string; optimize: boolean } {
   const url = mediaUrl(path);
-  if (/^https?:\/\//i.test(url)) return { src: url, optimize: true };
+  if (/^https?:\/\//i.test(url)) return { src: url, optimize: canOptimizeImage(url) };
   if (SITE_URL) return { src: `${SITE_URL}${url}`, optimize: true };
   return { src: url, optimize: false };
 }

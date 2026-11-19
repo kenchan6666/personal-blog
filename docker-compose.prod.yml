@@ -9,10 +9,18 @@
 # IMAGE_REGISTRY default is the private Artifact Registry repo in asia-east2.
 # CI and start.sh --pull set IMAGE_TAG to the git SHA.
 
+# Rotate container logs so json-file logs can't fill the data disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    logging: *default-logging
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
     volumes:
       - mongo_data:/data/db
@@ -20,6 +28,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - redis_data:/data
     command: ["redis-server", "--appendonly", "yes"]
@@ -27,6 +36,7 @@ services:
   qdrant:
     image: qdrant/qdrant:v1.15.4
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - qdrant_data:/qdrant/storage
 
@@ -34,6 +44,7 @@ services:
     image: ${IMAGE_REGISTRY:-asia-east2-docker.pkg.dev/project-9d21d8d1-183d-4306-8c3/personal-blog}/api:${IMAGE_TAG:-latest}
     build: ./backend
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ${DEPLOY_ENV_FILE:-./deployment/.env}
     environment:
@@ -60,6 +71,7 @@ services:
       context: .
       dockerfile: viola-agent/Dockerfile
     restart: unless-stopped
+    logging: *default-logging
     env_file:
       - ${DEPLOY_ENV_FILE:-./deployment/.env}
     environment:
@@ -93,6 +105,7 @@ services:
         NEXT_PUBLIC_API_BASE_URL: ""
         NEXT_PUBLIC_SITE_URL: ${PUBLIC_ORIGIN:-https://kenchan0522.blog}
     restart: unless-stopped
+    logging: *default-logging
     environment:
       API_INTERNAL_URL: http://api:8000
     depends_on:
@@ -101,6 +114,7 @@ services:
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "80:80"
       - "443:443"
@@ -120,6 +134,7 @@ services:
   certbot:
     image: certbot/certbot
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - certbot_www:/var/www/certbot
       - certbot_certs:/etc/letsencrypt
