@@ -1367,6 +1367,13 @@ html.is-locale-hold .article-page {
   line-height: 1.65;
 }
 
+@media (max-width: 480px) {
+  .resume-public .resume-entry-row {
+    flex-wrap: wrap;
+    gap: 0.15rem 1rem;
+  }
+}
+
 .resume-paper-head {
   margin-bottom: 1.15rem;
   text-align: center;

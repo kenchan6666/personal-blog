@@ -18,6 +18,7 @@ type Props = {
   showEmpty?: boolean;
   paged?: boolean;
   a4?: boolean;
+  preferPageLabels?: boolean;
 };
 
 const BUILTIN: ResumeSectionId[] = [
@@ -29,6 +30,18 @@ const BUILTIN: ResumeSectionId[] = [
   "activities",
   "skillsOthers",
 ];
+
+function withWorkSection(sections: string[], hasWork: boolean) {
+  if (!hasWork) return sections;
+  const next = sections.filter((id) => id !== "work");
+  const summaryAt = next.indexOf("summary");
+  if (summaryAt >= 0) {
+    next.splice(summaryAt + 1, 0, "work");
+  } else {
+    next.unshift("work");
+  }
+  return next;
+}
 
 function range(start: string, end: string) {
   return [start, end].filter(Boolean).join(" – ");
@@ -81,22 +94,33 @@ function filled(id: string, resume: PublicResume | OwnerResume) {
   return Boolean(extra && (extra.lines.length > 0 || extra.entries.length > 0));
 }
 
-function ResumePaperBody({ resume, dict, sections, showEmpty, a4 }: Props) {
-  const paperDict = isLocale(resume.locale)
-    ? getDictionary(resume.locale).resume
-    : dict.resume;
+function ResumePaperBody({
+  resume,
+  dict,
+  sections,
+  showEmpty,
+  a4,
+  preferPageLabels,
+}: Props) {
+  const paperDict =
+    preferPageLabels || !isLocale(resume.locale)
+      ? dict.resume
+      : getDictionary(resume.locale).resume;
   const r = paperDict;
   const header = resume.header;
   const extras = resume.extras ?? [];
   const seen = new Set<string>();
-  const order = [
-    ...(sections ?? resume.sections ?? BUILTIN),
-    ...extras.map((item) => item.slug),
-  ].filter((id) => {
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
+  const order = withWorkSection(
+    [
+      ...(sections ?? resume.sections ?? BUILTIN),
+      ...extras.map((item) => item.slug),
+    ].filter((id) => {
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }),
+    (resume.workExperiences ?? []).length > 0,
+  );
 
   return (
     <article className={a4 ? "resume-paper resume-paper-a4" : "resume-paper"}>
@@ -297,7 +321,7 @@ export function ResumePaper(props: Props) {
   if (!paged) {
     return (
       <div className="resume-public page-panel glass">
-        <ResumePaperBody {...props} />
+        <ResumePaperBody {...props} preferPageLabels />
       </div>
     );
   }

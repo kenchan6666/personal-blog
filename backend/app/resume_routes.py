@@ -33,6 +33,7 @@ from app.resume import (
     fold_duplicate_custom_templates,
     ensure_resume_dir,
     parse_resume_import,
+    public_resume_sections,
     render_resume_pdf,
     resume_vault_json,
     save_resume_pdf_bytes,
@@ -184,8 +185,11 @@ def register_resume_routes(app: FastAPI, require_owner: Callable) -> None:
         template = await current_store().find_one(
             ResumeTemplate, slug=row.template_slug
         )
-        if template is not None:
-            payload["sections"] = list(template.sections)
+        template_sections = list(template.sections) if template is not None else payload.get("sections")
+        payload["sections"] = public_resume_sections(
+            template_sections,
+            has_work=bool(row.work_experiences),
+        )
         return payload
 
     @app.get("/api/public/resumes/{slug}/pdf")

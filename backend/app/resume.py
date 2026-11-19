@@ -619,6 +619,23 @@ def validate_sections(sections: list[str], extra_slugs: set[str] | None = None) 
     return cleaned
 
 
+def public_resume_sections(
+    template_sections: list[str] | None,
+    *,
+    has_work: bool,
+) -> list[str]:
+    """Show work experience on public resumes, placed after Summary."""
+    sections = list(template_sections or [])
+    if not has_work:
+        return sections
+    sections = [item for item in sections if item != "work"]
+    if "summary" in sections:
+        sections.insert(sections.index("summary") + 1, "work")
+    else:
+        sections.insert(0, "work")
+    return sections
+
+
 def apply_template_body(template: ResumeTemplate, body: dict[str, Any]) -> None:
     template.slug = validate_slug(str(body.get("slug") or template.slug))
     name = body.get("name") or template.name

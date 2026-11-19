@@ -691,3 +691,36 @@ def test_github_project_heuristic_does_not_invent_features():
     )
     assert "Track nearby shops with FastAPI" in filled["description"]
     assert all("Primary features of" not in item for item in filled["description"])
+
+
+@pytest.mark.asyncio
+async def test_public_resume_shows_work_after_summary_even_on_classic_layout(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/resumes",
+        json=_resume_payload(
+            slug="work-en",
+            status="published",
+            workExperiences=[
+                {
+                    "organization": "Virpluz Limited",
+                    "role": "Software Engineer",
+                    "start": "2025-12",
+                    "end": "2026-09",
+                    "city": "Hong Kong",
+                    "description": ["Built the full MCP stack — client and servers."],
+                }
+            ],
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 200
+    detail = await client.get("/api/public/resumes/work-en")
+    assert detail.status_code == 200
+    sections = detail.json()["sections"]
+    assert "work" in sections
+    assert sections.index("work") == sections.index("summary") + 1
+    assert detail.json()["workExperiences"][0]["organization"] == "Virpluz Limited"
