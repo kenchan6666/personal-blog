@@ -48,6 +48,9 @@ export function proxy(request: NextRequest) {
     if (isLocale(segment)) headers.set("x-locale", segment);
     const response = NextResponse.next({ request: { headers } });
     response.headers.set("Content-Security-Policy", csp);
+    if (isLocale(segment) && pathname.split("/")[2] === "admin") {
+      response.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    }
     return response;
   }
 

@@ -7252,3 +7252,277 @@ html.is-guide-locked body {
     transition: none;
   }
 }
+
+/* --- admin chrome: compact top bar + phone bottom tab bar ---------------- */
+.admin-bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 60;
+  padding-top: env(safe-area-inset-top);
+}
+
+.admin-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  max-width: 72rem;
+  height: var(--nav-height);
+  margin: 0 auto;
+  padding: 0 max(1rem, env(safe-area-inset-right)) 0 max(1rem, env(safe-area-inset-left));
+}
+
+.admin-bar-lead {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: 0.45rem;
+}
+
+.admin-bar-brand {
+  flex: none;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  border-radius: 6px;
+  transition: opacity 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.admin-bar-brand:hover {
+  opacity: 0.7;
+}
+
+.admin-bar-sep {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.admin-bar-title {
+  overflow: hidden;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-bar-tabs {
+  display: none;
+  flex: 1;
+  justify-content: center;
+  gap: 0.15rem;
+  padding: 2px;
+  min-width: 0;
+}
+
+.admin-bar-tab {
+  position: relative;
+  min-height: 32px;
+  padding: 0 0.8rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    color 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.admin-bar-tab:hover {
+  color: var(--text-primary);
+  background: var(--panel-fill);
+}
+
+.admin-bar-tab[aria-current="page"] {
+  color: var(--text-primary);
+  background: var(--panel-fill-strong, var(--panel-fill));
+  box-shadow: inset 0 0 0 1px var(--hairline);
+}
+
+.admin-bar-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.admin-bar-email {
+  display: none;
+  max-width: 14rem;
+  overflow: hidden;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-bar-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 0.7rem;
+  border: 1px solid var(--hairline);
+  border-radius: 9px;
+  background: var(--panel-fill);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.admin-bar-logout:hover {
+  background: var(--panel-fill-strong, var(--panel-fill));
+}
+
+.admin-bar-brand:focus-visible,
+.admin-bar-tab:focus-visible,
+.admin-bar-logout:focus-visible,
+.admin-tabbar-item:focus-visible {
+  outline: 2px solid var(--accent-link);
+  outline-offset: 2px;
+}
+
+.admin-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--accent-taiko) 35%, var(--hairline));
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--accent-taiko) 8%, var(--surface));
+  font-size: 0.875rem;
+  animation: admin-tab-enter 240ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.admin-banner p {
+  flex: 1 1 16rem;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.admin-tabbar {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-width: 1px 0 0;
+  padding: 0.3rem max(0.35rem, env(safe-area-inset-right))
+    max(0.35rem, env(safe-area-inset-bottom))
+    max(0.35rem, env(safe-area-inset-left));
+}
+
+.admin-tabbar-item {
+  display: flex;
+  min-width: 44px;
+  min-height: 48px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.admin-tabbar-item:active {
+  transform: scale(0.94);
+}
+
+.admin-tabbar-item[aria-current="page"] {
+  color: var(--accent-taiko);
+  background: color-mix(in srgb, var(--accent-taiko) 10%, transparent);
+}
+
+.admin-tabbar-icon {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.admin-tabbar-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .admin-page {
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+
+  .admin-page:has(.admin-dashboard-shell.is-agent) {
+    padding-bottom: calc(4.4rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 768px) {
+  .admin-tabbar {
+    display: none;
+  }
+
+  .admin-bar-tabs {
+    display: flex;
+  }
+
+  .admin-bar.has-tabs .admin-bar-sep {
+    display: none;
+  }
+
+  /* Tabs show the current section; keep the h1 for assistive tech only. */
+  .admin-bar.has-tabs .admin-bar-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1180px) {
+  .admin-bar-email {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-bar-tab,
+  .admin-bar-logout,
+  .admin-bar-brand,
+  .admin-tabbar-item,
+  .admin-banner {
+    transition: none;
+    animation: none;
+  }
+
+  .admin-tabbar-item:active {
+    transform: none;
+  }
+}

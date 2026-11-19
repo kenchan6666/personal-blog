@@ -8,6 +8,7 @@ import type { Locale } from "@/i18n/config";
 import {
   attachOwnerSourceRepo,
   createOwnerProject,
+  deleteOwnerProject,
   emptyOwnerProject,
   fetchOwnerGitHubRepos,
   fetchOwnerProjects,
@@ -20,6 +21,7 @@ import {
 import { BilingualField } from "./bilingual-field";
 import { CmsCard, StatusPill } from "./cms-card";
 import { CmsModal } from "./cms-modal";
+import { CmsConfirm } from "./cms-confirm";
 
 type Props = {
   locale: Locale;
@@ -81,6 +83,7 @@ export function ProjectEditor({ locale, dict }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [repos, setRepos] = useState<SourceRepo[]>([]);
@@ -184,6 +187,26 @@ export function ProjectEditor({ locale, dict }: Props) {
       setPickedRepo(saved.sourceRepo);
       await reload(token);
       setMessage(a.saved);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onDelete() {
+    const token = getSessionToken();
+    if (!token || !current.id) return;
+    setSaving(true);
+    setMessage(null);
+    setError(null);
+    try {
+      await deleteOwnerProject(token, current.id);
+      await reload(token);
+      setOpen(false);
+      setCurrent(emptyOwnerProject());
+      setPickedRepo(null);
+      setConfirm(false);
     } catch {
       setError(a.errorGeneric);
     } finally {
@@ -299,6 +322,16 @@ export function ProjectEditor({ locale, dict }: Props) {
               >
                 {saving ? a.saving : a.save}
               </button>
+              {current.id ? (
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  disabled={saving}
+                  onClick={() => setConfirm(true)}
+                >
+                  {a.deleteProject}
+                </button>
+              ) : null}
               <button type="button" className="btn-ghost" onClick={closeEditor}>
                 {a.close}
               </button>
@@ -447,6 +480,16 @@ export function ProjectEditor({ locale, dict }: Props) {
           </form>
         )}
       </CmsModal>
+      <CmsConfirm
+        open={confirm}
+        title={a.confirmDelete}
+        hint={a.confirmDeleteHint}
+        confirmLabel={a.deleteProject}
+        closeLabel={a.close}
+        busy={saving}
+        onClose={() => setConfirm(false)}
+        onConfirm={() => void onDelete()}
+      />
     </CmsCard>
   );
 }

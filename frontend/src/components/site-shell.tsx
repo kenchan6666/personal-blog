@@ -120,6 +120,17 @@ export function SiteShell({ children }: Props) {
   const shellDict = { ...dict, brand };
   const admin = pathname.includes("/admin");
 
+  if (admin) {
+    // Admin and login pages bring their own compact AdminTopBar.
+    return (
+      <div className="site-root is-admin">
+        <LocaleHtml locale={locale} />
+        <RouteProgress />
+        <main className="site-main">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div className="site-root">
       <LocaleHtml locale={locale} />

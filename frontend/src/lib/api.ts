@@ -1938,3 +1938,25 @@ export async function streamOwnerAgent(
   if (streamError) throw new Error(streamError);
   return complete;
 }
+
+export async function deleteOwnerProject(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/owner/projects/${id}`, {
+    method: "DELETE",
+    headers: ownerHeaders(token),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}
+
+export async function deleteOwnerComment(
+  token: string,
+  id: string,
+): Promise<void> {
+  const res = await apiFetch(`${API_BASE}/api/owner/comments/${id}`, {
+    method: "DELETE",
+    headers: ownerHeaders(token),
+  });
+  if (!res.ok) throw new Error(await parseError(res));
+}

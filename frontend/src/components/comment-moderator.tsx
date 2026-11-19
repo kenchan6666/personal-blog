@@ -5,12 +5,14 @@ import type { Dictionary } from "@/i18n/dictionaries";
 import type { Locale } from "@/i18n/config";
 import {
   fetchOwnerComments,
+  deleteOwnerComment,
   getSessionToken,
   moderateOwnerComment,
   replyOwnerComment,
   type OwnerComment,
 } from "@/lib/api";
 import { CmsCard } from "./cms-card";
+import { CmsConfirm } from "./cms-confirm";
 
 type Props = {
   locale: Locale;
@@ -29,6 +31,8 @@ export function CommentModerator({ locale, dict }: Props) {
   const [comments, setComments] = useState<OwnerComment[]>([]);
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function reload(token: string) {
     const list = await fetchOwnerComments(token);
@@ -62,6 +66,27 @@ export function CommentModerator({ locale, dict }: Props) {
       await reload(token);
     } catch {
       setError(a.errorGeneric);
+    }
+  }
+
+  async function onDelete() {
+    const token = getSessionToken();
+    if (!token || !confirm || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteOwnerComment(token, confirm);
+      setReplies((previous) => {
+        const next = { ...previous };
+        delete next[confirm];
+        return next;
+      });
+      await reload(token);
+      setConfirm(null);
+    } catch {
+      setError(a.errorGeneric);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -133,6 +158,13 @@ export function CommentModerator({ locale, dict }: Props) {
                 >
                   {a.reject}
                 </button>
+                <button
+                  type="button"
+                  className="btn-ghost text-xs"
+                  onClick={() => setConfirm(comment.id)}
+                >
+                  {a.deleteComment}
+                </button>
               </div>
               <div className="mt-3 flex gap-2">
                 <input
@@ -158,6 +190,16 @@ export function CommentModerator({ locale, dict }: Props) {
           ))}
         </ul>
       )}
+      <CmsConfirm
+        open={confirm !== null}
+        title={a.confirmDelete}
+        hint={a.confirmDeleteHint}
+        confirmLabel={a.deleteComment}
+        closeLabel={a.close}
+        busy={deleting}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => void onDelete()}
+      />
     </CmsCard>
   );
 }

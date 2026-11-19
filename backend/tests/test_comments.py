@@ -165,3 +165,73 @@ async def test_projects_do_not_accept_comments(client, mailer, settings):
 
     listed = await client.get("/api/public/projects/glass-api/comments")
     assert listed.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_owner_can_delete_comment(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    await _publish_article(client, token)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/public/articles/craft-notes/comments", json=_comment_payload()
+    )
+    comment_id = created.json()["id"]
+    await client.post(f"/api/owner/comments/{comment_id}/approve", headers=headers)
+    assert len((await client.get("/api/public/articles/craft-notes/comments")).json()) == 1
+
+    deleted = await client.delete(f"/api/owner/comments/{comment_id}", headers=headers)
+    assert deleted.status_code == 200
+    assert deleted.json() == {"status": "deleted"}
+    owner_list = await client.get("/api/owner/comments", headers=headers)
+    assert all(item["id"] != comment_id for item in owner_list.json())
+    assert (await client.get("/api/public/articles/craft-notes/comments")).json() == []
+    missing = await client.delete(f"/api/owner/comments/{comment_id}", headers=headers)
+    assert missing.status_code == 404
+
+    client.cookies.clear()
+    created = await client.post(
+        "/api/public/articles/craft-notes/comments", json=_comment_payload()
+    )
+    anon = await client.delete(f"/api/owner/comments/{created.json()['id']}")
+    assert anon.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_comment_submission_is_rate_limited_per_ip(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    await _publish_article(client, token)
+    client.cookies.clear()
+    url = "/api/public/articles/craft-notes/comments"
+    alice = {"X-Real-IP": "203.0.113.7"}
+    for _ in range(settings.comment_rate_minute):
+        ok = await client.post(url, json=_comment_payload(), headers=alice)
+        assert ok.status_code == 200
+    blocked = await client.post(url, json=_comment_payload(), headers=alice)
+    assert blocked.status_code == 429
+    assert blocked.json()["detail"] == "comment_rate_limited"
+    assert int(blocked.headers["Retry-After"]) >= 1
+
+    # Another visitor is unaffected; rejected attempts on unknown targets count too.
+    bob = {"X-Real-IP": "198.51.100.9"}
+    assert (await client.post(url, json=_comment_payload(), headers=bob)).status_code == 200
+    for _ in range(2):
+        missing = await client.post(
+            "/api/public/articles/nope/comments", json=_comment_payload(), headers=bob
+        )
+        assert missing.status_code == 404
+    assert (
+        await client.post(url, json=_comment_payload(), headers=bob)
+    ).status_code == 429
+
+
+@pytest.mark.asyncio
+async def test_comment_daily_limit(client, mailer, settings, app):
+    token = await _owner_token(client, mailer, settings)
+    await _publish_journal(client, token)
+    client.cookies.clear()
+    settings.comment_rate_minute = 100
+    url = "/api/public/journals/monday-notes/comments"
+    carol = {"X-Real-IP": "192.0.2.44"}
+    for _ in range(settings.comment_rate_day):
+        assert (await client.post(url, json=_comment_payload(), headers=carol)).status_code == 200
+    assert (await client.post(url, json=_comment_payload(), headers=carol)).status_code == 429

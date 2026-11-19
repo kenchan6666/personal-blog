@@ -43,6 +43,7 @@ from app.avatar import (
 )
 from app.config import Settings
 from app.github import (
+    GitHubAuthError,
     GitHubBrowseError,
     GitHubClient,
     GitHubOAuthError,
@@ -227,6 +228,9 @@ async def get_or_create_site() -> SiteProfile:
 
 GITHUB_STATE_TTL = 600
 GITHUB_TOKEN_KEY = "github:owner_token"
+# Set when GitHub answers 401 for the stored owner token (revoked/expired).
+GITHUB_TOKEN_INVALID_KEY = "github:owner_token_invalid"
+GITHUB_TOKEN_INVALID_TTL = 600
 
 
 def _gmail_smtp(settings: Settings) -> SmtpMailer:
@@ -789,7 +793,75 @@ def create_app(
 
     GITHUB_CACHE_TTL = 120
 
-    async def published_browsable_source(slug: str) -> tuple[SourceRepo, str]:
+    async def public_github_access() -> str:
+        """Owner token for public reads, or "" to read GitHub anonymously."""
+        token = await github_access_token()
+        if not token:
+            return ""
+        redis: Redis = app.state.redis
+        if await redis.get(GITHUB_TOKEN_INVALID_KEY):
+            return ""
+        return token
+
+    async def mark_github_token_invalid() -> None:
+        redis: Redis = app.state.redis
+        await redis.set(
+            GITHUB_TOKEN_INVALID_KEY, "1", ex=GITHUB_TOKEN_INVALID_TTL
+        )
+
+    def public_fetcher(repo: SourceRepo, access: str):
+        """Cached GitHub read for public pages.
+
+        Uses the owner token when it works; when it is missing or GitHub
+        rejects it (401), falls back to the unauthenticated API, which only
+        sees public repos and is cached longer to respect the 60 req/h limit.
+        """
+        state = {"access": access}
+
+        async def fetch(kind: str, ref: str, path: str, call):
+            if state["access"]:
+                token = state["access"]
+                try:
+                    # Recheck visibility before authenticated reads, so changing
+                    # a public repo to private cannot expose fresh private data
+                    # behind a stale DB flag or source cache.
+                    if kind == "visibility":
+                        return await call(token)
+                    return await cached_github(
+                        public=True,
+                        kind=kind,
+                        full_name=repo.full_name,
+                        ref=ref,
+                        path=path,
+                        loader=lambda: call(token),
+                    )
+                except GitHubAuthError:
+                    await mark_github_token_invalid()
+                    state["access"] = ""
+            return await cached_github(
+                kind=kind,
+                full_name=repo.full_name,
+                ref=ref,
+                path=path,
+                loader=lambda: call(""),
+                anonymous=True,
+            )
+
+        return fetch
+
+    def owner_fetcher(repo: SourceRepo, access: str):
+        async def fetch(kind: str, ref: str, path: str, call):
+            return await cached_github(
+                kind=kind,
+                full_name=repo.full_name,
+                ref=ref,
+                path=path,
+                loader=lambda: call(access),
+            )
+
+        return fetch
+
+    async def published_browsable_source(slug: str):
         project = await current_store().find_one(
             Project, slug=slug, status="published"
         )
@@ -799,29 +871,31 @@ def create_app(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             )
-        access = await github_access_token()
-        if not access:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="not_found",
-            )
         github_client: GitHubClient = app.state.github
+        fetch = public_fetcher(repo, await public_github_access())
         try:
-            if await github_client.repo_is_private(
-                access_token=access,
-                owner=repo.owner,
-                name=repo.name,
-            ):
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="not_found",
-                )
+            private = await fetch(
+                "visibility",
+                "-",
+                "",
+                lambda token: github_client.repo_is_private(
+                    access_token=token,
+                    owner=repo.owner,
+                    name=repo.name,
+                ),
+            )
         except GitHubBrowseError:
+            # Anonymous callers get 404 for private repos: source unavailable.
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="not_found",
             ) from None
-        return repo, access
+        if private:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        return repo, fetch
 
     async def owner_browsable_source(slug: str) -> tuple[Project, SourceRepo, str]:
         project = await current_store().find_one(Project, slug=slug)
@@ -841,17 +915,16 @@ def create_app(
 
     async def github_source_overview(
         repo: SourceRepo,
-        access: str,
+        fetch,
         ref: str,
     ) -> dict[str, Any]:
         github_client: GitHubClient = app.state.github
-        branches = await cached_github(
-            kind="branches",
-            full_name=repo.full_name,
-            ref="-",
-            path="",
-            loader=lambda: github_client.list_branches(
-                access_token=access,
+        branches = await fetch(
+            "branches",
+            "-",
+            "",
+            lambda token: github_client.list_branches(
+                access_token=token,
                 owner=repo.owner,
                 name=repo.name,
             ),
@@ -864,34 +937,50 @@ def create_app(
                 else branches[0]
             )
         try:
-            readme = await cached_github(
-                kind="readme",
-                full_name=repo.full_name,
-                ref=branch,
-                path="",
-                loader=lambda: github_client.get_readme(
-                    access_token=access,
+            readme = await fetch(
+                "readme",
+                branch,
+                "",
+                lambda token: github_client.get_readme(
+                    access_token=token,
                     owner=repo.owner,
                     name=repo.name,
                     ref=branch,
                 ),
             )
+        except GitHubAuthError:
+            raise
         except GitHubBrowseError:
             readme = {"path": "", "content": ""}
-        tree = await cached_github(
-            kind="tree",
-            full_name=repo.full_name,
-            ref=branch,
-            path="",
-            loader=lambda: github_client.list_tree(
-                access_token=access,
+        tree = await fetch(
+            "tree",
+            branch,
+            "",
+            lambda token: github_client.list_tree(
+                access_token=token,
                 owner=repo.owner,
                 name=repo.name,
                 ref=branch,
                 path="",
             ),
         )
+        try:
+            languages = await fetch(
+                "languages",
+                "-",
+                "",
+                lambda token: github_client.get_languages(
+                    access_token=token,
+                    owner=repo.owner,
+                    name=repo.name,
+                ),
+            )
+        except GitHubAuthError:
+            raise
+        except GitHubBrowseError:
+            languages = {}
         return {
+            "languages": languages,
             "defaultBranch": repo.default_branch,
             "ref": branch,
             "branches": branches,
@@ -906,23 +995,32 @@ def create_app(
         ref: str,
         path: str,
         loader,
+        anonymous: bool = False,
+        public: bool = False,
     ):
         redis: Redis = app.state.redis
-        key = f"github:src:{full_name}:{kind}:{ref}:{path}"
+        # Public responses never reuse owner/private source-cache entries.
+        scope = "anon" if anonymous else "public" if public else "src"
+        key = f"github:{scope}:{full_name}:{kind}:{ref}:{path}"
         raw = await redis.get(key)
         if raw:
             return json.loads(raw)
         data = await loader()
-        await redis.set(key, json.dumps(data), ex=GITHUB_CACHE_TTL)
+        ttl = (
+            settings.github_anon_cache_ttl_seconds
+            if anonymous
+            else GITHUB_CACHE_TTL
+        )
+        await redis.set(key, json.dumps(data), ex=ttl)
         return data
 
     @app.get("/api/public/projects/{slug}/source")
     async def public_project_source(
         slug: str, ref: str = ""
     ) -> dict[str, Any]:
-        repo, access = await published_browsable_source(slug)
+        repo, fetch = await published_browsable_source(slug)
         try:
-            return await github_source_overview(repo, access, ref)
+            return await github_source_overview(repo, fetch, ref)
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -933,17 +1031,16 @@ def create_app(
     async def public_project_source_tree(
         slug: str, ref: str = "", path: str = ""
     ) -> dict[str, Any]:
-        repo, access = await published_browsable_source(slug)
+        repo, fetch = await published_browsable_source(slug)
         github_client: GitHubClient = app.state.github
         branch = ref or repo.default_branch or "main"
         try:
-            tree = await cached_github(
-                kind="tree",
-                full_name=repo.full_name,
-                ref=branch,
-                path=path,
-                loader=lambda: github_client.list_tree(
-                    access_token=access,
+            tree = await fetch(
+                "tree",
+                branch,
+                path,
+                lambda token: github_client.list_tree(
+                    access_token=token,
                     owner=repo.owner,
                     name=repo.name,
                     ref=branch,
@@ -966,17 +1063,16 @@ def create_app(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="path_required",
             )
-        repo, access = await published_browsable_source(slug)
+        repo, fetch = await published_browsable_source(slug)
         github_client: GitHubClient = app.state.github
         branch = ref or repo.default_branch or "main"
         try:
-            blob = await cached_github(
-                kind="blob",
-                full_name=repo.full_name,
-                ref=branch,
-                path=path,
-                loader=lambda: github_client.get_blob(
-                    access_token=access,
+            blob = await fetch(
+                "blob",
+                branch,
+                path,
+                lambda token: github_client.get_blob(
+                    access_token=token,
                     owner=repo.owner,
                     name=repo.name,
                     ref=branch,
@@ -998,7 +1094,14 @@ def create_app(
     ) -> dict[str, Any]:
         project, repo, access = await owner_browsable_source(slug)
         try:
-            payload = await github_source_overview(repo, access, ref)
+            payload = await github_source_overview(
+                repo, owner_fetcher(repo, access), ref
+            )
+        except GitHubAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1034,6 +1137,11 @@ def create_app(
                     path=path,
                 ),
             )
+        except GitHubAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1075,6 +1183,11 @@ def create_app(
                     path=path,
                 ),
             )
+        except GitHubAuthError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="github_not_connected",
+            ) from None
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1117,6 +1230,20 @@ def create_app(
         await ensure_unique_slug(project.slug, exclude_id=str(project.id))
         await current_store().save(project)
         return project.to_owner_dict()
+
+    @app.delete("/api/owner/projects/{project_id}")
+    async def owner_delete_project(
+        project_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        project = await current_store().get(Project, project_id)
+        if project is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="not_found",
+            )
+        await current_store().delete(project)
+        return {"status": "deleted"}
 
     @app.post("/api/owner/projects/{project_id}/publish")
     async def owner_publish_project(
@@ -1172,6 +1299,7 @@ def create_app(
         except GitHubOAuthError:
             return github_redirect(connected=False)
         await redis.set(GITHUB_TOKEN_KEY, access)
+        await redis.delete(GITHUB_TOKEN_INVALID_KEY)
         await persist_github_owner_token(access)
         return github_redirect(connected=True)
 
@@ -1304,7 +1432,7 @@ def create_app(
     ) -> dict[str, Any]:
         repo, access = await owner_github_repo(owner, name)
         try:
-            payload = await github_source_overview(repo, access, ref)
+            payload = await github_source_overview(repo, owner_fetcher(repo, access), ref)
         except GitHubBrowseError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -2020,11 +2148,33 @@ def create_app(
             )
         return None
 
+    async def enforce_comment_rate(ip: str | None) -> None:
+        redis: Redis = app.state.redis
+        subject = ip or "unknown"
+        windows = (
+            ("minute", 60, settings.comment_rate_minute),
+            ("day", 86400, settings.comment_rate_day),
+        )
+        for name, ttl, limit in windows:
+            key = f"comment:rate:{name}:{subject}"
+            count = await redis.incr(key)
+            if count == 1:
+                await redis.expire(key, ttl)
+            if count > limit:
+                remaining = await redis.ttl(key)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="comment_rate_limited",
+                    headers={"Retry-After": str(max(int(remaining), 1))},
+                )
+
     async def submit_public_comment(
         target_type: str,
         slug: str,
         body: CommentSubmitBody,
+        request: Request,
     ) -> dict[str, Any]:
+        await enforce_comment_rate(client_ip(request))
         target = await published_comment_target(target_type, slug)
         if target is None:
             raise HTTPException(
@@ -2071,9 +2221,9 @@ def create_app(
 
     @app.post("/api/public/articles/{slug}/comments")
     async def public_submit_article_comment(
-        slug: str, body: CommentSubmitBody
+        slug: str, body: CommentSubmitBody, request: Request
     ) -> dict[str, Any]:
-        return await submit_public_comment("article", slug, body)
+        return await submit_public_comment("article", slug, body, request)
 
     @app.get("/api/public/articles/{slug}/comments")
     async def public_list_article_comments(slug: str) -> list[dict[str, Any]]:
@@ -2081,9 +2231,9 @@ def create_app(
 
     @app.post("/api/public/journals/{slug}/comments")
     async def public_submit_journal_comment(
-        slug: str, body: CommentSubmitBody
+        slug: str, body: CommentSubmitBody, request: Request
     ) -> dict[str, Any]:
-        return await submit_public_comment("journal", slug, body)
+        return await submit_public_comment("journal", slug, body, request)
 
     @app.get("/api/public/journals/{slug}/comments")
     async def public_list_journal_comments(slug: str) -> list[dict[str, Any]]:
@@ -2125,6 +2275,15 @@ def create_app(
         comment.status = "rejected"
         await current_store().save(comment)
         return comment.to_owner_dict()
+
+    @app.delete("/api/owner/comments/{comment_id}")
+    async def owner_delete_comment(
+        comment_id: PydanticObjectId,
+        _: str = Depends(require_owner),
+    ) -> dict[str, str]:
+        comment = await load_owner_comment(comment_id)
+        await current_store().delete(comment)
+        return {"status": "deleted"}
 
     @app.post("/api/owner/comments/{comment_id}/reply")
     async def owner_reply_comment(

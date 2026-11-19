@@ -147,3 +147,46 @@ async def test_published_project_appears_in_public_list_and_detail(
     )
     assert zh_detail.json()["title"] == "玻璃 API"
     assert zh_detail.json()["body"] == "## 動機\n用作品說話"
+
+
+@pytest.mark.asyncio
+async def test_owner_can_delete_project_and_visitors_lose_it(
+    client, mailer, settings
+):
+    token = await _owner_token(client, mailer, settings)
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        "/api/owner/projects",
+        json=_project_payload(status="published"),
+        headers=headers,
+    )
+    project_id = created.json()["id"]
+    slug = created.json()["slug"]
+    assert (await client.get(f"/api/public/projects/{slug}")).status_code == 200
+
+    deleted = await client.delete(
+        f"/api/owner/projects/{project_id}", headers=headers
+    )
+    assert deleted.status_code == 200
+    assert deleted.json() == {"status": "deleted"}
+    assert (await client.get(f"/api/public/projects/{slug}")).status_code == 404
+    listing = await client.get("/api/owner/projects", headers=headers)
+    assert all(item["id"] != project_id for item in listing.json())
+    again = await client.delete(
+        f"/api/owner/projects/{project_id}", headers=headers
+    )
+    assert again.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_cannot_delete_project(client, mailer, settings):
+    token = await _owner_token(client, mailer, settings)
+    created = await client.post(
+        "/api/owner/projects",
+        json=_project_payload(),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    project_id = created.json()["id"]
+    client.cookies.clear()
+    response = await client.delete(f"/api/owner/projects/{project_id}")
+    assert response.status_code == 401

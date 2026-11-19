@@ -15,6 +15,10 @@ class GitHubBrowseError(Exception):
     pass
 
 
+class GitHubAuthError(GitHubBrowseError):
+    """The supplied token was rejected (401): revoked or expired."""
+
+
 class GitHubWriteError(Exception):
     pass
 
@@ -95,6 +99,10 @@ class GitHubClient(Protocol):
         self, *, access_token: str, owner: str, name: str
     ) -> bool: ...
 
+    async def get_languages(
+        self, *, access_token: str, owner: str, name: str
+    ) -> dict[str, int]: ...
+
     async def list_branches(
         self, *, access_token: str, owner: str, name: str
     ) -> list[str]: ...
@@ -169,6 +177,10 @@ class RecordingGitHub:
         self.deletes: list[str] = []
         self.extra_repos: list[dict[str, object]] = []
         self.extra_files: dict[str, dict[str, dict[str, str]]] = {}
+        # Tokens GitHub now answers 401 for (revoked / expired grants).
+        self.revoked_tokens: set[str] = set()
+        # (method, token) for every read-only browse call, for cache tests.
+        self.browse_calls: list[tuple[str, str]] = []
 
     def authorization_url(self, *, state: str) -> str:
         query = urlencode(
@@ -260,9 +272,24 @@ class RecordingGitHub:
         },
     }
 
+    def _browse(self, method: str, access_token: str, owner: str, name: str) -> None:
+        self.browse_calls.append((method, access_token))
+        if access_token and access_token in self.revoked_tokens:
+            raise GitHubAuthError("bad_token")
+        if not access_token and self._is_private(f"{owner}/{name}"):
+            # GitHub hides private repos from anonymous callers (404).
+            raise GitHubBrowseError("not_found")
+
+    def _is_private(self, full_name: str) -> bool:
+        for item in self.extra_repos:
+            if item.get("fullName") == full_name:
+                return bool(item.get("private"))
+        return full_name == "kenchan6666/secret-lab"
+
     async def repo_is_private(
         self, *, access_token: str, owner: str, name: str
     ) -> bool:
+        self._browse("repo", access_token, owner, name)
         full_name = f"{owner}/{name}"
         for item in self.extra_repos:
             if item.get("fullName") == full_name:
@@ -272,6 +299,12 @@ class RecordingGitHub:
         if full_name in self.FILES:
             return False
         raise GitHubBrowseError("not_found")
+
+    async def get_languages(
+        self, *, access_token: str, owner: str, name: str
+    ) -> dict[str, int]:
+        self._browse("languages", access_token, owner, name)
+        return {"Python": 128, "TypeScript": 512}
 
     def _files(self, owner: str, name: str, ref: str) -> dict[str, str]:
         full = f"{owner}/{name}"
@@ -286,7 +319,7 @@ class RecordingGitHub:
         return repo[ref]
 
     async def get_user(self, *, access_token: str) -> dict[str, str]:
-        if access_token != "gho_test":
+        if access_token != "gho_test" or access_token in self.revoked_tokens:
             raise GitHubOAuthError("bad_token")
         return {
             "login": "kenchan6666",
@@ -367,6 +400,7 @@ class RecordingGitHub:
     async def list_branches(
         self, *, access_token: str, owner: str, name: str
     ) -> list[str]:
+        self._browse("branches", access_token, owner, name)
         full = f"{owner}/{name}"
         extra = self.extra_files.get(full)
         if extra is not None:
@@ -379,6 +413,7 @@ class RecordingGitHub:
     async def get_readme(
         self, *, access_token: str, owner: str, name: str, ref: str
     ) -> dict[str, str]:
+        self._browse("readme", access_token, owner, name)
         files = self._files(owner, name, ref)
         for path, content in files.items():
             if "/" in path:
@@ -396,6 +431,7 @@ class RecordingGitHub:
         ref: str,
         path: str,
     ) -> list[dict[str, str]]:
+        self._browse("tree", access_token, owner, name)
         files = self._files(owner, name, ref)
         prefix = path.strip("/")
         entries: dict[str, dict[str, str]] = {}
@@ -422,11 +458,20 @@ class RecordingGitHub:
         ref: str,
         path: str,
     ) -> dict[str, str]:
+        self._browse("blob", access_token, owner, name)
         files = self._files(owner, name, ref)
         resolved = match_blob_path(list(files), path)
         if resolved is None:
             raise GitHubBrowseError("not_found")
         return {"path": resolved, "content": files[resolved]}
+
+
+def raise_for_browse(response: httpx.Response, access_token: str) -> None:
+    if response.status_code < 400:
+        return
+    if response.status_code == 401 and access_token:
+        raise GitHubAuthError("bad_token")
+    raise GitHubBrowseError("not_found")
 
 
 class HttpGitHub:
@@ -507,9 +552,17 @@ class HttpGitHub:
         url = f"https://api.github.com/repos/{owner}/{name}"
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             response = await client.get(url, headers=self._headers(access_token))
-        if response.status_code >= 400:
-            raise GitHubBrowseError("not_found")
+        raise_for_browse(response, access_token)
         return bool(response.json().get("private"))
+
+    async def get_languages(
+        self, *, access_token: str, owner: str, name: str
+    ) -> dict[str, int]:
+        url = f"https://api.github.com/repos/{owner}/{name}/languages"
+        async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
+            response = await client.get(url, headers=self._headers(access_token))
+        raise_for_browse(response, access_token)
+        return {str(key): int(value) for key, value in response.json().items()}
 
     def _headers(self, access_token: str) -> dict[str, str]:
         headers = {
@@ -528,8 +581,7 @@ class HttpGitHub:
         async with httpx.AsyncClient(timeout=20, follow_redirects=True) as client:
             while url:
                 response = await client.get(url, headers=self._headers(access_token))
-                if response.status_code >= 400:
-                    raise GitHubBrowseError("not_found")
+                raise_for_browse(response, access_token)
                 names.extend(item["name"] for item in response.json())
                 url = response.links.get("next", {}).get("url")
         return sorted(names)
@@ -544,6 +596,8 @@ class HttpGitHub:
                 headers=self._headers(access_token),
                 params={"ref": ref},
             )
+        if response.status_code == 401 and access_token:
+            raise GitHubAuthError("bad_token")
         if response.status_code < 400:
             payload = response.json()
             raw = base64.b64decode(payload.get("content") or "")
@@ -607,6 +661,8 @@ class HttpGitHub:
     ) -> dict[str, str]:
         try:
             payload = await self._contents(access_token, owner, name, ref, path)
+        except GitHubAuthError:
+            raise
         except GitHubBrowseError:
             if is_readme_filename(path.rsplit("/", 1)[-1]):
                 return await self.get_readme(
@@ -657,8 +713,7 @@ class HttpGitHub:
                 headers=self._headers(access_token),
                 params={"ref": ref},
             )
-        if response.status_code >= 400:
-            raise GitHubBrowseError("not_found")
+        raise_for_browse(response, access_token)
         return response.json()
 
     async def get_user(self, *, access_token: str) -> dict[str, str]:

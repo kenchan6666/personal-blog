@@ -66,6 +66,12 @@ class Settings(BaseSettings):
     agent_embedding_model: str = "text-embedding-3-small"
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "portfolio_about_me"
+    # Public comment submissions per client IP (X-Real-IP from nginx).
+    comment_rate_minute: int = 3
+    comment_rate_day: int = 20
+    # Anonymous GitHub fallback (60 req/h per server IP) caches longer.
+    github_anon_cache_ttl_seconds: int = 3600
+
     public_agent_enabled: bool = True
     public_agent_model: str = "gemini-2.5-flash"
     public_agent_max_tokens: int = 4096
