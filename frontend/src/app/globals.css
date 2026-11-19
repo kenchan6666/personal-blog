@@ -3020,6 +3020,16 @@ html.is-locale-hold .article-page {
   height: auto;
 }
 
+/* mermaid.render() measures in a temporary <div id="d{renderId}"> appended to
+   <body>; in the flow it made the page ~150px taller for half a second and
+   the scroll position jumped (e.g. right after folding the file list). */
+body > div[id^="dmermaid-"] {
+  position: fixed !important;
+  top: 0 !important;
+  left: -10000px !important;
+  pointer-events: none;
+}
+
 .mermaid-pending {
   min-height: 4.5rem;
 }
