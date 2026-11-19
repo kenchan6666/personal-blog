@@ -104,8 +104,8 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     const frame = window.requestAnimationFrame(() => inputRef.current?.focus());
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const root = document.documentElement;
+    root.classList.add("is-guide-locked");
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") onClose();
     }
@@ -113,7 +113,7 @@ export function PublicGuide({ locale, dict, open, onClose }: Props) {
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
+      root.classList.remove("is-guide-locked");
     };
   }, [onClose, open]);
 

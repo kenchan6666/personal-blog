@@ -103,15 +103,17 @@ export function SiteShell({ children }: Props) {
     if (!open) return;
     const mq = window.matchMedia(DESKTOP_NAV);
     if (mq.matches) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // Lock via a class on <html>: overflow hidden + scrollbar-gutter stable,
+    // so desktop-width scrollbars don't vanish and shift the page sideways.
+    const root = document.documentElement;
+    root.classList.add("is-scroll-locked");
     function onChange() {
-      document.body.style.overflow = mq.matches ? previous : "hidden";
+      root.classList.toggle("is-scroll-locked", !mq.matches);
     }
     mq.addEventListener("change", onChange);
     return () => {
       mq.removeEventListener("change", onChange);
-      document.body.style.overflow = previous;
+      root.classList.remove("is-scroll-locked");
     };
   }, [open]);
 

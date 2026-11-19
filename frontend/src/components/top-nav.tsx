@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, type CSSProperties } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Dictionary } from "@/i18n/dictionaries";
@@ -35,26 +35,21 @@ function subscribeToStorage(onChange: () => void) {
   return () => window.removeEventListener("storage", onChange);
 }
 
+/** Three bars that morph into an X (pure transforms, see .menu-icon in CSS). */
 function MenuIcon({ open }: { open: boolean }) {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
-      {open ? (
-        <path
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          d="M6 6l12 12M18 6L6 18"
-        />
-      ) : (
-        <path
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          d="M4 7h16M4 12h16M4 17h16"
-        />
-      )}
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden
+      className={`menu-icon${open ? " is-open" : ""}`}
+    >
+      <g fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <path className="menu-icon-top" d="M4 7h16" />
+        <path className="menu-icon-mid" d="M4 12h16" />
+        <path className="menu-icon-bot" d="M4 17h16" />
+      </g>
     </svg>
   );
 }
@@ -160,13 +155,14 @@ export function TopNav({
         inert={!open}
       >
         <nav className="nav-sheet-links">
-          {items.map((item) => (
+          {items.map((item, index) => (
             <Link
               key={item.key}
               href={item.href}
               onClick={onNavigate}
               tabIndex={open ? 0 : -1}
               className="nav-sheet-link"
+              style={{ "--i": index } as CSSProperties}
               aria-current={item.active ? "page" : undefined}
             >
               {item.label}
@@ -178,12 +174,18 @@ export function TopNav({
               onClick={onNavigate}
               tabIndex={open ? 0 : -1}
               className="nav-sheet-link"
+              style={{ "--i": items.length } as CSSProperties}
             >
               {dict.nav.admin}
             </Link>
           ) : null}
         </nav>
-        <LocaleSwitcher locale={locale} tabIndex={open ? 0 : -1} />
+        <div
+          className="nav-sheet-foot"
+          style={{ "--i": items.length + (showAdmin ? 1 : 0) } as CSSProperties}
+        >
+          <LocaleSwitcher locale={locale} tabIndex={open ? 0 : -1} />
+        </div>
       </div>
     </>
   );

@@ -7070,3 +7070,185 @@ pre[tabindex]:focus-visible {
   outline: 2px solid var(--accent-link);
   outline-offset: 2px;
 }
+
+/* ===================================================================== */
+/* Menu & disclosure motion v2 (2026-11): iOS-like, transform/opacity only */
+/* ===================================================================== */
+:root {
+  --ease-out-soft: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Scroll lock without the page jumping sideways when a scrollbar vanishes. */
+html.is-scroll-locked,
+html.is-guide-locked {
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+
+html.is-scroll-locked body,
+html.is-guide-locked body {
+  overflow: hidden;
+}
+
+/* --- menu sheet: grows out of the menu button (top right) -------------- */
+.nav-sheet-scrim {
+  /* A full-screen backdrop blur is the most expensive thing on the page to
+     fade (and pops in late on iOS); a plain dim reads the same. */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transition: opacity 200ms var(--ease-out-soft);
+}
+
+.nav-sheet-scrim.is-open {
+  transition: opacity 280ms var(--ease-out-soft);
+}
+
+.nav-sheet {
+  transform-origin: calc(100% - 1.25rem) -0.5rem;
+  transform: translateY(-6px) scale(0.94);
+  transition:
+    opacity 160ms var(--ease-out-soft),
+    transform 200ms var(--ease-apple),
+    visibility 0s 200ms;
+}
+
+.nav-sheet.is-open {
+  transform: none;
+  transition:
+    opacity 180ms var(--ease-out-soft),
+    transform 280ms var(--ease-apple),
+    visibility 0s;
+}
+
+/* Rows settle in one after another (~20ms apart) after the panel starts. */
+.nav-sheet-link,
+.nav-sheet-foot {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 120ms var(--ease-out-soft),
+    transform 120ms var(--ease-out-soft);
+}
+
+.nav-sheet.is-open .nav-sheet-link,
+.nav-sheet.is-open .nav-sheet-foot {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 200ms var(--ease-out-soft),
+    transform 260ms var(--ease-apple);
+  transition-delay: calc(40ms + var(--i, 0) * 20ms);
+}
+
+/* --- menu button: three bars morph into an X ---------------------------- */
+.top-nav-menu svg {
+  transition: none;
+}
+
+.menu-icon path {
+  transform-origin: 12px 12px;
+  transition:
+    transform 280ms var(--ease-apple),
+    opacity 160ms var(--ease-out-soft);
+}
+
+.menu-icon.is-open .menu-icon-top {
+  transform: rotate(45deg) translateY(5px) scaleX(0.8);
+}
+
+.menu-icon.is-open .menu-icon-mid {
+  opacity: 0;
+  transform: scaleX(0.3);
+}
+
+.menu-icon.is-open .menu-icon-bot {
+  transform: rotate(-45deg) translateY(-5px) scaleX(0.8);
+}
+
+/* --- disclosures (article 目錄, project files): content fades with height */
+.disclosure > .disclosure-inner > * {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 140ms var(--ease-out-soft),
+    transform 200ms var(--ease-apple);
+}
+
+.disclosure.is-open > .disclosure-inner > * {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 220ms var(--ease-out-soft) 60ms,
+    transform 280ms var(--ease-apple);
+}
+
+.article-toc-mobile-toggle .chevron,
+.gh-files-summary::after {
+  transition: transform 280ms var(--ease-apple);
+}
+
+/* Project files: a real button + animated disclosure instead of <details>. */
+.gh-files-summary {
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+}
+
+.gh-files-disclosure.is-open > .gh-files-summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.gh-files-disclosure .disclosure-inner > .gh-files {
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+/* Opening a folder: rows cross-fade in, no blur flash on the whole repo. */
+.gh-repo {
+  transition: opacity 180ms var(--ease-out-soft);
+}
+
+.gh-busy {
+  filter: none;
+  opacity: 0.6;
+  transition-delay: 120ms;
+}
+
+.gh-rows {
+  animation: gh-rows-in 240ms var(--ease-apple) both;
+}
+
+@keyframes gh-rows-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-sheet-link,
+  .nav-sheet-foot,
+  .nav-sheet.is-open .nav-sheet-link,
+  .nav-sheet.is-open .nav-sheet-foot,
+  .disclosure > .disclosure-inner > *,
+  .disclosure.is-open > .disclosure-inner > * {
+    transform: none !important;
+    transition: opacity 100ms linear !important;
+  }
+
+  .menu-icon path {
+    transition: opacity 100ms linear;
+  }
+
+  .gh-rows {
+    animation: none;
+  }
+
+  .gh-repo {
+    transition: none;
+  }
+}

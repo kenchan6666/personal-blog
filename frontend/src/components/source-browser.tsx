@@ -58,6 +58,45 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
   const [filesOpen, setFilesOpen] = useState(false);
   const [readmeOpen, setReadmeOpen] = useState(false);
   const skipInitialFetch = useRef(Boolean(initial));
+  const readmeRef = useRef<HTMLDivElement>(null);
+  const readmeCollapsedHeight = useRef(0);
+
+  // README expands/collapses by animating its real height (measured, then
+  // released), instead of jumping between a clipped and a full box.
+  function toggleReadme() {
+    const el = readmeRef.current;
+    const next = !readmeOpen;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!el || reduce) {
+      setReadmeOpen(next);
+      return;
+    }
+    const from = el.getBoundingClientRect().height;
+    if (next) readmeCollapsedHeight.current = from;
+    const to = next
+      ? el.scrollHeight
+      : readmeCollapsedHeight.current || Math.min(window.innerHeight * 0.7, 704);
+    const boxTop = el.parentElement?.getBoundingClientRect().top ?? 0;
+    el.getAnimations().forEach((a) => a.cancel());
+    el.style.overflow = "hidden";
+    setReadmeOpen(next);
+    const anim = el.animate(
+      [{ maxHeight: `${from}px` }, { maxHeight: `${to}px` }],
+      {
+        duration: next ? 320 : 260,
+        easing: "cubic-bezier(0.32, 0.72, 0, 1)",
+      },
+    );
+    const release = () => {
+      el.style.overflow = "";
+    };
+    anim.onfinish = release;
+    anim.oncancel = release;
+    // Collapsing from far down the README: bring its top back into view.
+    if (!next && boxTop < 0) {
+      window.scrollBy({ top: boxTop - 80, behavior: "smooth" });
+    }
+  }
 
   useEffect(() => {
     if (skipInitialFetch.current) {
@@ -237,6 +276,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
           </div>
           <div
             id={`readme-${slug}`}
+            ref={readmeRef}
             className={`gh-box-body gh-readme-body${readmeOpen ? " is-open" : ""}`}
           >
             {overview.readme.content ? (
@@ -256,7 +296,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
               className="gh-readme-toggle"
               aria-expanded={readmeOpen}
               aria-controls={`readme-${slug}`}
-              onClick={() => setReadmeOpen((open) => !open)}
+              onClick={toggleReadme}
             >
               {readmeOpen ? labels.readmeLess : labels.readmeMore}
             </button>
@@ -266,62 +306,72 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
 
       {!blob ? (
         atRoot ? (
-          <details
-            className="gh-files-disclosure"
-            open={filesOpen}
-            onToggle={(event) => setFilesOpen(event.currentTarget.open)}
-          >
-            <summary className="gh-files-summary">
+          <div className={`gh-files-disclosure${filesOpen ? " is-open" : ""}`}>
+            <button
+              type="button"
+              className="gh-files-summary"
+              aria-expanded={filesOpen}
+              aria-controls={`files-${slug}`}
+              onClick={() => setFilesOpen((value) => !value)}
+            >
               <FileIcon dir />
               <span>{labels.files}</span>
               <span className="gh-files-count">{visibleTree.length}</span>
-            </summary>
+            </button>
             <div
-              className="gh-files"
-              tabIndex={0}
-              role="region"
-              aria-label={labels.files}
+              id={`files-${slug}`}
+              className={`disclosure${filesOpen ? " is-open" : ""}`}
+              inert={!filesOpen}
             >
-              <table>
-                <thead>
-                  <tr>
-                    <th>{labels.fileName}</th>
-                    <th className="gh-kind-col">{labels.fileKind}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dir ? (
-                    <tr>
-                      <td colSpan={2}>
-                        <button
-                          type="button"
-                          className="gh-file"
-                          onClick={() => void openDir(parentPath(dir))}
-                        >
-                          <span className="gh-muted">..</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ) : null}
-                  {visibleTree.map((entry) => (
-                    <tr key={entry.path}>
-                      <td>
-                        <button
-                          type="button"
-                          className="gh-file"
-                          onClick={() => void openEntry(entry)}
-                        >
-                          <FileIcon dir={entry.type === "dir"} />
-                          <span>{entry.name}</span>
-                        </button>
-                      </td>
-                      <td className="gh-kind-col">{kindLabel(entry)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="disclosure-inner">
+                <div
+                  className="gh-files"
+                  tabIndex={0}
+                  role="region"
+                  aria-label={labels.files}
+                >
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>{labels.fileName}</th>
+                        <th className="gh-kind-col">{labels.fileKind}</th>
+                      </tr>
+                    </thead>
+                    <tbody key={dir || "/"} className="gh-rows">
+                      {dir ? (
+                        <tr>
+                          <td colSpan={2}>
+                            <button
+                              type="button"
+                              className="gh-file"
+                              onClick={() => void openDir(parentPath(dir))}
+                            >
+                              <span className="gh-muted">..</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ) : null}
+                      {visibleTree.map((entry) => (
+                        <tr key={entry.path}>
+                          <td>
+                            <button
+                              type="button"
+                              className="gh-file"
+                              onClick={() => void openEntry(entry)}
+                            >
+                              <FileIcon dir={entry.type === "dir"} />
+                              <span>{entry.name}</span>
+                            </button>
+                          </td>
+                          <td className="gh-kind-col">{kindLabel(entry)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-          </details>
+          </div>
         ) : (
           <div
             className="gh-files"
@@ -336,7 +386,7 @@ export function SourceBrowser({ slug, dict, sourceRepo, initial }: Props) {
                   <th className="gh-kind-col">{labels.fileKind}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody key={dir || "/"} className="gh-rows">
                 {dir ? (
                   <tr>
                     <td colSpan={2}>
