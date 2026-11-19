@@ -15,6 +15,18 @@ import {
 } from "@/lib/api";
 import { CmsCard } from "./cms-card";
 
+function RepoFullName({ name }: { name: string }) {
+  const slash = name.indexOf("/");
+  if (slash <= 0 || slash === name.length - 1) return name;
+  return (
+    <>
+      {name.slice(0, slash)}
+      /<wbr />
+      {name.slice(slash + 1)}
+    </>
+  );
+}
+
 type Props = {
   locale: Locale;
   dict: Dictionary;
@@ -216,53 +228,59 @@ export function GitHubConnect({ locale, dict }: Props) {
 
       {connected ? (
         <CmsCard title={a.githubReposHeading}>
-          <input
-            className="field mb-4"
-            placeholder={a.searchRepos}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-          {filtered.length === 0 ? (
-            <p className="text-sm text-[var(--text-muted)]">{a.noMatchingRepos}</p>
-          ) : (
-            <ul className="grid gap-2">
-              {filtered.map((repo) => (
-                <li key={repo.fullName} className="tile flex flex-wrap items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-mono text-sm font-semibold">{repo.fullName}</p>
-                    {repo.description ? (
-                      <p className="mt-1 text-sm text-[var(--text-muted)]">
-                        {repo.description}
+          <div className="github-repo-list">
+            <input
+              className="field field-tight github-repo-list__search"
+              placeholder={a.searchRepos}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+            {filtered.length === 0 ? (
+              <p className="text-sm text-[var(--text-muted)]">{a.noMatchingRepos}</p>
+            ) : (
+              <ul className="github-repo-list__items">
+                {filtered.map((repo) => (
+                  <li key={repo.fullName} className="tile github-repo-tile">
+                    <div className="github-repo-tile__body">
+                      <p className="github-repo-tile__name font-mono text-sm font-semibold">
+                        <RepoFullName name={repo.fullName} />
                       </p>
-                    ) : null}
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {repo.private ? a.githubRepoPrivate : a.githubRepoPublic}
-                      {repo.defaultBranch ? ` · ${repo.defaultBranch}` : ""}
-                    </p>
-                  </div>
-                  <a
-                    href={repo.htmlUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn-ghost text-sm"
-                  >
-                    {a.githubOpenRepo}
-                  </a>
-                  <button
-                    type="button"
-                    className="btn-ghost text-sm"
-                    onClick={() =>
-                      router.push(
-                        `/${locale}/admin?tab=content&attach=${encodeURIComponent(repo.fullName)}`,
-                      )
-                    }
-                  >
-                    {a.githubAttachProject}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+                      {repo.description ? (
+                        <p className="github-repo-tile__desc">
+                          {repo.description}
+                        </p>
+                      ) : null}
+                      <p className="github-repo-tile__meta">
+                        {repo.private ? a.githubRepoPrivate : a.githubRepoPublic}
+                        {repo.defaultBranch ? ` · ${repo.defaultBranch}` : ""}
+                      </p>
+                    </div>
+                    <div className="github-repo-tile__actions">
+                      <a
+                        href={repo.htmlUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="btn-ghost text-sm"
+                      >
+                        {a.githubOpenRepo}
+                      </a>
+                      <button
+                        type="button"
+                        className="btn-ghost text-sm"
+                        onClick={() =>
+                          router.push(
+                            `/${locale}/admin?tab=content&attach=${encodeURIComponent(repo.fullName)}`,
+                          )
+                        }
+                      >
+                        {a.githubAttachProject}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </CmsCard>
       ) : null}
     </div>
