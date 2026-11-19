@@ -13,12 +13,14 @@ type Props = {
   dict: Dictionary;
 };
 
+// A full, filled crescent and a sun with a solid core and short rays: at
+// 16px both read as icons, not as a loading spinner.
 function MoonIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+    <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
       <path
         fill="currentColor"
-        d="M15.2 3.1a1 1 0 0 1 1.15 1.45A8.2 8.2 0 1 0 19.4 16a1 1 0 0 1 1.5 1.2A10.2 10.2 0 1 1 14.3 2.9c.3 0 .6.07.9.2z"
+        d="M20.4 14.6A8.6 8.6 0 0 1 9.4 3.6a.6.6 0 0 0-.78-.73A9.6 9.6 0 1 0 21.13 15.4a.6.6 0 0 0-.73-.8z"
       />
     </svg>
   );
@@ -26,10 +28,14 @@ function MoonIcon() {
 
 function SunIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden>
+    <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
+      <circle cx="12" cy="12" r="4.6" fill="currentColor" />
       <path
-        fill="currentColor"
-        d="M12 4.2a1 1 0 0 1 1 1V7a1 1 0 1 1-2 0V5.2a1 1 0 0 1 1-1zm0 12.3a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9zm7.8-5.5H18a1 1 0 1 0 0 2h1.8a1 1 0 1 0 0-2zM6 12a1 1 0 0 0-1-1H3.2a1 1 0 1 0 0 2H5a1 1 0 0 0 1-1zm11.1 5.1a1 1 0 0 0-1.4 0l-1.3 1.3a1 1 0 1 0 1.4 1.4l1.3-1.3a1 1 0 0 0 0-1.4zM9.6 8.2a1 1 0 0 0 0-1.4L8.3 5.5A1 1 0 0 0 6.9 6.9l1.3 1.3a1 1 0 0 0 1.4 0zm.1 8.9-1.3 1.3A1 1 0 1 1 7 17l1.3-1.3a1 1 0 0 1 1.4 1.4zm8.4-9.6-1.3 1.3a1 1 0 1 1-1.4-1.4l1.3-1.3a1 1 0 1 1 1.4 1.4zM12 17a1 1 0 0 1 1 1v1.8a1 1 0 1 1-2 0V18a1 1 0 0 1 1-1z"
+        d="M12 2.5v1.8M12 19.7v1.8M2.5 12h1.8M19.7 12h1.8M5.3 5.3l1.27 1.27M17.43 17.43l1.27 1.27M5.3 18.7l1.27-1.27M17.43 6.57l1.27-1.27"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
       />
     </svg>
   );

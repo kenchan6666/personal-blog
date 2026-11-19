@@ -221,6 +221,15 @@ export function AgentChat({
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [messages]);
 
+  // Keep the composer height in step with its text, including after a send
+  // clears it.
+  useEffect(() => {
+    const node = composeRef.current;
+    if (!node) return;
+    node.style.height = "auto";
+    node.style.height = `${Math.min(node.scrollHeight, 132)}px`;
+  }, [input]);
+
   useEffect(() => {
     const root = workspaceRef.current;
     const viewport = window.visualViewport;
@@ -428,7 +437,11 @@ export function AgentChat({
 
   async function selectConversation(id: string) {
     const token = getSessionToken();
-    if (!token || id === activeId || sending) return;
+    if (id === activeId) {
+      setMobileSheet("");
+      return;
+    }
+    if (!token || sending) return;
     try {
       setLoading(true);
       await openConversation(token, id);
@@ -464,7 +477,8 @@ export function AgentChat({
     const node = composeRef.current;
     if (!node) return;
     node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight, 160)}px`;
+    // Grow with the text up to about five lines, then scroll inside.
+    node.style.height = `${Math.min(node.scrollHeight, 132)}px`;
   }
 
   async function stopTurn() {
@@ -754,11 +768,8 @@ export function AgentChat({
               key={pane || "chat"}
               type="button"
               className={mobileSheet === pane ? "is-active" : ""}
-              onClick={() =>
-                setMobileSheet((current) =>
-                  pane === "" ? "" : current === pane ? "" : pane,
-                )
-              }
+              aria-pressed={mobileSheet === pane}
+              onClick={() => setMobileSheet(pane)}
             >
               {label}
             </button>
@@ -766,26 +777,18 @@ export function AgentChat({
         </nav>
       ) : null}
       {!compact ? (
-        <button
-          type="button"
-          className="agent-sheet-backdrop"
-          aria-label="关闭"
-          onClick={() => setMobileSheet("")}
-        />
-      ) : null}
-      {!compact ? (
         <aside className="agent-conversations">
           <div className="agent-panel-heading">
             <div>
               <span className="eyebrow">CONVERSATIONS</span>
-              <h2 className="display-font">对话</h2>
+              <h2 className="display-font">会话</h2>
             </div>
             <button
               type="button"
               className="agent-new-button"
               onClick={createConversation}
             >
-              ＋ 新对话
+              新会话
             </button>
           </div>
           <div className="agent-conversation-list">
@@ -814,7 +817,15 @@ export function AgentChat({
                   aria-label="删除对话"
                   onClick={() => setPendingDeleteId(conversation.id)}
                 >
-                  ×
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden>
+                    <path
+                      d="M7 7l10 10M17 7 7 17"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </button>
               </div>
             ))}
@@ -1012,7 +1023,15 @@ export function AgentChat({
               aria-label="上传文件或图片"
               onClick={() => fileRef.current?.click()}
             >
-              ＋
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
             <input
               ref={fileRef}
@@ -1027,7 +1046,9 @@ export function AgentChat({
             <textarea
               ref={composeRef}
               value={input}
-              rows={compact ? 2 : 3}
+              rows={1}
+              placeholder={activeId ? "给 Agent 发消息…" : "先新建一个会话"}
+              aria-label="消息"
               disabled={!activeId}
               onChange={(event) => {
                 setInput(event.target.value);
@@ -1044,18 +1065,33 @@ export function AgentChat({
             {awaitingTurn ? (
               <button
                 type="button"
-                className="agent-send"
+                className="agent-send is-stop"
+                aria-label="停止"
+                title="停止"
                 onClick={() => void stopTurn()}
               >
-                停止
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden>
+                  <rect x="5" y="5" width="14" height="14" rx="3" fill="currentColor" />
+                </svg>
               </button>
             ) : (
               <button
                 type="submit"
                 className="agent-send"
+                aria-label="发送"
+                title="发送"
                 disabled={!activeId || (!input.trim() && files.length === 0)}
               >
-                发送
+                <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+                  <path
+                    d="M12 19V5m-6 6 6-6 6 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </button>
             )}
           </div>
@@ -1110,7 +1146,7 @@ export function AgentChat({
                     className="agent-new-button"
                     onClick={() => editKnowledge()}
                   >
-                    ＋ 添加
+                    添加
                   </button>
                 </>
               )}
@@ -1267,6 +1303,7 @@ export function AgentChat({
                     </button>
                     <button
                       type="button"
+                      className="is-danger"
                       onClick={() => removeKnowledge(record.id)}
                     >
                       删除
