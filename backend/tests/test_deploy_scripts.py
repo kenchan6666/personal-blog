@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -82,6 +83,9 @@ def test_start_ps1_parses() -> None:
 def test_prod_compose_file_parses() -> None:
     if shutil.which("docker") is None:
         pytest.skip("docker is not installed")
+    env = os.environ.copy()
+    # compose config otherwise looks for deployment/.env (api/agent env_file).
+    env["DEPLOY_ENV_FILE"] = "./deployment/env.example"
     result = subprocess.run(
         [
             "docker",
@@ -97,6 +101,7 @@ def test_prod_compose_file_parses() -> None:
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     assert result.returncode == 0, result.stderr
     assert "agent:" in (result.stdout or "")

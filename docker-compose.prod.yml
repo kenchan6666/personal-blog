@@ -111,6 +111,42 @@ services:
     depends_on:
       - api
 
+  # Static bachi-motion app at https://kenchan0522.blog/taiko/
+  # Opt-in only: set COMPOSE_PROFILES=taiko so existing
+  # `start.sh --prod --pull` deploys (api/agent/web from Artifact
+  # Registry) stay unchanged and cannot fail on a missing taiko image.
+  #
+  # Preferred: build from a sibling checkout pinned to TAIKO_REF.
+  # This keeps working after kenchan6666/bachi-motion is private, as
+  # long as this machine can `git pull` that repo (deploy key or
+  # HTTPS token with repo scope — do not commit the token).
+  #   git clone git@github.com:kenchan6666/bachi-motion.git ../bachi-motion
+  #   git -C ../bachi-motion checkout "$TAIKO_REF"
+  #
+  # Later alternative: set TAIKO_IMAGE to a pushed tag and
+  # TAIKO_PULL_POLICY=always (or missing):
+  #   - GHCR, e.g. ghcr.io/kenchan6666/bachi-motion:<sha>
+  #     After the repo is private, `docker login ghcr.io` with a
+  #     PAT / fine-grained token that has read:packages, and grant
+  #     that identity package read access.
+  #   - Same Artifact Registry as api/agent/web
+  #     (${IMAGE_REGISTRY}/taiko:<sha>). Reuses AR_TOKEN / start.sh
+  #     registry login. Add a build-and-push job when ready; do not
+  #     turn it on until the image exists, or `compose pull` will fail.
+  taiko:
+    profiles: ["taiko"]
+    image: ${TAIKO_IMAGE:-bachi-motion:${TAIKO_REF:-a63bf58ef12b25ab19b4297c3fae9f2a9e7d6270}}
+    pull_policy: ${TAIKO_PULL_POLICY:-never}
+    build:
+      context: ${TAIKO_CONTEXT:-../bachi-motion}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    logging: *default-logging
+    mem_limit: 64m
+    cpus: 0.25
+    expose:
+      - "8080"
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped

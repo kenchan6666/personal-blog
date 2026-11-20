@@ -19,6 +19,8 @@ Usage: bash deployment/start.sh [--prod] [--pull] [--down]
   (default)  Start Redis, FastAPI, and Next.js. Mongo starts only if MONGO_URI is set.
   --prod     Start the nginx + containers stack (build images locally unless --pull).
   --pull     With --prod: pull api/agent/web from Artifact Registry and up --no-build.
+             The optional taiko profile (COMPOSE_PROFILES=taiko) is documented in
+             deployment/taiko.md and is not enabled by default.
              Honors IMAGE_TAG (git SHA) and IMAGE_REGISTRY. Requires AR_TOKEN,
              a key at $HOME/.config/gcp/artifact-registry-reader.json, or an
              existing docker login to asia-east2-docker.pkg.dev.
@@ -76,6 +78,26 @@ ensure_prod_env() {
 compose_prod() {
   docker compose -f "$ROOT/docker-compose.prod.yml" --env-file "$DIR/.env" "$@"
 }
+
+
+taiko_wanted() {
+  # Enable with COMPOSE_PROFILES=taiko (colon or comma separated).
+  case ":${COMPOSE_PROFILES:-}:" in
+    *:taiko:*) return 0 ;;
+  esac
+  case ",${COMPOSE_PROFILES:-}," in
+    *,taiko,*) return 0 ;;
+  esac
+  return 1
+}
+
+build_taiko_if_wanted() {
+  if taiko_wanted; then
+    echo "building taiko image from ${TAIKO_CONTEXT:-../bachi-motion} (TAIKO_REF=${TAIKO_REF:-a63bf58ef12b25ab19b4297c3fae9f2a9e7d6270})…"
+    COMPOSE_PARALLEL_LIMIT=1 compose_prod build taiko
+  fi
+}
+
 
 AR_DOCKER_HOST="${AR_DOCKER_HOST:-asia-east2-docker.pkg.dev}"
 AR_KEY_FILE="${AR_KEY_FILE:-$HOME/.config/gcp/artifact-registry-reader.json}"
@@ -249,6 +271,7 @@ start_prod() {
   COMPOSE_PARALLEL_LIMIT=1 compose_prod build api
   COMPOSE_PARALLEL_LIMIT=1 compose_prod build agent
   COMPOSE_PARALLEL_LIMIT=1 compose_prod build web
+  build_taiko_if_wanted
   compose_prod up -d
   finish_prod_up
 }
@@ -257,7 +280,18 @@ start_prod_pull() {
   prepare_prod_runtime
   echo "pulling production images (IMAGE_TAG=${IMAGE_TAG:-latest})…"
   login_artifact_registry
-  compose_prod pull
+  if taiko_wanted; then
+    # Do not `compose pull` the whole stack here: taiko defaults to a
+    # local tag (pull_policy=never) and a full pull could try Docker Hub.
+    compose_prod pull api agent web mongo redis qdrant nginx certbot
+    if [ "${TAIKO_PULL_POLICY:-never}" != "never" ]; then
+      compose_prod pull taiko || compose_prod build taiko
+    else
+      compose_prod build taiko
+    fi
+  else
+    compose_prod pull
+  fi
   compose_prod up -d --no-build
   finish_prod_up
 }

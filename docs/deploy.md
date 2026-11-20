@@ -2,7 +2,7 @@
 
 One host runs **nginx :80**, **Next.js**, **FastAPI/uvicorn**, the internal
 **Portfolio Agent**, **MongoDB**, **Qdrant**, and **Redis**. Browsers talk only to nginx:
-`/` → frontend, `/api/` → API. The Agent has no public port; Owner login and
+`/` → frontend, `/api/` → API, and (optional) `/taiko/` → the static bachi-motion app. The Agent has no public port; Owner login and
 the API proxy protect every chat and upload. A chat turn may run up to 600s
 (Viola `--timeout 600`); nginx and the API proxy match that window. The stream
 sends SSE keepalives so a silent Gemini thinking pass is not cut as a network
@@ -83,6 +83,18 @@ After you know `PUBLIC_ORIGIN`, set GitHub callback/success to that origin (not 
 
 Never commit `deployment/.env`. Rotate any secret that has been pasted into chat.
 
+
+## bachi-motion (`/taiko/`)
+
+An optional Compose profile serves the static bachi-motion web app at
+`https://kenchan0522.blog/taiko/`. It is **off by default** so existing
+`--prod --pull` deploys do not change. When you are ready, follow
+[`deployment/taiko.md`](../deployment/taiko.md) (local checkout vs GHCR /
+Artifact Registry, and what to do after that repo is private). Do not
+enable the profile in the GitHub Actions deploy job until a taiko image
+exists in a registry you already log in to, or until the VM has a pinned
+checkout to build from.
+
 ## Portfolio Agent
 
 Set these values in `deployment/.env` before using the Agent tab:
@@ -140,7 +152,7 @@ Open GCP firewall **tcp:80** and **tcp:443**. Turn off GoDaddy HTTPS forwarding/
 
 - `bash deployment/start.sh --prod --pull` — production bring-up (pull images; no local build)
 - `bash deployment/start.sh --prod` — local/recovery build on the machine
-- `docker-compose.prod.yml` — mongo, redis, qdrant, api, agent, web, nginx
+- `docker-compose.prod.yml` — mongo, redis, qdrant, api, agent, web, nginx; optional `taiko` profile (see `deployment/taiko.md`)
 - `deployment/nginx.conf` — reverse proxy
 - `deployment/env.example` — template for `deployment/.env`
 - `backend/Dockerfile`, `frontend/Dockerfile`

@@ -150,6 +150,23 @@ function LoginArtifactRegistry {
     Write-Host "no AR_TOKEN or key file; assuming existing Docker credentials for $hostName"
 }
 
+
+function TaikoWanted {
+    $profiles = ""
+    if ($env:COMPOSE_PROFILES) { $profiles = $env:COMPOSE_PROFILES }
+    return (":${profiles}:".Contains(":taiko:") -or ",${profiles},".Contains(",taiko,"))
+}
+
+function BuildTaikoIfWanted($Root, $Dir) {
+    if (TaikoWanted) {
+        $ref = if ($env:TAIKO_REF) { $env:TAIKO_REF } else { "a63bf58ef12b25ab19b4297c3fae9f2a9e7d6270" }
+        Write-Host "building taiko image (TAIKO_REF=$ref)..."
+        $env:COMPOSE_PARALLEL_LIMIT = "1"
+        ComposeProd $Root $Dir @("build", "taiko")
+        if ($LASTEXITCODE -ne 0) { throw "docker compose build taiko failed" }
+    }
+}
+
 function RunProdUp($Root, $Dir) {
     PrepareProdRuntime $Dir
     Write-Host "starting production stack (nginx :80/:443)..."
@@ -159,6 +176,7 @@ function RunProdUp($Root, $Dir) {
     ComposeProd $Root $Dir @("build", "api")
     ComposeProd $Root $Dir @("build", "agent")
     ComposeProd $Root $Dir @("build", "web")
+    BuildTaikoIfWanted $Root $Dir
     ComposeProd $Root $Dir @("up", "-d")
     FinishProdUp $Root $Dir
 }
@@ -168,7 +186,23 @@ function RunProdPull($Root, $Dir) {
     $tag = if ($env:IMAGE_TAG) { $env:IMAGE_TAG } else { "latest" }
     Write-Host "pulling production images (IMAGE_TAG=$tag)..."
     LoginArtifactRegistry
-    ComposeProd $Root $Dir @("pull")
+    if (TaikoWanted) {
+        ComposeProd $Root $Dir @("pull", "api", "agent", "web", "mongo", "redis", "qdrant", "nginx", "certbot")
+        if ($LASTEXITCODE -ne 0) { throw "docker compose pull failed" }
+        $policy = if ($env:TAIKO_PULL_POLICY) { $env:TAIKO_PULL_POLICY } else { "never" }
+        if ($policy -ne "never") {
+            ComposeProd $Root $Dir @("pull", "taiko")
+            if ($LASTEXITCODE -ne 0) {
+                ComposeProd $Root $Dir @("build", "taiko")
+                if ($LASTEXITCODE -ne 0) { throw "docker compose pull/build taiko failed" }
+            }
+        } else {
+            ComposeProd $Root $Dir @("build", "taiko")
+            if ($LASTEXITCODE -ne 0) { throw "docker compose build taiko failed" }
+        }
+    } else {
+        ComposeProd $Root $Dir @("pull")
+    }
     ComposeProd $Root $Dir @("up", "-d", "--no-build")
     FinishProdUp $Root $Dir
 }
